@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Import | BrokeATM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/main.css?v=4" />
+  <style>
+    /* Review table inline inputs */
+    #review-table .review-inp {
+      width: 100%;
+      padding: 0.3rem 0.45rem;
+      font-size: 0.82rem;
+      background: var(--surface2);
+      border: 1px solid transparent;
+      border-radius: 4px;
+      color: var(--text);
+      box-sizing: border-box;
+    }
+    #review-table .review-inp:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--surface);
+    }
+    #review-table select.review-inp { cursor: pointer; }
+    #review-table tr.review-excluded td { opacity: 0.38; }
+    #review-table input.row-chk:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      accent-color: var(--muted, #64748b);
+    }
+    #review-table tr.review-dup { background: rgba(239,68,68,0.12); }
+    .review-dup-banner {
+      padding: 1.25rem 1.5rem;
+      border-radius: var(--radius);
+      border: 1px solid rgba(248, 113, 113, 0.65);
+      border-left: 6px solid #ef4444;
+      background: linear-gradient(135deg, rgba(127, 29, 29, 0.55), rgba(69, 10, 10, 0.65));
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+    }
+    .review-dup-banner strong {
+      display: block;
+      font-size: 1.1rem;
+      color: #fef2f2;
+      margin-bottom: 0.35rem;
+    }
+    .review-dup-banner .review-dup-banner-body {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      color: #fecaca;
+      max-width: 72rem;
+    }
+    #review-table td { padding: 0.3rem 0.5rem; vertical-align: middle; }
+    #review-table th { padding: 0.5rem; }
+    .review-actions-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .review-table-scroll {
+      max-height: min(58vh, calc(100vh - 15rem));
+      overflow: auto;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+    #review-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: var(--surface2);
+      box-shadow: 0 1px 0 var(--border);
+    }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="nav-brand">💸 BrokeATM</span>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/records">Records</a>
+    <a href="/categories">Categories</a>
+    <a href="/import" class="active">Import</a>
+    <a href="/settings">Settings</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Import Transactions</h1>
+    <p>Upload one or more CSV files to import in one batch (duplicates are checked across all files and your database)</p>
+  </div>
+
+  <div class="steps" id="steps">
+    <div class="step active" data-step="1">1 · Upload</div>
+    <div class="step" data-step="2">2 · Period per file</div>
+    <div class="step" data-step="3">3 · Review Rows</div>
+    <div class="step" data-step="4">4 · Done</div>
+  </div>
+
+  <div id="alerts"></div>
+
+  <!-- Step 1: Upload -->
+  <div id="step-1">
+    <div class="card mb-2">
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-icon">📂</div>
+        <p><strong>Drop CSV files here</strong> or click to browse (hold Ctrl to pick several)</p>
+        <p class="mt-1" style="font-size:0.8rem">Supported: CIBC credit card exports · multiple files are merged in order</p>
+        <input type="file" id="file-input" accept=".csv" multiple style="display:none" />
+      </div>
+      <div id="parse-loading" class="hidden mt-2 flex items-center gap-1 text-muted">
+        <span class="spinner"></span>
+        <span id="parse-loading-msg">Parsing…</span>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:600;font-size:0.95rem">Add a single entry manually</div>
+        <div class="text-muted" style="font-size:0.82rem;margin-top:0.2rem">Record an expense, income, or refund without a CSV file</div>
+      </div>
+      <button class="btn btn-primary" id="btn-add-entry-import" style="font-size:0.95rem;padding:0.55rem 1.4rem;white-space:nowrap">+ Add Entry</button>
+    </div>
+  </div>
+
+  <!-- Step 2: Confirm period per file -->
+  <div id="step-2" class="card hidden">
+    <h2 style="font-size:1rem;font-weight:600;margin-bottom:0.5rem">Confirm statement period per file</h2>
+    <p class="text-muted mb-2" style="font-size:0.82rem;line-height:1.45">
+      Month and year are saved on each <strong>import batch</strong> for your records. They do <strong>not</strong> change transaction dates on each row (those still come from the CSV).
+    </p>
+    <div id="file-periods" class="mt-2"></div>
+    <div id="parse-summary" class="mt-2 text-muted" style="font-size:0.85rem"></div>
+    <p class="mt-2 text-muted" style="font-size:0.82rem;line-height:1.45">
+      Duplicate check compares each row to your database and to <strong>earlier rows in this upload</strong> (including lines from other files in the same batch).
+    </p>
+    <div class="flex gap-1 mt-3">
+      <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+      <button class="btn btn-primary" id="btn-check-dups">Check for Duplicates →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: Review Rows -->
+  <div id="step-3" class="hidden">
+    <div id="review-dup-banner" class="review-dup-banner mb-2 hidden">
+      <strong>Duplicate rows (unchecked by default)</strong>
+      <p id="review-dup-banner-text" class="review-dup-banner-body" style="margin:0"></p>
+    </div>
+    <div class="card mb-2">
+      <div class="flex items-center justify-between">
+        <div>
+          <strong id="review-summary"></strong>
+          <span class="text-muted ml-1" style="font-size:0.8rem" id="dup-warning"></span>
+        </div>
+        <div class="flex gap-1 flex-wrap">
+          <button class="btn btn-ghost btn-sm" id="btn-recheck-dups">Re-check duplicates</button>
+          <button class="btn btn-ghost btn-sm" id="btn-exclude-payments">Exclude all payments</button>
+          <button class="btn btn-ghost btn-sm" id="btn-select-all">Select all</button>
+          <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Deselect all</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-2" style="padding:0.75rem 1rem">
+      <div class="review-actions-bar">
+        <button type="button" class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+        <div class="flex gap-1 items-center">
+          <span class="review-selected-count text-muted" style="font-size:0.85rem"></span>
+          <button type="button" class="btn btn-primary review-btn-commit">Import Selected →</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-2" style="padding:0">
+      <div class="review-table-scroll">
+        <table id="review-table">
+          <thead>
+            <tr>
+              <th style="width:36px;padding-left:0.75rem"><input type="checkbox" id="chk-all" title="Select or clear all rows (including duplicates you opted into)" /></th>
+              <th style="width:40px" title="Position in merged upload">#</th>
+              <th id="th-source" class="hidden" style="width:100px">File</th>
+              <th style="width:130px">Date</th>
+              <th>Merchant</th>
+              <th style="width:110px">Amount</th>
+              <th style="width:110px">Type</th>
+              <th style="width:140px">Category</th>
+              <th>Notes</th>
+              <th style="width:80px">Status</th>
+            </tr>
+          </thead>
+          <tbody id="review-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="padding:0.75rem 1rem">
+      <div class="review-actions-bar">
+        <button type="button" class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+        <div class="flex gap-1 items-center">
+          <span class="review-selected-count text-muted" style="font-size:0.85rem"></span>
+          <button type="button" class="btn btn-primary review-btn-commit">Import Selected →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 4: Done -->
+  <div id="step-4" class="card hidden" style="text-align:center;padding:3rem">
+    <div style="font-size:3rem;margin-bottom:1rem">✅</div>
+    <h2 style="font-size:1.3rem;font-weight:700" id="done-title">Import Complete</h2>
+    <p class="text-muted mt-1" id="done-summary"></p>
+    <div class="flex gap-2 mt-3" style="justify-content:center">
+      <a href="/records" class="btn btn-secondary">View Records</a>
+      <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
+      <button class="btn btn-ghost" onclick="resetImport()">Import Another</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/api.js"></script>
+<script>
+let parsedData = null;
+let reviewRows = [];
+let categories = [];
+/** Comma-separated names for the import batch (single or multi file). */
+let importFilename = "";
+
+function escHtml(s) {
+  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+async function init() {
+  categories = await API.getCategories();
+}
+init();
+
+// ── Drop zone ──
+const dropZone = document.getElementById("drop-zone");
+const fileInput = document.getElementById("file-input");
+
+dropZone.addEventListener("click", () => fileInput.click());
+dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("drag-over"); });
+dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-over"));
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  const files = [...e.dataTransfer.files].filter((f) => f.name.toLowerCase().endsWith(".csv"));
+  if (files.length) handleFileList(files);
+});
+fileInput.addEventListener("change", () => {
+  if (fileInput.files && fileInput.files.length) handleFileList(fileInput.files);
+});
+
+function detectMonthYearFromRows(rows) {
+  const counts = new Map();
+  for (const r of rows) {
+    const d = r.transaction_date;
+    if (!d) continue;
+    const s = typeof d === "string" ? d.slice(0, 10) : String(d);
+    if (s.length < 10) continue;
+    const y = +s.slice(0, 4);
+    const m = +s.slice(5, 7);
+    if (!m || !y) continue;
+    const k = `${y}-${m}`;
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  if (!counts.size) return { month: 1, year: 2000 };
+  let bestK = null;
+  let bestN = -1;
+  for (const [k, n] of counts) {
+    if (n > bestN) {
+      bestN = n;
+      bestK = k;
+    }
+  }
+  const [year, month] = bestK.split("-").map(Number);
+  return { month, year };
+}
+
+const FP_MONTH_LABELS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+function fpMonthOptionsHtml(selectedMonth) {
+  return FP_MONTH_LABELS.map((label, i) => {
+    const v = i + 1;
+    return `<option value="${v}"${v === selectedMonth ? " selected" : ""}>${label}</option>`;
+  }).join("");
+}
+
+function syncPerFilePeriodFromPickers() {
+  if (!parsedData?.source_files) return;
+  if (!parsedData.perFilePeriod) parsedData.perFilePeriod = {};
+  document.querySelectorAll("#file-periods .fp-row").forEach((el) => {
+    const idx = +el.dataset.fpIdx;
+    const fname = parsedData.source_files[idx];
+    if (!fname) return;
+    const mEl = el.querySelector(".fp-month");
+    const yEl = el.querySelector(".fp-year");
+    if (!mEl || !yEl) return;
+    parsedData.perFilePeriod[fname] = { month: +mEl.value, year: +yEl.value };
+  });
+}
+
+function applyImportPeriodsToRows(rows) {
+  if (!rows || !parsedData) return;
+  syncPerFilePeriodFromPickers();
+  const srcs = parsedData.source_files || [];
+  const map = parsedData.perFilePeriod || {};
+  const defM = parsedData.detected_month || 1;
+  const defY = parsedData.detected_year || 2000;
+  rows.forEach((r) => {
+    const fn = r.source_file || srcs[0] || "";
+    const p = map[fn];
+    if (p && p.month >= 1 && p.month <= 12 && p.year >= 2000 && p.year <= 2100) {
+      r.import_month = p.month;
+      r.import_year = p.year;
+    } else {
+      r.import_month = defM;
+      r.import_year = defY;
+    }
+  });
+}
+
+function renderFilePeriodPickers() {
+  const host = document.getElementById("file-periods");
+  if (!host || !parsedData?.source_files?.length) return;
+  if (!parsedData.perFilePeriod) parsedData.perFilePeriod = {};
+  host.innerHTML = "";
+  parsedData.source_files.forEach((fname, idx) => {
+    const sub = parsedData.rows.filter((r) => r.source_file === fname);
+    const det = detectMonthYearFromRows(sub.length ? sub : parsedData.rows);
+    const saved = parsedData.perFilePeriod[fname] || det;
+    parsedData.perFilePeriod[fname] = { month: saved.month, year: saved.year };
+
+    const row = document.createElement("div");
+    row.className = "fp-row flex gap-2 items-end mb-2 flex-wrap";
+    row.dataset.fpIdx = String(idx);
+    row.innerHTML = `
+      <div style="min-width:10rem;font-weight:600;font-size:0.9rem;word-break:break-all">${escHtml(fname)}</div>
+      <div>
+        <label class="text-muted" style="font-size:0.75rem;display:block">Month</label>
+        <select class="fp-month" style="min-width:9rem;padding:0.35rem 0.5rem;border-radius:4px;background:var(--surface2);color:var(--text);border:1px solid var(--border)">
+          ${fpMonthOptionsHtml(saved.month)}
+        </select>
+      </div>
+      <div>
+        <label class="text-muted" style="font-size:0.75rem;display:block">Year</label>
+        <input type="number" class="fp-year" min="2000" max="2100" value="${saved.year}"
+          style="width:5.5rem;padding:0.35rem 0.5rem;border-radius:4px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" />
+      </div>
+    `;
+    const onChange = () => {
+      syncPerFilePeriodFromPickers();
+    };
+    row.querySelector(".fp-month").addEventListener("change", onChange);
+    row.querySelector(".fp-year").addEventListener("change", onChange);
+    row.querySelector(".fp-year").addEventListener("input", onChange);
+    host.appendChild(row);
+  });
+}
+
+async function handleFileList(fileList) {
+  const files = [...fileList].filter((f) => f.name.toLowerCase().endsWith(".csv"));
+  if (!files.length) {
+    showAlert(document.getElementById("alerts"), "Choose one or more .csv files.", "error");
+    return;
+  }
+  files.sort((a, b) => a.name.localeCompare(b.name));
+  const msgEl = document.getElementById("parse-loading-msg");
+  document.getElementById("parse-loading").classList.remove("hidden");
+  const merged = { format: "generic", rows: [], errors: [], detected_month: null, detected_year: null, source_files: [] };
+  const errLines = [];
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (msgEl) msgEl.textContent = `Parsing ${i + 1} of ${files.length}: ${file.name}…`;
+      const one = await API.parseCSV(file);
+      if (!one.format) {
+        errLines.push(`${file.name}: ${one.errors?.[0] || "Unrecognized CSV format."}`);
+        continue;
+      }
+      merged.source_files.push(file.name);
+      const tagged = (one.rows || []).map((r) => ({ ...r, source_file: file.name }));
+      merged.rows.push(...tagged);
+      for (const er of one.errors || []) errLines.push(`${file.name}: ${er}`);
+    }
+    if (!merged.rows.length) {
+      showAlert(document.getElementById("alerts"), errLines.join("\n") || "No rows could be parsed from the selected files.", "error");
+      return;
+    }
+    const my = detectMonthYearFromRows(merged.rows);
+    merged.detected_month = my.month;
+    merged.detected_year = my.year;
+    merged.errors = errLines;
+    merged.perFilePeriod = {};
+    parsedData = merged;
+    importFilename =
+      merged.source_files.length === 1
+        ? merged.source_files[0]
+        : merged.source_files.join(", ").slice(0, 220) + (merged.source_files.join(", ").length > 220 ? "…" : "");
+
+    const total = merged.rows.length;
+    const payments = merged.rows.filter((r) => r.is_payment).length;
+    let summary = `Merged ${total} rows from ${merged.source_files.length} file(s): ${merged.source_files.join(", ")} (${payments} payment entries).`;
+    if (errLines.length) summary += ` · ${errLines.length} parse warning(s) (see alerts if needed)`;
+    document.getElementById("parse-summary").textContent = summary;
+    if (errLines.length) {
+      showAlert(document.getElementById("alerts"), errLines.slice(0, 6).join("\n") + (errLines.length > 6 ? "\n…" : ""), "warning");
+    }
+    goStep(2);
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  } finally {
+    document.getElementById("parse-loading").classList.add("hidden");
+    if (msgEl) msgEl.textContent = "Parsing…";
+  }
+}
+
+// ── Step 2: Duplicate check ──
+function rowsPayloadForDuplicateCheck(rows) {
+  return rows.map((r) => {
+    const o = { ...r };
+    delete o.duplicate;
+    delete o.duplicate_in_import;
+    delete o.duplicate_in_database;
+    return o;
+  });
+}
+
+/** Merge API duplicate flags into reviewRows; duplicate rows default excluded unless re-check preserves prior choice. */
+function applyDuplicateCheckResult(resultRows, previousRows) {
+  reviewRows = resultRows.map((r, i) => {
+    const dup = !!r.duplicate;
+    const prevRow = previousRows[i];
+    let exclude;
+    if (dup) {
+      exclude = prevRow && prevRow.duplicate ? !!prevRow.exclude : true;
+    } else {
+      exclude = !!r.exclude;
+    }
+    return {
+      ...r,
+      duplicate: dup,
+      exclude,
+      duplicate_in_import: !!r.duplicate_in_import,
+      duplicate_in_database: !!r.duplicate_in_database,
+    };
+  });
+}
+
+function refreshDupHintForRow(i) {
+  const el = document.querySelector(`[data-dup-hint="${i}"]`);
+  if (!el) return;
+  const row = reviewRows[i];
+  if (!row || !row.duplicate) return;
+  el.textContent = row.exclude ? "deselected" : "will import";
+}
+
+async function runDuplicateCheckAndGoReview() {
+  applyImportPeriodsToRows(parsedData.rows);
+  const prevSnap = reviewRows.length ? reviewRows.slice() : [];
+  const result = await API.checkDuplicates(rowsPayloadForDuplicateCheck(parsedData.rows));
+  applyDuplicateCheckResult(result.rows, prevSnap);
+  renderReviewTable();
+  goStep(3);
+}
+
+document.getElementById("btn-check-dups").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-check-dups");
+  btn.disabled = true;
+  btn.textContent = "Checking…";
+  try {
+    await runDuplicateCheckAndGoReview();
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Check for Duplicates →";
+  }
+});
+
+document.getElementById("btn-recheck-dups").addEventListener("click", async () => {
+  const btn = document.getElementById("btn-recheck-dups");
+  btn.disabled = true;
+  try {
+    const prevSnap = reviewRows.slice();
+    applyImportPeriodsToRows(reviewRows);
+    const result = await API.checkDuplicates(rowsPayloadForDuplicateCheck(reviewRows));
+    applyDuplicateCheckResult(result.rows, prevSnap);
+    renderReviewTable();
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Step 3: Review table ──
+function renderReviewTable() {
+  const tbody = document.getElementById("review-tbody");
+  tbody.innerHTML = "";
+  const dupCount = reviewRows.filter((r) => r.duplicate).length;
+  const dupExcluded = reviewRows.filter((r) => r.duplicate && r.exclude).length;
+  const dupOptedIn = reviewRows.filter((r) => r.duplicate && !r.exclude).length;
+  const dupInUpload = reviewRows.filter((r) => r.duplicate && r.duplicate_in_import).length;
+  const dupInDbOnly = reviewRows.filter((r) => r.duplicate && r.duplicate_in_database && !r.duplicate_in_import).length;
+  const payCount = reviewRows.filter((r) => r.is_payment).length;
+  const dupIdxs = reviewRows.map((r, i) => (r.duplicate ? i + 1 : null)).filter((n) => n != null);
+  const showFileCol = !!(parsedData && parsedData.source_files && parsedData.source_files.length > 1);
+  const thSource = document.getElementById("th-source");
+  if (thSource) thSource.classList.toggle("hidden", !showFileCol);
+
+  const dupBanner = document.getElementById("review-dup-banner");
+  const dupBannerText = document.getElementById("review-dup-banner-text");
+  if (dupCount) {
+    dupBanner.classList.remove("hidden");
+    const list =
+      dupIdxs.length <= 15
+        ? dupIdxs.join(", ")
+        : dupIdxs.slice(0, 15).join(", ") + ", …";
+    const parts = [
+      `Rows ${list} are duplicates: they match an earlier row in this merged upload and/or a saved transaction (same reference and date, or same interest-style line without a reference).`,
+    ];
+    if (dupInUpload) parts.push(`${dupInUpload} repeat another line in this import (including another CSV in the same batch).`);
+    if (dupInDbOnly) parts.push(`${dupInDbOnly} match data already in your database.`);
+    parts.push(
+      `The same bank reference on a different date is still a new line. Duplicate rows start unchecked; check any row to include it in the import.`,
+    );
+    dupBannerText.textContent = parts.join(" ");
+  } else {
+    dupBanner.classList.add("hidden");
+  }
+
+  document.getElementById("review-summary").textContent = `${reviewRows.length} rows to review`;
+  const warn = [];
+  if (dupCount) {
+    let d = `${dupExcluded} duplicate row(s) off`;
+    if (dupOptedIn) d += `, ${dupOptedIn} opted in`;
+    if (dupInUpload || dupInDbOnly) d += ` (${dupInUpload} in this upload, ${dupInDbOnly} in database)`;
+    warn.push(d);
+  }
+  if (payCount) warn.push(`${payCount} payment(s)`);
+  document.getElementById("dup-warning").textContent = warn.join(" · ");
+
+  const sugCatBase = `<option value="">-- none --</option>` + categories.map(c =>
+    `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`
+  ).join("");
+
+  // Assign sequential tabindex across all focusable cells so Tab moves left→right, row by row.
+  // Order per row: checkbox, date, merchant, amount, type, category, notes
+  let tabIdx = 1;
+
+  reviewRows.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    if (row.duplicate) tr.classList.add("review-dup");
+    if (row.exclude) tr.classList.add("review-excluded");
+
+    const checked = !row.exclude ? "checked" : "";
+    let dupHint = "";
+    if (row.duplicate) {
+      if (row.duplicate_in_import && row.duplicate_in_database) dupHint = "upload+db";
+      else if (row.duplicate_in_import) dupHint = "in upload";
+      else if (row.duplicate_in_database) dupHint = "in database";
+      else dupHint = "";
+    }
+    const dupBadge = row.duplicate
+      ? `<span class="badge badge-dup">DUP</span><span class="text-muted" style="font-size:0.65rem;margin-left:0.2rem">${dupHint ? escHtml(dupHint) : ""}</span>`
+      : "";
+    const payBadge = row.is_payment ? `<span class="badge badge-transfer">PMT</span>` : "";
+
+    const typeOpts = ["expense","income","refund","transfer"].map(t =>
+      `<option value="${t}" ${row.transaction_type === t ? "selected" : ""}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`
+    ).join("");
+
+    const sugCat = row.suggested_category || row.category_name || "";
+    const catOpts = `<option value="">-- none --</option>` + categories.map(c =>
+      `<option value="${escHtml(c.name)}" ${c.name === sugCat ? "selected" : ""}>${escHtml(c.name)}</option>`
+    ).join("");
+
+    const chkTab = tabIdx++;
+    const ti = {
+      chk: chkTab,
+      date: tabIdx++,
+      merchant: tabIdx++,
+      amount: tabIdx++,
+      type: tabIdx++,
+      cat: tabIdx++,
+      notes: tabIdx++,
+    };
+    const dupChkAttrs = row.duplicate
+      ? `tabindex="${ti.chk}" title="Duplicate: unchecked by default; check to include in import"`
+      : `tabindex="${ti.chk}"`;
+
+    const srcCell = showFileCol
+      ? `<td class="text-muted" style="font-size:0.75rem;max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(row.source_file || "")}">${escHtml((row.source_file || "—").slice(0, 22))}${(row.source_file || "").length > 22 ? "…" : ""}</td>`
+      : "";
+    tr.innerHTML = `
+      <td style="padding-left:0.75rem">
+        <input type="checkbox" class="row-chk" data-idx="${i}" ${checked} ${dupChkAttrs} />
+      </td>
+      <td class="text-muted" style="font-size:0.8rem">${i + 1}</td>
+      ${srcCell}
+      <td>
+        <input type="date" class="review-inp date-inp" data-idx="${i}"
+          value="${row.transaction_date || ""}" tabindex="${ti.date}" />
+      </td>
+      <td>
+        <input type="text" class="review-inp merchant-inp" data-idx="${i}"
+          value="${escHtml(row.merchant_name || "")}" placeholder="merchant…" tabindex="${ti.merchant}" />
+      </td>
+      <td>
+        <input type="number" class="review-inp amount-inp" data-idx="${i}"
+          value="${row.amount}" step="0.01" min="0" tabindex="${ti.amount}" style="width:90px" />
+      </td>
+      <td>
+        <select class="review-inp type-sel" data-idx="${i}" tabindex="${ti.type}">${typeOpts}</select>
+      </td>
+      <td>
+        <select class="review-inp cat-sel" data-idx="${i}" tabindex="${ti.cat}">${catOpts}</select>
+      </td>
+      <td>
+        <input type="text" class="review-inp notes-inp" data-idx="${i}"
+          placeholder="notes…" value="${escHtml(row.notes || "")}" tabindex="${ti.notes}" />
+      </td>
+      <td style="white-space:nowrap">
+        ${dupBadge}${payBadge}
+        ${row.duplicate ? `<span class="text-muted dup-import-hint" style="font-size:0.72rem;margin-left:0.25rem" data-dup-hint="${i}">${row.exclude ? "deselected" : "will import"}</span>` : ""}
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  attachReviewListeners();
+  updateSelectedCount();
+}
+
+function attachReviewListeners() {
+  const chkAllEl = document.getElementById("chk-all");
+  const chkAllFresh = chkAllEl.cloneNode(true);
+  chkAllEl.parentNode.replaceChild(chkAllFresh, chkAllEl);
+  chkAllFresh.addEventListener("change", (e) => {
+    const want = e.target.checked;
+    document.querySelectorAll(".row-chk").forEach((chk) => {
+      const i = +chk.dataset.idx;
+      const row = reviewRows[i];
+      chk.checked = want;
+      row.exclude = !want;
+      chk.closest("tr").classList.toggle("review-excluded", row.exclude);
+      refreshDupHintForRow(i);
+    });
+    updateSelectedCount();
+  });
+
+  document.querySelectorAll(".row-chk").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const i = +chk.dataset.idx;
+      reviewRows[i].exclude = !chk.checked;
+      chk.closest("tr").classList.toggle("review-excluded", reviewRows[i].exclude);
+      refreshDupHintForRow(i);
+      updateSelectedCount();
+    });
+  });
+  document.querySelectorAll(".date-inp").forEach(inp => {
+    inp.addEventListener("change", () => { reviewRows[+inp.dataset.idx].transaction_date = inp.value || null; });
+  });
+  document.querySelectorAll(".merchant-inp").forEach(inp => {
+    inp.addEventListener("input", () => { reviewRows[+inp.dataset.idx].merchant_name = inp.value; });
+  });
+  document.querySelectorAll(".amount-inp").forEach(inp => {
+    inp.addEventListener("input", () => {
+      const v = parseFloat(inp.value);
+      if (!isNaN(v)) reviewRows[+inp.dataset.idx].amount = v;
+    });
+  });
+  document.querySelectorAll(".type-sel").forEach(sel => {
+    sel.addEventListener("change", () => { reviewRows[+sel.dataset.idx].transaction_type = sel.value; });
+  });
+  document.querySelectorAll(".cat-sel").forEach(sel => {
+    sel.addEventListener("change", () => { reviewRows[+sel.dataset.idx].category_name = sel.value; });
+  });
+  document.querySelectorAll(".notes-inp").forEach(inp => {
+    inp.addEventListener("input", () => { reviewRows[+inp.dataset.idx].notes = inp.value; });
+  });
+}
+
+function syncReviewMasterCheckbox() {
+  const el = document.getElementById("chk-all");
+  if (!el || !reviewRows.length) return;
+  const nSel = reviewRows.filter((r) => !r.exclude).length;
+  el.checked = nSel === reviewRows.length;
+  el.indeterminate = nSel > 0 && nSel < reviewRows.length;
+}
+
+function updateSelectedCount() {
+  const nDup = reviewRows.filter((r) => r.duplicate).length;
+  const dupOff = reviewRows.filter((r) => r.duplicate && r.exclude).length;
+  const selected = reviewRows.filter((r) => !r.exclude).length;
+  let text;
+  if (nDup > 0) {
+    text = `${selected} of ${reviewRows.length} selected · ${dupOff} duplicate row(s) off`;
+  } else {
+    text = `${selected} of ${reviewRows.length} selected`;
+  }
+  document.querySelectorAll(".review-selected-count").forEach((el) => { el.textContent = text; });
+  syncReviewMasterCheckbox();
+}
+
+document.getElementById("btn-exclude-payments").addEventListener("click", () => {
+  reviewRows.forEach((r, i) => {
+    if (r.is_payment) {
+      r.exclude = true;
+      const chk = document.querySelector(`.row-chk[data-idx="${i}"]`);
+      if (chk) {
+        chk.checked = false;
+        chk.closest("tr").classList.toggle("review-excluded", true);
+      }
+      refreshDupHintForRow(i);
+    }
+  });
+  updateSelectedCount();
+});
+
+document.getElementById("btn-select-all").addEventListener("click", () => {
+  reviewRows.forEach((r, i) => {
+    r.exclude = false;
+    const chk = document.querySelector(`.row-chk[data-idx="${i}"]`);
+    if (chk) {
+      chk.checked = true;
+      chk.closest("tr").classList.toggle("review-excluded", false);
+    }
+    refreshDupHintForRow(i);
+  });
+  updateSelectedCount();
+});
+
+document.getElementById("btn-deselect-all").addEventListener("click", () => {
+  reviewRows.forEach((r, i) => {
+    r.exclude = true;
+    const chk = document.querySelector(`.row-chk[data-idx="${i}"]`);
+    if (chk) {
+      chk.checked = false;
+      chk.closest("tr").classList.toggle("review-excluded", true);
+    }
+    refreshDupHintForRow(i);
+  });
+  updateSelectedCount();
+});
+
+// ── Commit ──
+async function runCommitImport() {
+  const buttons = document.querySelectorAll(".review-btn-commit");
+  buttons.forEach((b) => { b.disabled = true; b.textContent = "Importing…"; });
+  try {
+    applyImportPeriodsToRows(reviewRows);
+    const result = await API.commitImport({
+      filename: importFilename || "import.csv",
+      month: parsedData.detected_month || 1,
+      year: parsedData.detected_year || 2000,
+      rows: reviewRows,
+    });
+    document.getElementById("done-title").textContent = "Import Complete!";
+    const batchNote =
+      result.batch_ids && result.batch_ids.length > 1
+        ? ` (${result.batch_ids.length} import batches)`
+        : "";
+    document.getElementById("done-summary").textContent =
+      `${result.imported} transactions imported, ${result.skipped} skipped${batchNote}. Primary batch: ${(result.batch_id || "").slice(0, 8)}…`;
+    goStep(4);
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  } finally {
+    buttons.forEach((b) => { b.disabled = false; b.textContent = "Import Selected →"; });
+  }
+}
+document.querySelectorAll(".review-btn-commit").forEach((btn) => {
+  btn.addEventListener("click", runCommitImport);
+});
+
+// ── Navigation ──
+function goStep(n) {
+  [1,2,3,4].forEach(i => {
+    document.getElementById(`step-${i}`).classList.toggle("hidden", i !== n);
+    const stepEl = document.querySelector(`.step[data-step="${i}"]`);
+    stepEl.classList.remove("active","done");
+    if (i === n) stepEl.classList.add("active");
+    else if (i < n) stepEl.classList.add("done");
+  });
+  if (n === 2 && parsedData) renderFilePeriodPickers();
+}
+
+function resetImport() {
+  parsedData = null;
+  reviewRows = [];
+  importFilename = "";
+  fileInput.value = "";
+  goStep(1);
+}
+
+// ── Add Entry (manual) ──
+let addEntryCategories = [];
+let addEntryAccounts = [];
+
+async function initAddEntry() {
+  [addEntryCategories, addEntryAccounts] = await Promise.all([API.getCategories(), API.getAccounts()]);
+  const catSel = document.getElementById("ae-category");
+  catSel.innerHTML = `<option value="">No category</option>` +
+    addEntryCategories.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
+  const accSel = document.getElementById("ae-account");
+  accSel.innerHTML = `<option value="">No account</option>` +
+    addEntryAccounts.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join("");
+}
+
+document.getElementById("btn-add-entry-import").addEventListener("click", async () => {
+  await initAddEntry();
+  document.getElementById("ae-date").value = new Date().toISOString().slice(0, 10);
+  document.getElementById("ae-merchant").value = "";
+  document.getElementById("ae-amount").value = "";
+  document.getElementById("ae-type").value = "expense";
+  document.getElementById("ae-category").value = "";
+  document.getElementById("ae-account").value = "";
+  document.getElementById("ae-notes").value = "";
+  document.getElementById("ae-modal").classList.remove("hidden");
+});
+
+document.getElementById("ae-cancel").addEventListener("click", () => {
+  document.getElementById("ae-modal").classList.add("hidden");
+});
+
+document.getElementById("ae-save").addEventListener("click", async () => {
+  const dateVal = document.getElementById("ae-date").value;
+  const merchantVal = document.getElementById("ae-merchant").value.trim();
+  const amountVal = parseFloat(document.getElementById("ae-amount").value);
+
+  if (!dateVal || !merchantVal || isNaN(amountVal) || amountVal < 0) {
+    showAlert(document.getElementById("alerts"), "Date, merchant, and a valid amount are required.", "error");
+    return;
+  }
+
+  const payload = {
+    transaction_date: dateVal,
+    merchant_name: merchantVal,
+    amount: amountVal,
+    transaction_type: document.getElementById("ae-type").value,
+    category_id: document.getElementById("ae-category").value ? +document.getElementById("ae-category").value : null,
+    account_id: document.getElementById("ae-account").value ? +document.getElementById("ae-account").value : null,
+    notes: document.getElementById("ae-notes").value.trim() || null,
+    currency: "CAD",
+  };
+
+  try {
+    await API.createTransaction(payload);
+    document.getElementById("ae-modal").classList.add("hidden");
+    showAlert(document.getElementById("alerts"), "Entry added successfully.", "success");
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  }
+});
+</script>
+
+<!-- Add Entry Modal -->
+<div class="modal-overlay hidden" id="ae-modal">
+  <div class="modal">
+    <h2>Add Transaction</h2>
+    <div style="display:grid;gap:0.75rem">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div>
+          <label>Date <span style="color:var(--danger)">*</span></label>
+          <input type="date" id="ae-date" required />
+        </div>
+        <div>
+          <label>Amount (CAD) <span style="color:var(--danger)">*</span></label>
+          <input type="number" id="ae-amount" step="0.01" min="0" required />
+        </div>
+      </div>
+      <div>
+        <label>Merchant / Description <span style="color:var(--danger)">*</span></label>
+        <input type="text" id="ae-merchant" required />
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
+        <div>
+          <label>Type</label>
+          <select id="ae-type">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+            <option value="refund">Refund</option>
+            <option value="transfer">Transfer</option>
+          </select>
+        </div>
+        <div>
+          <label>Category</label>
+          <select id="ae-category"></select>
+        </div>
+      </div>
+      <div>
+        <label>Account</label>
+        <select id="ae-account"></select>
+      </div>
+      <div>
+        <label>Notes</label>
+        <textarea id="ae-notes" rows="2" placeholder="Optional note…"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="ae-cancel">Cancel</button>
+      <button class="btn btn-primary" id="ae-save">Add</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>

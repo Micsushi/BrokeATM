@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip show:*)",
+      "Bash(pip --version)",
+      "Bash(.venv/Scripts/pip show:*)",
+      "Bash(gh --version)"
+    ]
+  }
+}

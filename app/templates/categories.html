@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Categories | BrokeATM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/main.css?v=4" />
+  <style>
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.875rem;
+      margin-top: 1rem;
+    }
+    .cat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.4rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      transition: border-color 0.15s;
+    }
+    .cat-card:hover { border-color: var(--accent); }
+    .cat-card-header { display: flex; align-items: center; gap: 0.6rem; }
+    .cat-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; cursor: pointer; }
+    .cat-name { font-weight: 600; font-size: 0.9rem; flex: 1; }
+    .cat-meta { font-size: 0.75rem; color: var(--text-muted); }
+    .cat-keywords {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      flex: 1;
+      min-height: 1.8em;
+      max-height: 5.6rem;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    .cat-keywords::-webkit-scrollbar { width: 4px; }
+    .cat-keywords::-webkit-scrollbar-track { background: transparent; }
+    .cat-keywords::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .kw-tag {
+      font-size: 0.72rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem 0.55rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    .cat-actions { display: flex; gap: 0.35rem; margin-top: 0.2rem; flex-wrap: wrap; }
+    .add-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto auto;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .add-form .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .color-swatch-btn {
+      width: 44px; height: 36px;
+      border-radius: 7px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      background: #6366f1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.8);
+      transition: border-color 0.15s, filter 0.15s;
+      flex-shrink: 0;
+    }
+    .color-swatch-btn::after { content: "✎"; }
+    .color-swatch-btn:hover { border-color: rgba(255,255,255,0.6); filter: brightness(1.15); }
+    .rename-input {
+      font-size: 0.9rem;
+      font-weight: 600;
+      background: var(--surface2);
+      border: 1px solid var(--accent);
+      border-radius: 5px;
+      padding: 0.2rem 0.5rem;
+      color: var(--text);
+      width: 100%;
+    }
+    .merge-select {
+      font-size: 0.8rem;
+      padding: 0.3rem 0.5rem;
+    }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="nav-brand">💸 BrokeATM</span>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/records">Records</a>
+    <a href="/categories" class="active">Categories</a>
+    <a href="/import">Import</a>
+    <a href="/settings">Settings</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header">
+    <h1>Categories</h1>
+    <p>Manage your spending categories. All names are stored in lowercase.</p>
+  </div>
+
+  <div id="alerts"></div>
+
+  <!-- Add new category -->
+  <div class="card mb-2">
+    <h3 style="font-size:0.75rem;font-weight:700;margin-bottom:0.875rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em">Add Category</h3>
+    <div id="add-conflicts" class="hidden" style="margin-bottom:0.75rem"></div>
+    <div class="add-form">
+      <div class="form-group">
+        <label>Name</label>
+        <input type="text" id="new-name" placeholder="e.g. groceries" />
+      </div>
+      <div class="form-group">
+        <label>Keywords <span style="font-weight:400;color:var(--text-muted)">(one per line)</span></label>
+        <textarea id="new-keywords" rows="3"
+          style="resize:none;font-size:0.82rem;font-family:monospace;line-height:1.7"
+          placeholder="e.g. fruit&#10;e.g. veggies"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Color</label>
+        <div style="position:relative;display:inline-block;width:44px;height:36px">
+          <input type="color" id="new-color" value="#6366f1"
+            style="position:absolute;inset:0;width:100%;height:100%;cursor:pointer;border:none;padding:0;opacity:1;border-radius:7px"
+            tabindex="-1" />
+          <div class="color-swatch-btn" id="new-color-swatch"
+            style="position:absolute;inset:0;pointer-events:none;z-index:1"></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>&nbsp;</label>
+        <button class="btn btn-primary" id="btn-add" style="padding:0.6rem 1.75rem;font-size:0.95rem;width:100%">Add</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats summary -->
+  <div class="flex items-center justify-between mb-1">
+    <span id="cat-count" class="text-muted" style="font-size:0.85rem"></span>
+    <div class="flex items-center gap-1">
+      <select id="sort-cats" style="width:200px;font-size:0.95rem;padding:0.5rem 0.85rem">
+        <option value="alpha">A to Z</option>
+        <option value="created">Newest first</option>
+      </select>
+      <input type="text" id="search-cats" placeholder="🔍 Search…" style="width:200px;font-size:0.95rem;padding:0.5rem 0.85rem" />
+    </div>
+  </div>
+
+  <!-- Category grid -->
+  <div class="cat-grid" id="cat-grid">
+    <div style="color:var(--text-muted);padding:2rem">Loading…</div>
+  </div>
+</div>
+
+<!-- Merge modal -->
+<div class="modal-overlay hidden" id="merge-modal">
+  <div class="modal">
+    <h2>Merge Category</h2>
+    <p class="text-muted mb-2" style="font-size:0.85rem">
+      Move all transactions from <strong id="merge-from-name"></strong> into another category, then delete it.
+    </p>
+    <div>
+      <label>Merge into</label>
+      <select id="merge-target" class="merge-select w-full"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="merge-cancel">Cancel</button>
+      <button class="btn btn-danger" id="merge-confirm">Merge &amp; Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Keywords modal -->
+<div class="modal-overlay hidden" id="kw-modal">
+  <div class="modal" style="max-width:520px">
+    <h2>Keywords: <span id="kw-cat-name"></span></h2>
+    <p class="text-muted mb-2" style="font-size:0.82rem">
+      One keyword or phrase per line. Matched case-insensitively against merchant names during import.
+    </p>
+    <div id="kw-conflicts" class="hidden" style="margin-bottom:0.75rem"></div>
+    <div>
+      <label>Keywords</label>
+      <textarea id="kw-input" rows="8"
+        style="width:100%;resize:vertical;font-size:0.85rem;font-family:monospace;line-height:1.6"
+        placeholder="uber&#10;lyft&#10;taxi&#10;transit"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="kw-cancel">Cancel</button>
+      <button class="btn btn-primary" id="kw-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/utils.js"></script>
+<script src="/static/js/api.js"></script>
+<script>
+let allStats = [];
+let mergingId = null;
+let newlyAddedId = null;  // pinned to top until next full reload
+
+function escHtml(s) {
+  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function renderFormIssues(el, title, lines) {
+  if (!lines || !lines.length) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  el.className = "alert alert-error form-errors";
+  el.innerHTML =
+    `<div class="form-errors-title">${escHtml(title)}</div><ul class="form-errors-list">` +
+    lines.map((line) => `<li>${escHtml(line)}</li>`).join("") +
+    "</ul>";
+  el.classList.remove("hidden");
+}
+
+function clearFormIssues(el) {
+  el.classList.add("hidden");
+  el.innerHTML = "";
+}
+
+async function loadStats(keepNew = false) {
+  const res = await fetch("/api/categories/stats");
+  allStats = await res.json();
+  if (!keepNew) newlyAddedId = null;
+  renderGrid(allStats);
+  document.getElementById("cat-count").textContent = `${allStats.length} categories`;
+}
+
+function sortedStats(stats) {
+  const sort = document.getElementById("sort-cats").value;
+  const copy = [...stats];
+  if (sort === "alpha") {
+    copy.sort((a, b) => a.name.localeCompare(b.name));
+  } else {
+    // newest first = descending id (higher id = created later)
+    copy.sort((a, b) => b.id - a.id);
+  }
+  // pin newly added to top regardless of sort
+  if (newlyAddedId !== null) {
+    const idx = copy.findIndex(c => c.id === newlyAddedId);
+    if (idx > 0) {
+      const [item] = copy.splice(idx, 1);
+      copy.unshift(item);
+    }
+  }
+  return copy;
+}
+
+function renderGrid(stats) {
+  const grid = document.getElementById("cat-grid");
+  const filter = document.getElementById("search-cats").value.toLowerCase();
+  let filtered = filter ? stats.filter(c => c.name.includes(filter)) : stats;
+  filtered = sortedStats(filtered);
+
+  if (!filtered.length) {
+    grid.innerHTML = `<div style="color:var(--text-muted);padding:2rem;grid-column:1/-1">No categories found.</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(c => `
+    <div class="cat-card" data-id="${c.id}">
+      <div class="cat-card-header">
+        <span class="cat-dot" style="background:${c.color || '#6366f1'}" title="Click to change color"
+          onclick="pickColor(${c.id}, this)"></span>
+        <span class="cat-name" id="name-${c.id}">${escHtml(c.name)}</span>
+      </div>
+      <div class="cat-meta">${c.tx_count} transaction${c.tx_count !== 1 ? "s" : ""} · ${fmtCurrency(c.total)}</div>
+      <div class="cat-keywords" id="kw-display-${c.id}" title="${escHtml(c.keywords || '')}">
+        ${c.keywords
+          ? c.keywords.split(",").map(k => k.trim()).filter(Boolean).map(k => `<span class="kw-tag">${escHtml(k)}</span>`).join("")
+          : '<em style="opacity:0.4">no keywords</em>'}
+      </div>
+      <div class="cat-actions">
+        <button class="btn btn-ghost btn-sm" onclick="startRename(${c.id})">Rename</button>
+        <button class="btn btn-ghost btn-sm" onclick="editKeywords(${c.id})">Keywords</button>
+        <button class="btn btn-ghost btn-sm" onclick="startMerge(${c.id}, '${escHtml(c.name)}')">Merge</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteCat(${c.id})" ${c.tx_count > 0 ? 'title="Has transactions: they will become uncategorized"' : ''}>Delete</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function collectAddCategoryIssues(nameRaw, keywords) {
+  const issues = [];
+  const name = nameRaw.trim();
+  if (!name) issues.push("Enter a category name.");
+  else {
+    const norm = name.toLowerCase();
+    if (allStats.some((c) => c.name === norm)) {
+      issues.push(
+        `A category named "${norm}" already exists. Use another name or merge duplicates in the list below.`
+      );
+    }
+  }
+  for (const c of findConflicts(keywords, null)) {
+    issues.push(
+      `"${c.keyword}" is already a keyword on "${c.category}". Remove it here or edit that category.`
+    );
+  }
+  return issues;
+}
+
+// ── Add ──
+document.getElementById("btn-add").addEventListener("click", async () => {
+  const conflictEl = document.getElementById("add-conflicts");
+  const nameRaw = document.getElementById("new-name").value;
+  const color = document.getElementById("new-color").value;
+  const rawKw = document.getElementById("new-keywords").value;
+  const keywords = parseLines(rawKw);
+
+  const issues = collectAddCategoryIssues(nameRaw, keywords);
+  if (issues.length) {
+    renderFormIssues(conflictEl, "Could not add category:", issues);
+    return;
+  }
+  clearFormIssues(conflictEl);
+
+  try {
+    const created = await API.createCategory({
+      name: nameRaw.trim(),
+      color,
+      keywords: keywords.length ? keywords.join(", ") : null,
+    });
+    document.getElementById("new-name").value = "";
+    document.getElementById("new-keywords").value = "";
+    clearFormIssues(conflictEl);
+    newlyAddedId = created.id;
+    await loadStats(true);
+  } catch (e) {
+    renderFormIssues(conflictEl, "Could not add category:", [e.message || "Something went wrong. Try again."]);
+  }
+});
+
+document.getElementById("new-name").addEventListener("input", () => {
+  clearFormIssues(document.getElementById("add-conflicts"));
+});
+document.getElementById("new-keywords").addEventListener("input", () => {
+  clearFormIssues(document.getElementById("add-conflicts"));
+});
+
+document.getElementById("new-name").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") document.getElementById("btn-add").click();
+});
+
+// ── Rename ──
+function startRename(id) {
+  const span = document.getElementById(`name-${id}`);
+  const current = span.textContent;
+  const input = document.createElement("input");
+  input.className = "rename-input";
+  input.value = current;
+  span.replaceWith(input);
+  input.focus();
+  input.select();
+
+  async function save() {
+    const newName = input.value.trim();
+    if (!newName || newName === current) {
+      input.replaceWith(span);
+      return;
+    }
+    try {
+      await API.updateCategory(id, { name: newName });
+      await loadStats();
+    } catch (e) {
+      showAlert(document.getElementById("alerts"), e.message, "error");
+      input.replaceWith(span);
+    }
+  }
+
+  input.addEventListener("blur", save);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    if (e.key === "Escape") { input.replaceWith(span); }
+  });
+}
+
+// ── Color picker ──
+function pickColor(id, dotEl) {
+  const picker = document.createElement("input");
+  picker.type = "color";
+  picker.value = dotEl.style.background || "#6366f1";
+  picker.style.position = "absolute";
+  picker.style.opacity = "0";
+  picker.style.width = "0";
+  document.body.appendChild(picker);
+  picker.click();
+  picker.addEventListener("change", async () => {
+    const color = picker.value;
+    try {
+      await API.updateCategory(id, { color });
+      dotEl.style.background = color;
+    } catch (e) {
+      showAlert(document.getElementById("alerts"), e.message, "error");
+    }
+    picker.remove();
+  });
+  picker.addEventListener("blur", () => picker.remove());
+}
+
+// ── Merge ──
+function startMerge(id, name) {
+  mergingId = id;
+  document.getElementById("merge-from-name").textContent = name;
+  const sel = document.getElementById("merge-target");
+  sel.innerHTML = allStats
+    .filter(c => c.id !== id)
+    .map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`)
+    .join("");
+  document.getElementById("merge-modal").classList.remove("hidden");
+}
+
+document.getElementById("merge-cancel").addEventListener("click", () => {
+  document.getElementById("merge-modal").classList.add("hidden");
+});
+
+document.getElementById("merge-confirm").addEventListener("click", async () => {
+  const targetId = +document.getElementById("merge-target").value;
+  if (!targetId || !mergingId) return;
+  try {
+    // Re-assign all transactions from mergingId to targetId
+    const txData = await API.getTransactions({ category_id: mergingId, page_size: 1000 });
+    await Promise.all(txData.items.map(tx => API.updateTransaction(tx.id, { category_id: targetId })));
+    await API.deleteCategory(mergingId);
+    document.getElementById("merge-modal").classList.add("hidden");
+    await loadStats();
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  }
+});
+
+// ── Delete ──
+async function deleteCat(id) {
+  const cat = allStats.find(c => c.id === id);
+  const msg = cat?.tx_count > 0
+    ? `Delete "${cat.name}"? Its ${cat.tx_count} transaction(s) will become uncategorized.`
+    : `Delete "${cat?.name}"?`;
+  if (!confirm(msg)) return;
+  try {
+    await API.deleteCategory(id);
+    await loadStats();
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  }
+}
+
+// ── Keyword helpers ──
+
+function parseLines(raw) {
+  return raw.split(/[\n,]/).map(k => k.trim().toLowerCase()).filter(Boolean);
+}
+
+function findConflicts(keywords, excludeId) {
+  const conflicts = [];
+  for (const kw of keywords) {
+    for (const cat of allStats) {
+      if (cat.id === excludeId) continue;
+      const catKws = (cat.keywords || "").split(",").map(k => k.trim().toLowerCase()).filter(Boolean);
+      if (catKws.includes(kw)) {
+        conflicts.push({ keyword: kw, category: cat.name });
+      }
+    }
+  }
+  return conflicts;
+}
+
+function showConflicts(el, conflicts) {
+  const lines = conflicts.map(
+    (c) =>
+      `"${c.keyword}" is already a keyword on "${c.category}". Remove it here or edit that category.`
+  );
+  renderFormIssues(el, "Keyword conflicts:", lines);
+}
+
+// ── Keywords editor ──
+let kwEditingId = null;
+
+function editKeywords(id) {
+  kwEditingId = id;
+  const cat = allStats.find(c => c.id === id);
+  document.getElementById("kw-cat-name").textContent = cat?.name || "";
+
+  // Convert stored comma-separated to one per line
+  const existing = (cat?.keywords || "").split(",").map(k => k.trim()).filter(Boolean);
+  document.getElementById("kw-input").value = existing.join("\n");
+
+  // Show conflicts for existing keywords on open
+  const conflictEl = document.getElementById("kw-conflicts");
+  const conflicts = findConflicts(existing, id);
+  if (conflicts.length) showConflicts(conflictEl, conflicts);
+  else clearFormIssues(conflictEl);
+
+  document.getElementById("kw-modal").classList.remove("hidden");
+  document.getElementById("kw-input").focus();
+}
+
+document.getElementById("kw-cancel").addEventListener("click", () => {
+  document.getElementById("kw-modal").classList.add("hidden");
+});
+
+document.getElementById("kw-save").addEventListener("click", async () => {
+  const raw = document.getElementById("kw-input").value;
+  const keywords = parseLines(raw);
+  const conflictEl = document.getElementById("kw-conflicts");
+
+  const conflicts = findConflicts(keywords, kwEditingId);
+  if (conflicts.length) {
+    showConflicts(conflictEl, conflicts);
+    return;
+  }
+  clearFormIssues(conflictEl);
+
+  try {
+    await API.updateCategory(kwEditingId, { keywords: keywords.join(", ") || null });
+    document.getElementById("kw-modal").classList.add("hidden");
+    await loadStats();
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  }
+});
+
+// ── Search + sort ──
+document.getElementById("search-cats").addEventListener("input", () => renderGrid(allStats));
+document.getElementById("sort-cats").addEventListener("change", () => renderGrid(allStats));
+
+// ── New category color swatch ──
+document.getElementById("new-color").addEventListener("input", (e) => {
+  document.getElementById("new-color-swatch").style.background = e.target.value;
+});
+
+loadStats();
+</script>
+</body>
+</html>

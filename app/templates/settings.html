@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings | BrokeATM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/main.css?v=4" />
+  <style>
+    .settings-section { margin-bottom: 2rem; }
+    .settings-section h2 {
+      font-size: 1rem; font-weight: 700; color: var(--text);
+      margin-bottom: 1rem; padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .setting-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 1.5rem; padding: 0.85rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .setting-row:last-child { border-bottom: none; }
+    .setting-label { flex: 1; }
+    .setting-label strong { display: block; font-size: 0.92rem; color: var(--text); margin-bottom: 0.2rem; }
+    .setting-label span { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+    .setting-control { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+    .setting-control input[type="number"] {
+      width: 110px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.9rem;
+      padding: 0.45rem 0.75rem;
+    }
+    .setting-control input[type="number"]:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124,130,255,0.18);
+    }
+    .setting-control input[type="checkbox"] {
+      width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent);
+    }
+    .setting-unit { font-size: 0.82rem; color: var(--text-muted); }
+    .saved-toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem;
+      background: var(--accent); color: #fff; padding: 0.5rem 1.1rem;
+      border-radius: 8px; font-weight: 600; font-size: 0.85rem;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.4); z-index: 999;
+      opacity: 0; transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    .saved-toast.show { opacity: 1; }
+    .preview-box {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 1rem 1.25rem;
+      font-size: 0.83rem; color: var(--text-muted); line-height: 1.6;
+      margin-top: 0.75rem;
+    }
+    .preview-box strong { color: var(--accent-hover); }
+    /* Column toggle grid */
+    .col-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .col-toggle {
+      display: flex; align-items: center; gap: 0.6rem;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.55rem 0.9rem;
+      cursor: pointer; transition: border-color 0.15s;
+      user-select: none;
+    }
+    .col-toggle:hover { border-color: var(--accent); }
+    .col-toggle input[type="checkbox"] {
+      width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
+    }
+    .col-toggle label { font-size: 0.88rem; color: var(--text); cursor: pointer; font-weight: 500; }
+    .col-toggle.required { opacity: 0.5; }
+    .col-toggle.required label { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="nav-brand">💸 BrokeATM</span>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/records">Records</a>
+    <a href="/categories">Categories</a>
+    <a href="/import">Import</a>
+    <a href="/settings" class="active">Settings</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <h1>Settings</h1>
+      <p>All changes save automatically</p>
+    </div>
+    <button class="btn btn-secondary btn-sm" id="btn-reset">Reset to defaults</button>
+  </div>
+
+  <!-- Large Expense Detection -->
+  <div class="card settings-section">
+    <h2>Large Expense Detection</h2>
+    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:1.25rem">
+      Transactions shown in the <strong style="color:var(--text)">Large Expenses</strong> section on the Dashboard.
+      A transaction is flagged if it meets <em>either</em> enabled condition.
+    </p>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>Fixed amount threshold</strong>
+        <span>Flag any single expense over this dollar amount.</span>
+      </div>
+      <div class="setting-control">
+        <input type="checkbox" id="enable-amount" />
+        <input type="number" id="threshold-amount" min="0" step="1" placeholder="200" />
+        <span class="setting-unit">CAD</span>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>Percentage threshold</strong>
+        <span>Flag any expense that is more than this % of total spending for the period.</span>
+      </div>
+      <div class="setting-control">
+        <input type="checkbox" id="enable-pct" />
+        <input type="number" id="threshold-pct" min="0" max="100" step="1" placeholder="20" />
+        <span class="setting-unit">%</span>
+      </div>
+    </div>
+
+    <div class="preview-box" id="preview-box"></div>
+  </div>
+
+  <!-- Records Columns -->
+  <div class="card settings-section">
+    <h2>Records: Visible Columns</h2>
+    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:1rem">
+      Choose which columns to show in the Records table. Changes apply immediately on next visit.
+      <em>Date</em>, <em>Merchant</em>, <em>Amount</em> and <em>Actions</em> are always shown.
+    </p>
+    <div class="col-grid" id="col-grid"></div>
+  </div>
+
+  <!-- Dashboard Defaults -->
+  <div class="card settings-section">
+    <h2>Dashboard Defaults</h2>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>Pie chart default period (months back)</strong>
+        <span>How many recent months to pre-select on the pie chart on first load.</span>
+      </div>
+      <div class="setting-control">
+        <input type="number" id="default-pie-months" min="1" max="24" step="1" placeholder="1" />
+        <span class="setting-unit">months</span>
+      </div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>Bar chart default range (months back)</strong>
+        <span>How many months to show on the bar chart by default.</span>
+      </div>
+      <div class="setting-control">
+        <input type="number" id="default-bar-months" min="1" max="36" step="1" placeholder="6" />
+        <span class="setting-unit">months</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="saved-toast" id="saved-toast">Saved</div>
+
+<script>
+// ── Column definitions (id matches what records.html expects) ─────────────────
+const ALL_COLUMNS = [
+  { id: "date_added", label: "Date Added",  required: false, defaultOn: true  },
+  { id: "category",   label: "Category",    required: false, defaultOn: true  },
+  { id: "type",       label: "Type",        required: false, defaultOn: true  },
+  { id: "notes",      label: "Notes",       required: false, defaultOn: false },
+  { id: "account",    label: "Account",     required: false, defaultOn: false },
+  { id: "currency",   label: "Currency",    required: false, defaultOn: false },
+];
+
+const DEFAULTS = {
+  enableAmount: false,
+  thresholdAmount: 200,
+  enablePct: false,
+  thresholdPct: 20,
+  defaultPieMonths: 1,
+  defaultBarMonths: 6,
+  visibleColumns: ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id),
+};
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+
+function loadSettings() {
+  try {
+    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem("brokeAtmSettings") || "{}") };
+  } catch (_) { return { ...DEFAULTS }; }
+}
+
+let _toastTimer = null;
+function saveSettings(s) {
+  localStorage.setItem("brokeAtmSettings", JSON.stringify(s));
+  const toast = document.getElementById("saved-toast");
+  toast.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => toast.classList.remove("show"), 1500);
+}
+
+function readForm() {
+  const visibleColumns = ALL_COLUMNS
+    .filter(c => !c.required)
+    .filter(c => document.getElementById(`col-${c.id}`)?.checked)
+    .map(c => c.id);
+  return {
+    enableAmount: document.getElementById("enable-amount").checked,
+    thresholdAmount: parseFloat(document.getElementById("threshold-amount").value) || DEFAULTS.thresholdAmount,
+    enablePct: document.getElementById("enable-pct").checked,
+    thresholdPct: parseFloat(document.getElementById("threshold-pct").value) || DEFAULTS.thresholdPct,
+    defaultPieMonths: parseInt(document.getElementById("default-pie-months").value) || DEFAULTS.defaultPieMonths,
+    defaultBarMonths: parseInt(document.getElementById("default-bar-months").value) || DEFAULTS.defaultBarMonths,
+    visibleColumns,
+  };
+}
+
+function fillForm(s) {
+  document.getElementById("enable-amount").checked = s.enableAmount;
+  document.getElementById("threshold-amount").value = s.thresholdAmount;
+  document.getElementById("enable-pct").checked = s.enablePct;
+  document.getElementById("threshold-pct").value = s.thresholdPct;
+  document.getElementById("default-pie-months").value = s.defaultPieMonths;
+  document.getElementById("default-bar-months").value = s.defaultBarMonths;
+  // Columns
+  ALL_COLUMNS.filter(c => !c.required).forEach(c => {
+    const el = document.getElementById(`col-${c.id}`);
+    if (el) el.checked = s.visibleColumns.includes(c.id);
+  });
+  updatePreview(s);
+  updateInputStates(s);
+}
+
+// ── Column grid ───────────────────────────────────────────────────────────────
+
+function buildColumnGrid(s) {
+  const grid = document.getElementById("col-grid");
+  grid.innerHTML = "";
+  ALL_COLUMNS.forEach(col => {
+    const wrap = document.createElement("label");
+    wrap.className = "col-toggle" + (col.required ? " required" : "");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.id = `col-${col.id}`;
+    cb.checked = col.required || s.visibleColumns.includes(col.id);
+    cb.disabled = col.required;
+    const lbl = document.createElement("label");
+    lbl.htmlFor = `col-${col.id}`;
+    lbl.textContent = col.label;
+    wrap.appendChild(cb);
+    wrap.appendChild(lbl);
+    grid.appendChild(wrap);
+  });
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+
+function updateInputStates(s) {
+  document.getElementById("threshold-amount").disabled = !s.enableAmount;
+  document.getElementById("threshold-pct").disabled = !s.enablePct;
+}
+
+function updatePreview(s) {
+  const box = document.getElementById("preview-box");
+  const parts = [];
+  if (s.enableAmount) parts.push(`amount ≥ <strong>$${s.thresholdAmount}</strong>`);
+  if (s.enablePct) parts.push(`≥ <strong>${s.thresholdPct}%</strong> of period total`);
+  box.innerHTML = parts.length
+    ? `Flagging expenses where: ${parts.join(" <em>or</em> ")}.`
+    : "No thresholds enabled — Large Expenses section will be hidden on the Dashboard.";
+}
+
+// ── Auto-save on any change ───────────────────────────────────────────────────
+
+function onAnyChange() {
+  const s = readForm();
+  updatePreview(s);
+  updateInputStates(s);
+  saveSettings(s);
+}
+
+document.addEventListener("change", onAnyChange);
+// Also fire on number input blur (so typing then tabbing away saves)
+document.addEventListener("input", e => {
+  if (e.target.type === "number") {
+    updatePreview(readForm());
+    updateInputStates(readForm());
+  }
+});
+document.addEventListener("focusout", e => {
+  if (e.target.type === "number") onAnyChange();
+});
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  fillForm({ ...DEFAULTS });
+  saveSettings({ ...DEFAULTS });
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+const s = loadSettings();
+buildColumnGrid(s);
+fillForm(s);
+</script>
+</body>
+</html>

@@ -1,0 +1,248 @@
+from __future__ import annotations
+
+from datetime import date, datetime
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class ParsedRow(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    transaction_date: date | None
+    posted_date: date | None = None
+    reference_number: str | None = None
+    merchant_name: str = ""
+    merchant_city: str | None = None
+    merchant_state: str | None = None
+    merchant_country: str | None = None
+    mcc_description: str | None = None
+    amount: float
+    currency: str = "CAD"
+    transaction_type: str
+    suggested_category: str | None = None
+    category_name: str | None = None
+    card_number_masked: str | None = None
+    cardholder: str | None = None
+    is_payment: bool = False
+    is_refund: bool = False
+    duplicate: bool = False
+    exclude: bool = False
+    notes: str | None = None
+    source_file: str | None = None
+    import_month: int | None = None
+    import_year: int | None = None
+
+
+class ParseResponse(BaseModel):
+    format: str | None
+    rows: list[ParsedRow]
+    detected_month: int | None
+    detected_year: int | None
+    errors: list[str]
+
+
+class CommitRow(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    transaction_date: date
+    posted_date: date | None = None
+    reference_number: str | None = None
+    merchant_name: str = ""
+    merchant_city: str | None = None
+    merchant_state: str | None = None
+    merchant_country: str | None = None
+    mcc_description: str | None = None
+    amount: float
+    currency: str = "CAD"
+    transaction_type: str
+    category_name: str | None = None
+    card_number_masked: str | None = None
+    cardholder: str | None = None
+    exclude: bool = False
+    notes: str | None = None
+    source_file: str | None = None
+    import_month: int | None = None
+    import_year: int | None = None
+
+
+class CommitRequest(BaseModel):
+    filename: str
+    month: int
+    year: int
+    rows: list[CommitRow]
+
+
+class CommitResponse(BaseModel):
+    batch_id: str
+    batch_ids: list[str] = Field(default_factory=list)
+    imported: int
+    skipped: int
+
+
+class TransactionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    transaction_date: date
+    posted_date: date | None
+    reference_number: str | None
+    merchant_name: str
+    merchant_city: str | None
+    merchant_state: str | None
+    merchant_country: str | None
+    mcc_description: str | None
+    amount: float
+    currency: str
+    transaction_type: str
+    account_id: int | None
+    category_id: int | None
+    notes: str | None
+    import_batch_id: str | None
+    is_excluded: bool
+    created_at: datetime
+    updated_at: datetime
+    exact_duplicate: bool = False
+    category_name: str | None = None
+    account_name: str | None = None
+
+
+class TransactionCreate(BaseModel):
+    transaction_date: date
+    merchant_name: str
+    amount: float
+    transaction_type: str = "expense"
+    category_id: int | None = None
+    account_id: int | None = None
+    notes: str | None = None
+    currency: str = "CAD"
+    posted_date: date | None = None
+    merchant_city: str | None = None
+    merchant_country: str | None = None
+
+
+class TransactionUpdate(BaseModel):
+    merchant_name: str | None = None
+    amount: float | None = None
+    transaction_type: str | None = None
+    category_id: int | None = None
+    account_id: int | None = None
+    notes: str | None = None
+    is_excluded: bool | None = None
+    transaction_date: date | None = None
+
+
+class BulkDeleteRequest(BaseModel):
+    ids: list[int]
+
+
+class BulkUpdateRequest(BaseModel):
+    ids: list[int]
+    category_id: int | None = None
+    transaction_type: str | None = None
+
+
+class TransactionListResponse(BaseModel):
+    items: list[TransactionOut]
+    total: int
+    page: int
+    page_size: int
+
+
+class DuplicateGroupOut(BaseModel):
+    keep_id: int
+    transaction_ids: list[int]
+    row_count: int
+    summary: dict[str, Any]
+
+
+class DuplicateReportResponse(BaseModel):
+    groups: list[DuplicateGroupOut]
+    total_groups: int
+    total_extra_rows: int
+
+
+class PruneExactDuplicatesRequest(BaseModel):
+    confirm: bool = False
+
+
+class PruneExactDuplicatesResponse(BaseModel):
+    deleted: int
+
+
+class CategoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    color: str | None
+    keywords: str | None
+    created_at: datetime
+
+
+class CategoryCreate(BaseModel):
+    name: str
+    color: str | None = None
+    keywords: str | None = None
+
+
+class CategoryUpdate(BaseModel):
+    name: str | None = None
+    color: str | None = None
+    keywords: str | None = None
+
+
+class AccountOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    card_number_masked: str | None
+    institution: str | None
+    created_at: datetime
+
+
+class AccountCreate(BaseModel):
+    name: str
+    card_number_masked: str | None = None
+    institution: str | None = None
+
+
+class PieSlice(BaseModel):
+    category: str
+    amount: float
+    color: str | None = None
+
+
+class BarMonth(BaseModel):
+    month: int
+    year: int
+    label: str
+    expenses: float
+    income: float
+
+
+class DashboardResponse(BaseModel):
+    expense_pie: list[PieSlice]
+    income_pie: list[PieSlice]
+    bar_chart: list[BarMonth]
+    total_expenses: float
+    total_income: float
+    net: float
+
+
+class LargeExpenseRow(BaseModel):
+    id: int
+    transaction_date: date
+    merchant_name: str
+    category: str | None
+    amount: float
+    pct_of_total: float
+    currency: str
+
+
+class LargeExpensesResponse(BaseModel):
+    items: list[LargeExpenseRow]
+    total: int
+    page: int
+    page_size: int

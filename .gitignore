@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# App data
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+*.err
+
+# Uploaded CSVs / local test files
+*.csv
+uploads/
+
+# Env
+.env

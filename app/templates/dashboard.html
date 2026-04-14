@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard | BrokeATM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/main.css?v=4" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    .legend {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-top: 0.75rem;
+      max-height: 14rem;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.45rem;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 0.2em; }
+    .legend-pct { font-weight: 700; color: var(--text); min-width: 2.75rem; flex-shrink: 0; }
+    .legend-label { flex: 1; min-width: 0; line-height: 1.4; word-break: break-word; }
+
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: 0.07em;
+    }
+    /* Unified picker row: range on left, chips on right */
+    .picker-unified {
+      display: flex;
+      align-items: flex-start;
+      gap: 5rem;
+      flex-wrap: wrap;
+    }
+    .picker-range {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+    .picker-range input[type="month"] {
+      color-scheme: dark;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.85rem;
+      padding: 0.35rem 0.6rem;
+      width: 140px;
+    }
+    .picker-range input[type="month"].range-active {
+      border-color: var(--accent);
+    }
+    .picker-range-sep {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 600;
+      user-select: none;
+    }
+    .picker-chips-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex: 1;
+      justify-content: flex-end;
+      min-width: 0;
+    }
+    .picker-chips-wrap .ctrl-chip { flex-shrink: 0; }
+    /* Chips scroll horizontally when too many months */
+    .picker-chips-wrap .month-picker {
+      display: flex;
+      flex-wrap: nowrap;
+      gap: 0.45rem;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+      padding-bottom: 2px;
+      min-width: 0;
+    }
+    .picker-chips-wrap .month-picker::-webkit-scrollbar { height: 3px; }
+    .picker-chips-wrap .month-picker::-webkit-scrollbar-track { background: transparent; }
+    .picker-chips-wrap .month-picker::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="nav-brand">💸 BrokeATM</span>
+  <div class="nav-links">
+    <a href="/" class="active">Dashboard</a>
+    <a href="/records">Records</a>
+    <a href="/categories">Categories</a>
+    <a href="/import">Import</a>
+    <a href="/settings">Settings</a>
+  </div>
+</nav>
+
+<div class="page">
+  <div class="page-header flex items-center justify-between">
+    <div>
+      <h1>Dashboard</h1>
+      <p>Visual breakdown of your spending and income</p>
+    </div>
+    <button class="btn btn-primary btn-sm" id="btn-refresh">Refresh</button>
+  </div>
+
+  <div id="alerts"></div>
+
+  <!-- ── PIE SECTION ─────────────────────────────────────────────────── -->
+  <div class="card mb-2">
+    <div class="section-header">
+      <span class="section-title">Totals &amp; Pie Charts: Period</span>
+      <div style="display:flex;align-items:center;gap:0.4rem">
+        <button class="ctrl-chip" id="pie-all">All</button>
+        <button class="ctrl-chip" id="pie-clear">Clear</button>
+      </div>
+    </div>
+    <div class="picker-unified">
+      <div class="picker-range">
+        <input type="month" id="pie-range-from" title="From month" />
+        <span class="picker-range-sep">──</span>
+        <input type="month" id="pie-range-to" title="To month" />
+      </div>
+      <div class="picker-chips-wrap">
+        <div class="month-picker" id="pie-picker"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stat-grid mb-2">
+    <div class="stat-card">
+      <div class="stat-label">Total Expenses</div>
+      <div class="stat-value text-danger" id="stat-expenses">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Income</div>
+      <div class="stat-value text-success" id="stat-income">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Net</div>
+      <div class="stat-value" id="stat-net">-</div>
+    </div>
+  </div>
+
+  <!-- Pie charts -->
+  <div class="chart-grid mb-2">
+    <div class="chart-card">
+      <h3>Expenses by Category</h3>
+      <div class="chart-wrap"><canvas id="expense-pie"></canvas></div>
+      <div class="legend" id="expense-legend"></div>
+    </div>
+    <div class="chart-card">
+      <h3>Income by Category</h3>
+      <div class="chart-wrap"><canvas id="income-pie"></canvas></div>
+      <div class="legend" id="income-legend"></div>
+    </div>
+  </div>
+
+  <!-- ── BAR SECTION ─────────────────────────────────────────────────── -->
+  <div class="card mb-2">
+    <div class="section-header">
+      <span class="section-title">Bar Chart: Period</span>
+      <div style="display:flex;align-items:center;gap:0.4rem">
+        <button class="ctrl-chip" id="bar-all">All</button>
+        <button class="ctrl-chip" id="bar-clear">Clear</button>
+      </div>
+    </div>
+    <div class="picker-unified">
+      <div class="picker-range">
+        <input type="month" id="bar-range-from" title="From month" />
+        <span class="picker-range-sep">──</span>
+        <input type="month" id="bar-range-to" title="To month" />
+      </div>
+      <div class="picker-chips-wrap">
+        <div class="month-picker" id="bar-picker"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bar chart -->
+  <div class="chart-card">
+    <h3>Expenses vs Income Over Time</h3>
+    <div class="chart-wrap" style="height:320px"><canvas id="bar-chart"></canvas></div>
+  </div>
+
+  <!-- Large Expenses -->
+  <div id="large-expenses-section" class="card mt-2" style="display:none">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em">Large Expenses</div>
+        <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.2rem" id="large-expenses-subtitle"></div>
+      </div>
+      <a href="/settings" style="font-size:0.78rem;color:var(--accent);text-decoration:none;font-weight:600">⚙ Thresholds</a>
+    </div>
+    <!-- Independent date range filter -->
+    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.875rem;flex-wrap:wrap">
+      <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600">Period:</span>
+      <input type="month" id="le-date-from" title="From month" style="color-scheme:dark;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.82rem;padding:0.3rem 0.55rem;width:130px" />
+      <span style="color:var(--text-muted)">──</span>
+      <input type="month" id="le-date-to" title="To month" style="color-scheme:dark;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.82rem;padding:0.3rem 0.55rem;width:130px" />
+      <button class="btn btn-secondary btn-sm" id="le-clear-dates" style="font-size:0.8rem;padding:0.3rem 0.8rem">All time</button>
+    </div>
+    <div class="table-wrap">
+      <table id="large-expenses-table" style="width:100%">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Merchant</th>
+            <th>Category</th>
+            <th class="text-right">Amount</th>
+            <th class="text-right">% of Period</th>
+          </tr>
+        </thead>
+        <tbody id="large-expenses-tbody">
+          <tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:1.5rem">No large expenses found.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <!-- Pagination -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-top:0.75rem;font-size:0.82rem;color:var(--text-muted)" id="le-pagination-wrap">
+      <span id="le-page-info"></span>
+      <div style="display:flex;gap:0.4rem">
+        <button class="btn btn-secondary btn-sm" id="le-prev" style="padding:0.25rem 0.7rem">‹ Prev</button>
+        <button class="btn btn-secondary btn-sm" id="le-next" style="padding:0.25rem 0.7rem">Next ›</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/utils.js?v=5"></script>
+<script src="/static/js/api.js?v=5"></script>
+<script>
+let expensePieChart = null;
+let incomePieChart = null;
+let barChart = null;
+
+let availableMonths = [];   // [{ym, year, month, count}, ...] sorted desc
+let pieSelected = new Set();
+let barSelected = new Set();
+
+const CHART_DEFAULTS = { maintainAspectRatio: false };
+Chart.defaults.color = "#8892b0";
+Chart.defaults.borderColor = "#2e3250";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function prevMonth(year, month) {
+  if (month === 1) return { year: year - 1, month: 12 };
+  return { year, month: month - 1 };
+}
+
+function ymStr(year, month) {
+  return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function last6Months() {
+  const now = new Date();
+  const result = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    result.push(ymStr(d.getFullYear(), d.getMonth() + 1));
+  }
+  return result;
+}
+
+/** Given a Set of ym strings, return [minYm, maxYm] or [null, null] if empty. */
+function selectionRange(selectedSet) {
+  if (selectedSet.size === 0) return [null, null];
+  const sorted = [...selectedSet].sort();
+  return [sorted[0], sorted[sorted.length - 1]];
+}
+
+/** Returns true if every available month between min and max of the selection is selected. */
+function isContiguous(selectedSet) {
+  if (selectedSet.size === 0) return true;
+  const [minYm, maxYm] = selectionRange(selectedSet);
+  // Check every available month in [minYm, maxYm] is selected
+  const inRange = availableMonths.filter(m => m.ym >= minYm && m.ym <= maxYm);
+  return inRange.every(m => selectedSet.has(m.ym));
+}
+
+/** Set the range inputs to reflect current selection.
+ *  If selection is non-contiguous (gaps), clears both inputs to "".
+ *  If empty, clears to "". */
+function syncRangeInputs(prefix, selectedSet) {
+  const fromEl = document.getElementById(`${prefix}-range-from`);
+  const toEl = document.getElementById(`${prefix}-range-to`);
+  if (selectedSet.size === 0 || !isContiguous(selectedSet)) {
+    fromEl.value = "";
+    toEl.value = "";
+  } else {
+    const [minYm, maxYm] = selectionRange(selectedSet);
+    fromEl.value = minYm;
+    toEl.value = maxYm;
+  }
+}
+
+/** Select all available months between fromYm and toYm (inclusive) into selectedSet. */
+function applyRangeToSelection(prefix, selectedSet, fromYm, toYm, loadFn) {
+  const from = fromYm || "";
+  const to = toYm || "";
+  selectedSet.clear();
+  availableMonths.forEach(({ ym }) => {
+    if ((!from || ym >= from) && (!to || ym <= to)) {
+      selectedSet.add(ym);
+    }
+  });
+  buildPicker(`${prefix}-picker`, selectedSet, loadFn);
+  syncCtrlChips(prefix, selectedSet);
+  loadFn();
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+
+function getDashboardSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem("brokeAtmSettings") || "{}");
+    return {
+      defaultPieMonths: Math.max(1, parseInt(s.defaultPieMonths) || 1),
+      defaultBarMonths: Math.max(1, parseInt(s.defaultBarMonths) || 6),
+    };
+  } catch (_) {
+    return { defaultPieMonths: 1, defaultBarMonths: 6 };
+  }
+}
+
+async function init() {
+  availableMonths = await API.getAvailableMonths();
+  const ds = getDashboardSettings();
+
+  // Pie default: most recent N months from settings
+  availableMonths.slice(0, ds.defaultPieMonths).forEach(({ ym }) => pieSelected.add(ym));
+  if (pieSelected.size === 0 && availableMonths.length > 0) {
+    pieSelected.add(availableMonths[0].ym);
+  }
+
+  // Bar default: most recent N months from settings
+  availableMonths.slice(0, ds.defaultBarMonths).forEach(({ ym }) => barSelected.add(ym));
+  if (barSelected.size === 0 && availableMonths.length > 0) {
+    barSelected.add(availableMonths[0].ym);
+  }
+
+  buildPicker("pie-picker", pieSelected, () => { syncRangeInputs("pie", pieSelected); loadPie(); });
+  buildPicker("bar-picker", barSelected, () => { syncRangeInputs("bar", barSelected); loadBar(); });
+  syncRangeInputs("pie", pieSelected);
+  syncRangeInputs("bar", barSelected);
+
+  await Promise.all([loadPie(), loadBar(), loadLargeExpenses()]);
+}
+
+/** Build a chips picker. onChange is called after each chip click. */
+function buildPicker(containerId, selectedSet, onChange) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = "";
+  const prefix = containerId.startsWith("pie") ? "pie" : "bar";
+  const sorted = [...availableMonths].sort((a, b) => b.ym.localeCompare(a.ym));
+  sorted.forEach(({ ym, year, month }) => {
+    const chip = document.createElement("button");
+    chip.className = "month-chip" + (selectedSet.has(ym) ? " selected" : "");
+    chip.textContent = monthLabel(year, month);
+    chip.dataset.ym = ym;
+    chip.addEventListener("click", () => {
+      chip.classList.toggle("selected");
+      if (chip.classList.contains("selected")) selectedSet.add(ym);
+      else selectedSet.delete(ym);
+      syncCtrlChips(prefix, selectedSet);
+      onChange();
+    });
+    container.appendChild(chip);
+  });
+  syncCtrlChips(prefix, selectedSet);
+}
+
+function syncPicker(containerId, selectedSet) {
+  const prefix = containerId.startsWith("pie") ? "pie" : "bar";
+  document.querySelectorAll(`#${containerId} .month-chip`).forEach(chip => {
+    chip.classList.toggle("selected", selectedSet.has(chip.dataset.ym));
+  });
+  syncCtrlChips(prefix, selectedSet);
+}
+
+/** Highlight "All" only when every available month is selected. "Clear" never highlights. */
+function syncCtrlChips(prefix, selectedSet) {
+  const allBtn = document.getElementById(`${prefix}-all`);
+  const clearBtn = document.getElementById(`${prefix}-clear`);
+  if (!allBtn) return;
+  const allSelected =
+    availableMonths.length > 0 &&
+    selectedSet.size === availableMonths.length &&
+    availableMonths.every(m => selectedSet.has(m.ym));
+  allBtn.classList.toggle("active", allSelected);
+  if (clearBtn) clearBtn.classList.remove("active");
+}
+
+// ── Pie + Stats ───────────────────────────────────────────────────────────────
+
+async function loadPie() {
+  if (pieSelected.size === 0) {
+    renderStats({ total_expenses: 0, total_income: 0, net: 0 });
+    renderPie("expense-pie", "expense-legend", []);
+    renderPie("income-pie", "income-legend", []);
+    return;
+  }
+  const params = { bar_months: "", months: [...pieSelected].sort().join(",") };
+  try {
+    const data = await API.getDashboard(params);
+    renderStats(data);
+    renderPie("expense-pie", "expense-legend", data.expense_pie);
+    renderPie("income-pie", "income-legend", data.income_pie);
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  }
+}
+
+// ── Bar ───────────────────────────────────────────────────────────────────────
+
+async function loadBar() {
+  if (barSelected.size === 0) {
+    renderBar([]);
+    return;
+  }
+  const params = { months: "", bar_months: [...barSelected].sort().join(",") };
+  try {
+    const data = await API.getDashboard(params);
+    renderBar(data.bar_chart);
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  }
+}
+
+// ── Large Expenses (independent of bar chart) ─────────────────────────────────
+
+let leCurrentPage = 1;
+const lePageSize = 10;
+
+function getThresholdSettings() {
+  try {
+    return { ...{ enableAmount: false, thresholdAmount: 200, enablePct: false, thresholdPct: 20 },
+      ...JSON.parse(localStorage.getItem("brokeAtmSettings") || "{}") };
+  } catch (_) {
+    return { enableAmount: false, thresholdAmount: 200, enablePct: false, thresholdPct: 20 };
+  }
+}
+
+async function loadLargeExpenses(resetPage = false) {
+  const s = getThresholdSettings();
+  const section = document.getElementById("large-expenses-section");
+  if (!s.enableAmount && !s.enablePct) { section.style.display = "none"; return; }
+  section.style.display = "";
+
+  if (resetPage) leCurrentPage = 1;
+
+  const params = {
+    page: leCurrentPage,
+    page_size: lePageSize,
+  };
+  const fromVal = document.getElementById("le-date-from").value;
+  const toVal = document.getElementById("le-date-to").value;
+  if (fromVal) params.date_from = fromVal;
+  if (toVal) params.date_to = toVal;
+  if (s.enableAmount) params.min_amount = s.thresholdAmount;
+  if (s.enablePct) params.min_pct = s.thresholdPct;
+
+  try {
+    const resp = await API.getLargeExpenses(params);
+    renderLargeExpenses(resp, s);
+  } catch (e) {
+    section.style.display = "none";
+  }
+}
+
+function renderLargeExpenses(resp, s) {
+  const tbody = document.getElementById("large-expenses-tbody");
+  const subtitle = document.getElementById("large-expenses-subtitle");
+  const pageInfo = document.getElementById("le-page-info");
+  const prevBtn = document.getElementById("le-prev");
+  const nextBtn = document.getElementById("le-next");
+  const paginationWrap = document.getElementById("le-pagination-wrap");
+
+  const rows = resp.items || [];
+  const total = resp.total || 0;
+  const pages = Math.ceil(total / lePageSize) || 1;
+
+  const parts = [];
+  if (s && s.enableAmount) parts.push(`> $${s.thresholdAmount}`);
+  if (s && s.enablePct) parts.push(`> ${s.thresholdPct}% of period`);
+  subtitle.textContent = `${total} transaction${total !== 1 ? "s" : ""}${parts.length ? " · " + parts.join(" or ") : ""}`;
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:1.5rem">No large expenses found.</td></tr>`;
+    paginationWrap.style.display = "none";
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${fmtDate(r.transaction_date)}</td>
+      <td style="font-weight:600">${escHtml(r.merchant_name)}</td>
+      <td style="color:var(--text-muted)">${escHtml(r.category || "—")}</td>
+      <td class="text-right text-danger" style="font-family:'JetBrains Mono',monospace;font-weight:700">${fmtCurrency(r.amount, r.currency)}</td>
+      <td class="text-right" style="color:var(--text-muted)">${r.pct_of_total}%</td>
+    </tr>`).join("");
+
+  paginationWrap.style.display = "flex";
+  pageInfo.textContent = `Page ${leCurrentPage} of ${pages} · ${total} total`;
+  prevBtn.disabled = leCurrentPage <= 1;
+  nextBtn.disabled = leCurrentPage >= pages;
+}
+
+// Large expenses pagination
+document.getElementById("le-prev").addEventListener("click", () => {
+  if (leCurrentPage > 1) { leCurrentPage--; loadLargeExpenses(); }
+});
+document.getElementById("le-next").addEventListener("click", () => {
+  leCurrentPage++; loadLargeExpenses();
+});
+
+// Large expenses date filter
+document.getElementById("le-date-from").addEventListener("change", () => loadLargeExpenses(true));
+document.getElementById("le-date-to").addEventListener("change", () => loadLargeExpenses(true));
+document.getElementById("le-clear-dates").addEventListener("click", () => {
+  document.getElementById("le-date-from").value = "";
+  document.getElementById("le-date-to").value = "";
+  loadLargeExpenses(true);
+});
+
+// ── Pie controls ─────────────────────────────────────────────────────────────
+
+document.getElementById("pie-all").addEventListener("click", () => {
+  availableMonths.forEach(({ ym }) => pieSelected.add(ym));
+  syncPicker("pie-picker", pieSelected);
+  syncRangeInputs("pie", pieSelected);
+  loadPie();
+});
+document.getElementById("pie-clear").addEventListener("click", () => {
+  pieSelected.clear();
+  syncPicker("pie-picker", pieSelected);
+  syncRangeInputs("pie", pieSelected);
+  loadPie();
+});
+
+// Range inputs → drive chip selection
+document.getElementById("pie-range-from").addEventListener("change", () => {
+  const from = document.getElementById("pie-range-from").value;
+  const to = document.getElementById("pie-range-to").value;
+  applyRangeToSelection("pie", pieSelected, from, to, loadPie);
+});
+document.getElementById("pie-range-to").addEventListener("change", () => {
+  const from = document.getElementById("pie-range-from").value;
+  const to = document.getElementById("pie-range-to").value;
+  applyRangeToSelection("pie", pieSelected, from, to, loadPie);
+});
+
+// ── Bar controls ──────────────────────────────────────────────────────────────
+
+document.getElementById("bar-all").addEventListener("click", () => {
+  availableMonths.forEach(({ ym }) => barSelected.add(ym));
+  syncPicker("bar-picker", barSelected);
+  syncRangeInputs("bar", barSelected);
+  loadBar();
+});
+document.getElementById("bar-clear").addEventListener("click", () => {
+  barSelected.clear();
+  syncPicker("bar-picker", barSelected);
+  syncRangeInputs("bar", barSelected);
+  loadBar();
+});
+
+// Range inputs → drive chip selection
+document.getElementById("bar-range-from").addEventListener("change", () => {
+  const from = document.getElementById("bar-range-from").value;
+  const to = document.getElementById("bar-range-to").value;
+  applyRangeToSelection("bar", barSelected, from, to, loadBar);
+});
+document.getElementById("bar-range-to").addEventListener("change", () => {
+  const from = document.getElementById("bar-range-from").value;
+  const to = document.getElementById("bar-range-to").value;
+  applyRangeToSelection("bar", barSelected, from, to, loadBar);
+});
+
+document.getElementById("btn-refresh").addEventListener("click", async () => {
+  availableMonths = await API.getAvailableMonths();
+  buildPicker("pie-picker", pieSelected, () => { syncRangeInputs("pie", pieSelected); loadPie(); });
+  buildPicker("bar-picker", barSelected, () => { syncRangeInputs("bar", barSelected); loadBar(); });
+  syncRangeInputs("pie", pieSelected);
+  syncRangeInputs("bar", barSelected);
+  await Promise.all([loadPie(), loadBar(), loadLargeExpenses(true)]);
+});
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+
+function renderStats(data) {
+  document.getElementById("stat-expenses").textContent = fmtCurrency(data.total_expenses);
+  document.getElementById("stat-income").textContent = fmtCurrency(data.total_income);
+  const netEl = document.getElementById("stat-net");
+  netEl.textContent = fmtCurrency(data.net);
+  netEl.className = "stat-value " + (data.net >= 0 ? "text-success" : "text-danger");
+}
+
+function groupSmallSlices(slices, threshold = 0.05) {
+  const total = slices.reduce((s, x) => s + x.amount, 0);
+  if (total === 0) return slices;
+
+  const main = [];
+  const small = [];
+  slices.forEach(s => {
+    if (s.amount / total < threshold) small.push(s);
+    else main.push(s);
+  });
+
+  if (!small.length) return slices;
+
+  const otherAmount = small.reduce((s, x) => s + x.amount, 0);
+  // Build tooltip listing the bucketed categories
+  const otherLabel = "other (" + small.map(s => s.category).join(", ") + ")";
+  main.push({ category: otherLabel, amount: otherAmount, color: "#64748b" });
+  return main;
+}
+
+function renderPie(canvasId, legendId, rawSlices) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext("2d");
+
+  if (canvasId === "expense-pie" && expensePieChart) { expensePieChart.destroy(); expensePieChart = null; }
+  if (canvasId === "income-pie" && incomePieChart) { incomePieChart.destroy(); incomePieChart = null; }
+
+  if (!rawSlices.length) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#8892b0";
+    ctx.font = "14px Inter";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("No data", canvas.width / 2, canvas.height / 2);
+    document.getElementById(legendId).innerHTML = "";
+    return;
+  }
+
+  const slices = groupSmallSlices(rawSlices);
+
+  const chart = new Chart(ctx, {
+    type: "doughnut",
+    data: {
+      labels: slices.map(s => s.category),
+      datasets: [{
+        data: slices.map(s => s.amount),
+        backgroundColor: slices.map(s => s.color),
+        borderColor: "#1a1d27",
+        borderWidth: 2,
+        hoverOffset: 8,
+      }],
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      cutout: "60%",
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: (c) => ` ${c.label}: ${fmtCurrency(c.raw)}` },
+        },
+      },
+    },
+  });
+
+  if (canvasId === "expense-pie") expensePieChart = chart;
+  else incomePieChart = chart;
+
+  const total = slices.reduce((s, x) => s + x.amount, 0);
+  document.getElementById(legendId).innerHTML = slices.map(s => {
+    const pct = total > 0 ? ((s.amount / total) * 100).toFixed(1) : "0";
+    return `
+    <div class="legend-item" title="${escHtml(s.category)}: ${pct}%">
+      <span class="legend-dot" style="background:${s.color}"></span>
+      <span class="legend-pct">${pct}%</span>
+      <span class="legend-label">${escHtml(s.category)}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderBar(months) {
+  const canvas = document.getElementById("bar-chart");
+  const ctx = canvas.getContext("2d");
+  if (barChart) { barChart.destroy(); barChart = null; }
+
+  if (!months.length) {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#8892b0";
+    ctx.font = "14px Inter";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("No data", canvas.width / 2, canvas.height / 2);
+    return;
+  }
+
+  barChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: months.map(m => m.label),
+      datasets: [
+        {
+          label: "Expenses",
+          data: months.map(m => m.expenses),
+          backgroundColor: "rgba(239,68,68,0.7)",
+          borderColor: "#ef4444",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+        {
+          label: "Income",
+          data: months.map(m => m.income),
+          backgroundColor: "rgba(16,185,129,0.7)",
+          borderColor: "#10b981",
+          borderWidth: 1,
+          borderRadius: 4,
+        },
+      ],
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: "#8892b0", usePointStyle: true, pointStyle: "circle" },
+        },
+        tooltip: {
+          callbacks: { label: (c) => ` ${c.dataset.label}: ${fmtCurrency(c.raw)}` },
+        },
+      },
+      scales: {
+        x: { grid: { color: "#2e3250" }, ticks: { color: "#8892b0" } },
+        y: {
+          grid: { color: "#2e3250" },
+          ticks: {
+            color: "#8892b0",
+            callback: (v) => `$${(v / 1000).toFixed(1)}k`,
+          },
+        },
+      },
+    },
+  });
+}
+
+function escHtml(s) {
+  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+init();
+</script>
+</body>
+</html>
