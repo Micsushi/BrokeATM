@@ -55,12 +55,30 @@ function monthLabel(year, month) {
   return new Date(year, month - 1, 1).toLocaleDateString("en-CA", { year: "numeric", month: "short" });
 }
 
+function escHtml(s) {
+  return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function debounce(fn, ms = 300) {
   let t;
   return (...args) => {
     clearTimeout(t);
     t = setTimeout(() => fn(...args), ms);
   };
+}
+
+// Called once per page load to catch up any due recurring entries.
+// Shows a toast at the top of the page if entries were created.
+async function processRecurringOnLoad() {
+  try {
+    const result = await fetch("/api/recurring/process", { method: "POST" }).then(r => r.json());
+    if (result.created > 0) {
+      const container = document.getElementById("alerts") || document.body;
+      showAlert(container, `${result.created} recurring entr${result.created === 1 ? "y" : "ies"} added automatically.`, "success");
+    }
+  } catch (_) {
+    // silently ignore — recurring is best-effort
+  }
 }
 
 function el(tag, attrs = {}, ...children) {

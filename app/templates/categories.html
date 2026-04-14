@@ -33,10 +33,9 @@
       display: flex;
       flex-wrap: wrap;
       gap: 0.35rem;
-      flex: 1;
-      min-height: 1.8em;
-      max-height: 5.6rem;
+      height: 5.6rem;
       overflow-y: auto;
+      align-content: flex-start;
       scrollbar-width: thin;
       scrollbar-color: var(--border) transparent;
     }
@@ -52,7 +51,7 @@
       color: var(--text-muted);
       white-space: nowrap;
     }
-    .cat-actions { display: flex; gap: 0.35rem; margin-top: 0.2rem; flex-wrap: wrap; }
+    .cat-actions { display: flex; gap: 0.35rem; margin-top: auto; flex-wrap: wrap; padding-top: 0.5rem; }
     .add-form {
       display: grid;
       grid-template-columns: 1fr 1fr auto auto;
@@ -98,6 +97,7 @@
   <div class="nav-links">
     <a href="/">Dashboard</a>
     <a href="/records">Records</a>
+    <a href="/budget">Budget</a>
     <a href="/categories" class="active">Categories</a>
     <a href="/import">Import</a>
     <a href="/settings">Settings</a>
@@ -201,16 +201,12 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js"></script>
+<script src="/static/js/utils.js?v=6"></script>
 <script src="/static/js/api.js"></script>
 <script>
 let allStats = [];
 let mergingId = null;
 let newlyAddedId = null;  // pinned to top until next full reload
-
-function escHtml(s) {
-  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
 
 function renderFormIssues(el, title, lines) {
   if (!lines || !lines.length) {

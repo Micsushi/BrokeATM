@@ -106,6 +106,7 @@
   <div class="nav-links">
     <a href="/">Dashboard</a>
     <a href="/records" class="active">Records</a>
+    <a href="/budget">Budget</a>
     <a href="/categories">Categories</a>
     <a href="/import">Import</a>
     <a href="/settings">Settings</a>
@@ -280,10 +281,10 @@
   </div>
 </div>
 
-<!-- Edit / Add Modal (shared) -->
+<!-- Edit Modal -->
 <div class="modal-overlay hidden" id="edit-modal">
   <div class="modal">
-    <h2 id="modal-title">Edit Transaction</h2>
+    <h2>Edit Transaction</h2>
     <div style="display:grid;gap:0.75rem">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
         <div>
@@ -330,8 +331,9 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=5"></script>
-<script src="/static/js/api.js?v=5"></script>
+<script src="/static/js/utils.js?v=6"></script>
+<script src="/static/js/api.js?v=6"></script>
+<script src="/static/js/add-tx-modal.js?v=3"></script>
 <script>
 /** Calendar date portion of API ``created_at`` (matches Date column formatting). */
 function fmtDateAdded(isoVal) {
@@ -347,7 +349,7 @@ let sortBy = "date";
 let sortDir = "asc";
 let categories = [];
 let accounts = [];
-let editingId = null;   // null = adding new
+let editingId = null;
 let selectedIds = new Set();
 let lastTableItems = [];
 let inlineEditBlurTimer = null;
@@ -390,6 +392,7 @@ async function init() {
   syncSortHeaders();
   syncDupToggleUi();
   applyColumnVisibility();
+  processRecurringOnLoad();
   loadRecords();
 }
 
@@ -670,25 +673,12 @@ function renderPagination(pages) {
 
 // ── Add Entry ──
 document.getElementById("btn-add-entry").addEventListener("click", () => {
-  editingId = null;
-  document.getElementById("modal-title").textContent = "Add Transaction";
-  document.getElementById("edit-save").textContent = "Add";
-  // Default to today
-  document.getElementById("edit-date").value = new Date().toISOString().slice(0, 10);
-  document.getElementById("edit-merchant").value = "";
-  document.getElementById("edit-amount").value = "";
-  document.getElementById("edit-type").value = "expense";
-  document.getElementById("edit-category").value = "";
-  document.getElementById("edit-account-sel").value = "";
-  document.getElementById("edit-notes").value = "";
-  document.getElementById("edit-modal").classList.remove("hidden");
+  openAddTxModal({ onSuccess: () => loadRecords() });
 });
 
 // ── Edit ──
 function openEdit(id) {
   editingId = id;
-  document.getElementById("modal-title").textContent = "Edit Transaction";
-  document.getElementById("edit-save").textContent = "Save";
   fetch(`/api/transactions/${id}`).then(r => r.json()).then(tx => {
     document.getElementById("edit-date").value = tx.transaction_date;
     document.getElementById("edit-merchant").value = tx.merchant_name;
@@ -728,12 +718,7 @@ document.getElementById("edit-save").addEventListener("click", async () => {
   };
 
   try {
-    if (editingId === null) {
-      await API.createTransaction(payload);
-      showAlert(document.getElementById("alerts"), "Transaction added.", "success");
-    } else {
-      await API.updateTransaction(editingId, payload);
-    }
+    await API.updateTransaction(editingId, payload);
     document.getElementById("edit-modal").classList.add("hidden");
     loadRecords();
   } catch (e) {
@@ -827,10 +812,6 @@ document.getElementById("btn-clear-filters").addEventListener("click", () => {
   currentPage = 1;
   loadRecords();
 });
-
-function escHtml(s) {
-  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
 
 function abortInlineCellEdit(restore) {
   const open = document.querySelector("td.cell-inline-editing");

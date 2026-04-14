@@ -6,7 +6,7 @@
   <title>Dashboard | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=4" />
+  <link rel="stylesheet" href="/static/css/main.css?v=5" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
     .legend {
@@ -37,62 +37,6 @@
       font-size: 0.72rem; font-weight: 700; color: var(--text-muted);
       text-transform: uppercase; letter-spacing: 0.07em;
     }
-    /* Unified picker row: range on left, chips on right */
-    .picker-unified {
-      display: flex;
-      align-items: flex-start;
-      gap: 5rem;
-      flex-wrap: wrap;
-    }
-    .picker-range {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex-shrink: 0;
-    }
-    .picker-range input[type="month"] {
-      color-scheme: dark;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 0.85rem;
-      padding: 0.35rem 0.6rem;
-      width: 140px;
-    }
-    .picker-range input[type="month"].range-active {
-      border-color: var(--accent);
-    }
-    .picker-range-sep {
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      font-weight: 600;
-      user-select: none;
-    }
-    .picker-chips-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex: 1;
-      justify-content: flex-end;
-      min-width: 0;
-    }
-    .picker-chips-wrap .ctrl-chip { flex-shrink: 0; }
-    /* Chips scroll horizontally when too many months */
-    .picker-chips-wrap .month-picker {
-      display: flex;
-      flex-wrap: nowrap;
-      gap: 0.45rem;
-      overflow-x: auto;
-      overflow-y: hidden;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-      padding-bottom: 2px;
-      min-width: 0;
-    }
-    .picker-chips-wrap .month-picker::-webkit-scrollbar { height: 3px; }
-    .picker-chips-wrap .month-picker::-webkit-scrollbar-track { background: transparent; }
-    .picker-chips-wrap .month-picker::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   </style>
 </head>
 <body>
@@ -101,6 +45,7 @@
   <div class="nav-links">
     <a href="/" class="active">Dashboard</a>
     <a href="/records">Records</a>
+    <a href="/budget">Budget</a>
     <a href="/categories">Categories</a>
     <a href="/import">Import</a>
     <a href="/settings">Settings</a>
@@ -120,22 +65,21 @@
 
   <!-- ── PIE SECTION ─────────────────────────────────────────────────── -->
   <div class="card mb-2">
-    <div class="section-header">
-      <span class="section-title">Totals &amp; Pie Charts: Period</span>
-      <div style="display:flex;align-items:center;gap:0.4rem">
+    <div class="picker-card-header">
+      <span class="section-title">Totals &amp; Pie Charts</span>
+      <div class="picker-card-controls">
         <button class="ctrl-chip" id="pie-all">All</button>
+        <span style="color:var(--border);font-size:0.8rem">·</span>
         <button class="ctrl-chip" id="pie-clear">Clear</button>
       </div>
     </div>
-    <div class="picker-unified">
-      <div class="picker-range">
-        <input type="month" id="pie-range-from" title="From month" />
-        <span class="picker-range-sep">──</span>
-        <input type="month" id="pie-range-to" title="To month" />
-      </div>
-      <div class="picker-chips-wrap">
-        <div class="month-picker" id="pie-picker"></div>
-      </div>
+    <div class="picker-range-row">
+      <input type="month" id="pie-range-from" title="From month" />
+      <span class="picker-range-sep">→</span>
+      <input type="month" id="pie-range-to" title="To month" />
+    </div>
+    <div class="picker-scroll-outer">
+      <div class="month-picker" id="pie-picker"></div>
     </div>
   </div>
 
@@ -171,22 +115,21 @@
 
   <!-- ── BAR SECTION ─────────────────────────────────────────────────── -->
   <div class="card mb-2">
-    <div class="section-header">
-      <span class="section-title">Bar Chart: Period</span>
-      <div style="display:flex;align-items:center;gap:0.4rem">
+    <div class="picker-card-header">
+      <span class="section-title">Bar Chart</span>
+      <div class="picker-card-controls">
         <button class="ctrl-chip" id="bar-all">All</button>
+        <span style="color:var(--border);font-size:0.8rem">·</span>
         <button class="ctrl-chip" id="bar-clear">Clear</button>
       </div>
     </div>
-    <div class="picker-unified">
-      <div class="picker-range">
-        <input type="month" id="bar-range-from" title="From month" />
-        <span class="picker-range-sep">──</span>
-        <input type="month" id="bar-range-to" title="To month" />
-      </div>
-      <div class="picker-chips-wrap">
-        <div class="month-picker" id="bar-picker"></div>
-      </div>
+    <div class="picker-range-row">
+      <input type="month" id="bar-range-from" title="From month" />
+      <span class="picker-range-sep">→</span>
+      <input type="month" id="bar-range-to" title="To month" />
+    </div>
+    <div class="picker-scroll-outer">
+      <div class="month-picker" id="bar-picker"></div>
     </div>
   </div>
 
@@ -198,20 +141,21 @@
 
   <!-- Large Expenses -->
   <div id="large-expenses-section" class="card mt-2" style="display:none">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+    <div class="picker-card-header">
       <div>
-        <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em">Large Expenses</div>
+        <span class="section-title">Large Expenses</span>
         <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.2rem" id="large-expenses-subtitle"></div>
       </div>
-      <a href="/settings" style="font-size:0.78rem;color:var(--accent);text-decoration:none;font-weight:600">⚙ Thresholds</a>
+      <div class="picker-card-controls">
+        <button class="ctrl-chip" id="le-clear-dates">All time</button>
+        <span style="color:var(--border);font-size:0.8rem">·</span>
+        <a href="/settings" style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;font-weight:600;transition:color 0.15s" onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--text-muted)'">⚙ Thresholds</a>
+      </div>
     </div>
-    <!-- Independent date range filter -->
-    <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.875rem;flex-wrap:wrap">
-      <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600">Period:</span>
-      <input type="month" id="le-date-from" title="From month" style="color-scheme:dark;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.82rem;padding:0.3rem 0.55rem;width:130px" />
-      <span style="color:var(--text-muted)">──</span>
-      <input type="month" id="le-date-to" title="To month" style="color-scheme:dark;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.82rem;padding:0.3rem 0.55rem;width:130px" />
-      <button class="btn btn-secondary btn-sm" id="le-clear-dates" style="font-size:0.8rem;padding:0.3rem 0.8rem">All time</button>
+    <div class="picker-range-row" style="margin-bottom:0.875rem">
+      <input type="month" id="le-date-from" title="From month" />
+      <span class="picker-range-sep">→</span>
+      <input type="month" id="le-date-to" title="To month" />
     </div>
     <div class="table-wrap">
       <table id="large-expenses-table" style="width:100%">
@@ -238,10 +182,29 @@
       </div>
     </div>
   </div>
+
+  <!-- Budget overview card -->
+  <div id="budget-card" class="card mt-2" style="display:none">
+    <div class="picker-card-header" style="margin-bottom:0.75rem">
+      <div>
+        <span class="section-title">Budget overview</span>
+      </div>
+      <div class="picker-card-controls">
+        <select id="budget-months-sel" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:0.8rem;padding:0.2rem 0.45rem">
+          <option value="3">3 months</option>
+          <option value="6" selected>6 months</option>
+          <option value="12">12 months</option>
+        </select>
+        <span style="color:var(--border);font-size:0.8rem">·</span>
+        <a href="/budget" style="font-size:0.8rem;color:var(--text-muted);text-decoration:none;font-weight:600;transition:color 0.15s" onmouseover="this.style.color='var(--accent-hover)'" onmouseout="this.style.color='var(--text-muted)'">Manage →</a>
+      </div>
+    </div>
+    <div id="budget-months-list" style="display:flex;flex-direction:column;gap:0.55rem"></div>
+  </div>
 </div>
 
-<script src="/static/js/utils.js?v=5"></script>
-<script src="/static/js/api.js?v=5"></script>
+<script src="/static/js/utils.js?v=6"></script>
+<script src="/static/js/api.js?v=6"></script>
 <script>
 let expensePieChart = null;
 let incomePieChart = null;
@@ -358,6 +321,8 @@ async function init() {
   syncRangeInputs("pie", pieSelected);
   syncRangeInputs("bar", barSelected);
 
+  processRecurringOnLoad();
+  loadBudgetCard();
   await Promise.all([loadPie(), loadBar(), loadLargeExpenses()]);
 }
 
@@ -370,7 +335,9 @@ function buildPicker(containerId, selectedSet, onChange) {
   sorted.forEach(({ ym, year, month }) => {
     const chip = document.createElement("button");
     chip.className = "month-chip" + (selectedSet.has(ym) ? " selected" : "");
-    chip.textContent = monthLabel(year, month);
+    const abbr = new Date(year, month - 1, 1).toLocaleDateString("en-CA", { month: "short" });
+    chip.textContent = `${abbr} '${String(year).slice(2)}`;
+    chip.title = monthLabel(year, month);
     chip.dataset.ym = ym;
     chip.addEventListener("click", () => {
       chip.classList.toggle("selected");
@@ -752,9 +719,44 @@ function renderBar(months) {
   });
 }
 
-function escHtml(s) {
-  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+// ── Budget overview card ──────────────────────────────────────────────────────
+
+async function loadBudgetCard() {
+  const months = parseInt(document.getElementById("budget-months-sel").value);
+  const data = await fetch(`/api/budget/summary?months=${months}`).then(r => r.json()).catch(() => null);
+  if (!data || data.total_budget == null) {
+    document.getElementById("budget-card").style.display = "none";
+    return;
+  }
+  document.getElementById("budget-card").style.display = "";
+
+  const list = document.getElementById("budget-months-list");
+  list.innerHTML = data.monthly.map(mo => {
+    const pct = Math.min((mo.total_spent / data.total_budget) * 100, 100);
+    const over = mo.total_spent > data.total_budget;
+    const fillColor = over ? "var(--danger)" : "rgba(124,130,255,0.75)";
+    const statusText = over
+      ? `$${(mo.total_spent - data.total_budget).toFixed(0)} over`
+      : `$${(data.total_budget - mo.total_spent).toFixed(0)} left`;
+    const statusColor = over ? "var(--danger)" : "#22c55e";
+    return `
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.25rem">
+          <span style="color:var(--text-muted);font-weight:600">${escHtml(mo.label)}</span>
+          <span>
+            <span style="font-family:'JetBrains Mono',monospace">$${mo.total_spent.toFixed(0)}</span>
+            <span style="color:var(--text-muted)"> / $${data.total_budget.toFixed(0)}</span>
+            <span style="margin-left:0.5rem;color:${statusColor};font-weight:600;font-size:0.75rem">${statusText}</span>
+          </span>
+        </div>
+        <div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${fillColor};border-radius:4px;transition:width 0.4s"></div>
+        </div>
+      </div>`;
+  }).join("");
 }
+
+document.getElementById("budget-months-sel").addEventListener("change", loadBudgetCard);
 
 init();
 </script>

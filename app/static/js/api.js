@@ -198,6 +198,33 @@ const API = {
     return res.json();
   },
 
+  async getRecurringRules() {
+    const res = await fetch("/api/recurring");
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async createRecurringRule(payload) {
+    const res = await fetch("/api/recurring", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseApiError(res));
+    return res.json();
+  },
+
+  async deleteRecurringRule(id) {
+    const res = await fetch(`/api/recurring/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(await res.text());
+  },
+
+  async processRecurring() {
+    const res = await fetch("/api/recurring/process", { method: "POST" });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
   async getLargeExpenses(params = {}) {
     const qs = new URLSearchParams(
       Object.fromEntries(Object.entries(params).filter(([, v]) => v != null && v !== "" && v !== false && v !== undefined))

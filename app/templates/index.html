@@ -82,6 +82,7 @@
   <div class="nav-links">
     <a href="/">Dashboard</a>
     <a href="/records">Records</a>
+    <a href="/budget">Budget</a>
     <a href="/categories">Categories</a>
     <a href="/import" class="active">Import</a>
     <a href="/settings">Settings</a>
@@ -221,8 +222,9 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js"></script>
-<script src="/static/js/api.js"></script>
+<script src="/static/js/utils.js?v=6"></script>
+<script src="/static/js/api.js?v=6"></script>
+<script src="/static/js/add-tx-modal.js?v=3"></script>
 <script>
 let parsedData = null;
 let reviewRows = [];
@@ -230,12 +232,10 @@ let categories = [];
 /** Comma-separated names for the import batch (single or multi file). */
 let importFilename = "";
 
-function escHtml(s) {
-  return String(s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
 
 async function init() {
   categories = await API.getCategories();
+  processRecurringOnLoad();
 }
 init();
 
@@ -804,114 +804,18 @@ function resetImport() {
 }
 
 // ── Add Entry (manual) ──
-let addEntryCategories = [];
-let addEntryAccounts = [];
-
-async function initAddEntry() {
-  [addEntryCategories, addEntryAccounts] = await Promise.all([API.getCategories(), API.getAccounts()]);
-  const catSel = document.getElementById("ae-category");
-  catSel.innerHTML = `<option value="">No category</option>` +
-    addEntryCategories.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
-  const accSel = document.getElementById("ae-account");
-  accSel.innerHTML = `<option value="">No account</option>` +
-    addEntryAccounts.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join("");
-}
-
-document.getElementById("btn-add-entry-import").addEventListener("click", async () => {
-  await initAddEntry();
-  document.getElementById("ae-date").value = new Date().toISOString().slice(0, 10);
-  document.getElementById("ae-merchant").value = "";
-  document.getElementById("ae-amount").value = "";
-  document.getElementById("ae-type").value = "expense";
-  document.getElementById("ae-category").value = "";
-  document.getElementById("ae-account").value = "";
-  document.getElementById("ae-notes").value = "";
-  document.getElementById("ae-modal").classList.remove("hidden");
-});
-
-document.getElementById("ae-cancel").addEventListener("click", () => {
-  document.getElementById("ae-modal").classList.add("hidden");
-});
-
-document.getElementById("ae-save").addEventListener("click", async () => {
-  const dateVal = document.getElementById("ae-date").value;
-  const merchantVal = document.getElementById("ae-merchant").value.trim();
-  const amountVal = parseFloat(document.getElementById("ae-amount").value);
-
-  if (!dateVal || !merchantVal || isNaN(amountVal) || amountVal < 0) {
-    showAlert(document.getElementById("alerts"), "Date, merchant, and a valid amount are required.", "error");
-    return;
-  }
-
-  const payload = {
-    transaction_date: dateVal,
-    merchant_name: merchantVal,
-    amount: amountVal,
-    transaction_type: document.getElementById("ae-type").value,
-    category_id: document.getElementById("ae-category").value ? +document.getElementById("ae-category").value : null,
-    account_id: document.getElementById("ae-account").value ? +document.getElementById("ae-account").value : null,
-    notes: document.getElementById("ae-notes").value.trim() || null,
-    currency: "CAD",
-  };
-
-  try {
-    await API.createTransaction(payload);
-    document.getElementById("ae-modal").classList.add("hidden");
-    showAlert(document.getElementById("alerts"), "Entry added successfully.", "success");
-  } catch (e) {
-    showAlert(document.getElementById("alerts"), e.message, "error");
-  }
+document.getElementById("btn-add-entry-import").addEventListener("click", () => {
+  openAddTxModal({
+    onSuccess: (count) => {
+      showAlert(
+        document.getElementById("alerts"),
+        count === 1 ? "Entry added successfully." : `${count} entries added successfully.`,
+        "success"
+      );
+    },
+  });
 });
 </script>
 
-<!-- Add Entry Modal -->
-<div class="modal-overlay hidden" id="ae-modal">
-  <div class="modal">
-    <h2>Add Transaction</h2>
-    <div style="display:grid;gap:0.75rem">
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
-        <div>
-          <label>Date <span style="color:var(--danger)">*</span></label>
-          <input type="date" id="ae-date" required />
-        </div>
-        <div>
-          <label>Amount (CAD) <span style="color:var(--danger)">*</span></label>
-          <input type="number" id="ae-amount" step="0.01" min="0" required />
-        </div>
-      </div>
-      <div>
-        <label>Merchant / Description <span style="color:var(--danger)">*</span></label>
-        <input type="text" id="ae-merchant" required />
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem">
-        <div>
-          <label>Type</label>
-          <select id="ae-type">
-            <option value="expense">Expense</option>
-            <option value="income">Income</option>
-            <option value="refund">Refund</option>
-            <option value="transfer">Transfer</option>
-          </select>
-        </div>
-        <div>
-          <label>Category</label>
-          <select id="ae-category"></select>
-        </div>
-      </div>
-      <div>
-        <label>Account</label>
-        <select id="ae-account"></select>
-      </div>
-      <div>
-        <label>Notes</label>
-        <textarea id="ae-notes" rows="2" placeholder="Optional note…"></textarea>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" id="ae-cancel">Cancel</button>
-      <button class="btn btn-primary" id="ae-save">Add</button>
-    </div>
-  </div>
-</div>
 </body>
 </html>

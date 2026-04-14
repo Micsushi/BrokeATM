@@ -94,6 +94,36 @@ class Transaction(Base):
     category: Mapped["Category | None"] = relationship("Category", back_populates="transactions")
 
 
+class BudgetRule(Base):
+    __tablename__ = "budget_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    category_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("categories.id", ondelete="CASCADE"), nullable=True
+    )
+    limit_amount: Mapped[float] = mapped_column(Float, nullable=False)
+    is_total: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class RecurringRule(Base):
+    __tablename__ = "recurring_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    merchant_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    transaction_type: Mapped[str] = mapped_column(String(20), default="expense", nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="CAD", nullable=False)
+    category_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("categories.id"), nullable=True)
+    account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("accounts.id"), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    frequency: Mapped[str] = mapped_column(String(20), nullable=False)  # monthly, weekly, biweekly, yearly
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # null = forever
+    last_created_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class ImportBatch(Base):
     __tablename__ = "import_batches"
 

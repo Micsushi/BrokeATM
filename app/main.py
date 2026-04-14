@@ -6,9 +6,11 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import (
     accounts_router,
+    budget_router,
     categories_router,
     dashboard_router,
     import_router,
+    recurring_router,
     transactions_router,
 )
 from app.core.config import settings
@@ -32,6 +34,8 @@ app.include_router(transactions_router.router)
 app.include_router(categories_router.router)
 app.include_router(accounts_router.router)
 app.include_router(dashboard_router.router)
+app.include_router(recurring_router.router)
+app.include_router(budget_router.router)
 
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -67,3 +71,8 @@ def categories_page() -> FileResponse:
 @app.get("/settings")
 def settings_page() -> FileResponse:
     return FileResponse(str(TEMPLATES_DIR / "settings.html"))
+
+
+@app.get("/budget")
+def budget_page() -> FileResponse:
+    return FileResponse(str(TEMPLATES_DIR / "budget.html"))

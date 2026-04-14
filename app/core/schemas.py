@@ -246,3 +246,85 @@ class LargeExpensesResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class BudgetCategoryRule(BaseModel):
+    category_id: int
+    limit_amount: float
+
+
+class BudgetSave(BaseModel):
+    total: float | None = None
+    rules: list[BudgetCategoryRule] = []
+
+
+class BudgetCategoryAvg(BaseModel):
+    category_id: int | None
+    category_name: str
+    avg_monthly: float
+    limit_amount: float | None = None
+
+
+class BudgetSettingsOut(BaseModel):
+    total: float | None
+    avg_months: int
+    categories: list[BudgetCategoryAvg]
+
+
+class BudgetMonthItem(BaseModel):
+    category_id: int | None
+    category_name: str
+    budget: float | None
+    spent: float
+    over: bool
+
+
+class BudgetMonthSummary(BaseModel):
+    ym: str
+    label: str
+    total_budget: float | None
+    total_spent: float
+    others_spent: float
+    items: list[BudgetMonthItem]
+
+
+class BudgetSummaryResponse(BaseModel):
+    months: int
+    total_budget: float | None
+    monthly: list[BudgetMonthSummary]
+
+
+class RecurringRuleCreate(BaseModel):
+    merchant_name: str
+    amount: float
+    transaction_type: str = "expense"
+    currency: str = "CAD"
+    category_id: int | None = None
+    account_id: int | None = None
+    notes: str | None = None
+    frequency: str  # monthly, weekly, biweekly, yearly
+    start_date: date
+    end_date: date | None = None
+
+
+class RecurringRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    merchant_name: str
+    amount: float
+    transaction_type: str
+    currency: str
+    category_id: int | None
+    account_id: int | None
+    notes: str | None
+    frequency: str
+    start_date: date
+    end_date: date | None
+    last_created_date: date | None
+    created_at: datetime
+
+
+class ProcessRecurringResponse(BaseModel):
+    created: int
+    rules_triggered: int

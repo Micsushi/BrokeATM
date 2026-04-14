@@ -357,3 +357,10 @@ def delete_transaction(tx_id: int, db: Session = Depends(get_db)) -> None:
         raise HTTPException(status_code=404, detail="Transaction not found")
     db.delete(tx)
     db.commit()
+
+
+@router.post("/delete-all", status_code=200)
+def delete_all_transactions(db: Session = Depends(get_db)) -> Any:
+    deleted = db.query(Transaction).delete()
+    db.commit()
+    return {"deleted": deleted}

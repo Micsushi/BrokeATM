@@ -86,6 +86,7 @@
   <div class="nav-links">
     <a href="/">Dashboard</a>
     <a href="/records">Records</a>
+    <a href="/budget">Budget</a>
     <a href="/categories">Categories</a>
     <a href="/import">Import</a>
     <a href="/settings" class="active">Settings</a>
@@ -170,6 +171,42 @@
         <input type="number" id="default-bar-months" min="1" max="36" step="1" placeholder="6" />
         <span class="setting-unit">months</span>
       </div>
+    </div>
+  </div>
+
+  <!-- Danger Zone -->
+  <div class="card settings-section" style="border-color:rgba(239,68,68,0.35)">
+    <h2 style="color:var(--danger);border-bottom-color:rgba(239,68,68,0.25)">Danger Zone</h2>
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>Clear all transaction records</strong>
+        <span>Permanently deletes every transaction in the database. This cannot be undone.</span>
+      </div>
+      <div class="setting-control">
+        <button class="btn btn-danger" id="btn-clear-records">Clear all records</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>Clear all categories</strong>
+        <span>Permanently deletes every category. Transactions will become uncategorized.</span>
+      </div>
+      <div class="setting-control">
+        <button class="btn btn-danger" id="btn-clear-cats">Clear all categories</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm clear modal -->
+<div class="modal-overlay hidden" id="clear-modal">
+  <div class="modal" style="max-width:420px">
+    <h2 style="color:var(--danger)" id="clear-title">Delete all records?</h2>
+    <p style="color:var(--text-muted);font-size:0.9rem;margin:0.75rem 0 1.25rem" id="clear-body"></p>
+    <div id="clear-alerts"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="clear-cancel">Cancel</button>
+      <button class="btn btn-danger" id="clear-confirm">Yes, delete everything</button>
     </div>
   </div>
 </div>
@@ -318,6 +355,87 @@ document.getElementById("btn-reset").addEventListener("click", () => {
 const s = loadSettings();
 buildColumnGrid(s);
 fillForm(s);
+
+// ── Danger zone ───────────────────────────────────────────────────────────────
+
+let _clearAction = null;
+
+function openClearModal(title, body, action) {
+  _clearAction = action;
+  document.getElementById("clear-title").textContent = title;
+  document.getElementById("clear-body").innerHTML = body;
+  document.getElementById("clear-alerts").innerHTML = "";
+  document.getElementById("clear-modal").classList.remove("hidden");
+}
+
+function closeClearModal() {
+  document.getElementById("clear-modal").classList.add("hidden");
+  _clearAction = null;
+}
+
+document.getElementById("clear-modal").addEventListener("click", e => {
+  if (e.target === document.getElementById("clear-modal")) closeClearModal();
+});
+document.getElementById("clear-cancel").addEventListener("click", closeClearModal);
+
+document.getElementById("btn-clear-records").addEventListener("click", async () => {
+  const res = await fetch("/api/transactions?page=1&page_size=1").then(r => r.json()).catch(() => null);
+  const count = res ? res.total : "all";
+  openClearModal(
+    "Delete all records?",
+    `This will permanently delete <strong style="color:var(--text)">${count} transaction${count === 1 ? "" : "s"}</strong> from the database. Categories and accounts are kept. <strong style="color:var(--danger)">This cannot be undone.</strong>`,
+    async () => {
+      const r = await fetch("/api/transactions/delete-all", { method: "POST" });
+      if (!r.ok) throw new Error(await r.text());
+      return (await r.json()).deleted;
+    }
+  );
+});
+
+document.getElementById("btn-clear-cats").addEventListener("click", async () => {
+  const res = await fetch("/api/categories").then(r => r.json()).catch(() => []);
+  const count = Array.isArray(res) ? res.length : "all";
+  openClearModal(
+    "Delete all categories?",
+    `This will permanently delete <strong style="color:var(--text)">${count} categor${count === 1 ? "y" : "ies"}</strong>. Transactions will become uncategorized. <strong style="color:var(--danger)">This cannot be undone.</strong>`,
+    async () => {
+      const cats = await fetch("/api/categories").then(r => r.json());
+      for (const c of cats) {
+        await fetch(`/api/categories/${c.id}`, { method: "DELETE" });
+      }
+      return cats.length;
+    }
+  );
+});
+
+document.getElementById("clear-confirm").addEventListener("click", async () => {
+  if (!_clearAction) return;
+  const btn = document.getElementById("clear-confirm");
+  btn.disabled = true;
+  btn.textContent = "Deleting…";
+  try {
+    const n = await _clearAction();
+    closeClearModal();
+    const toast = document.getElementById("saved-toast");
+    toast.textContent = `Deleted ${n} item${n === 1 ? "" : "s"}`;
+    toast.classList.add("show");
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => {
+      toast.classList.remove("show");
+      toast.textContent = "Saved";
+    }, 2500);
+  } catch (e) {
+    const alertBox = document.getElementById("clear-alerts");
+    const el = document.createElement("div");
+    el.className = "alert alert-error";
+    el.textContent = e.message;
+    alertBox.innerHTML = "";
+    alertBox.appendChild(el);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Yes, delete everything";
+  }
+});
 </script>
 </body>
 </html>

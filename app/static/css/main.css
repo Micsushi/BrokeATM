@@ -354,62 +354,101 @@ tr:hover td { background: rgba(124,130,255,0.07); }
 .chart-wrap { position: relative; height: 280px; }
 
 /* ── Month picker (dashboard) ────────────────────────────────────── */
-.month-picker-wrap { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-.month-picker { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.picker-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+}
+.picker-card-header .section-title { margin: 0; }
+.picker-card-controls { display: flex; align-items: center; gap: 0.5rem; }
+.picker-range-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.65rem;
+  flex-wrap: wrap;
+}
+.picker-range-row input[type="month"] {
+  color-scheme: dark;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 0.3rem 0.6rem;
+  width: 130px;
+  transition: border-color 0.15s;
+}
+.picker-range-row input[type="month"]:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124,130,255,0.15);
+}
+.picker-range-row input[type="month"].range-active { border-color: var(--accent); }
+.picker-range-sep { color: var(--text-muted); font-size: 0.85rem; user-select: none; }
+.picker-scroll-outer {
+  position: relative;
+}
+.picker-scroll-outer::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 3rem;
+  background: linear-gradient(to right, transparent, var(--surface));
+  pointer-events: none;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.month-picker {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.35rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.month-picker::-webkit-scrollbar { display: none; }
 .month-chip {
-  padding: 0.32rem 0.9rem;
-  border-radius: 99px;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 600;
-  transition: all 0.15s;
-}
-.month-chip:hover { border-color: var(--accent); color: var(--accent-hover); }
-.month-chip.selected {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  box-shadow: 0 2px 10px rgba(124,130,255,0.35);
-}
-
-/* All / Clear control chips */
-.ctrl-chip {
-  padding: 0.32rem 0.9rem;
-  border-radius: 99px;
-  border: 1px solid var(--border);
-  background: var(--surface2);
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 0.84rem;
-  font-weight: 700;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.ctrl-chip:hover { border-color: var(--accent); color: var(--accent-hover); }
-.ctrl-chip.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-  box-shadow: 0 2px 10px rgba(124,130,255,0.35);
-}
-
-/* Month input mode toggle */
-.picker-mode-tabs { display: flex; gap: 0.3rem; }
-.picker-mode-tab {
   padding: 0.28rem 0.75rem;
-  border-radius: 99px;
+  border-radius: 6px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--surface2);
   color: var(--text-muted);
+  cursor: pointer;
   font-size: 0.78rem;
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  letter-spacing: 0.01em;
 }
-.picker-mode-tab.active { border-color: var(--accent); color: var(--accent-hover); background: rgba(124,130,255,0.1); }
+.month-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent-hover);
+  background: rgba(124,130,255,0.08);
+}
+.month-chip.selected {
+  background: rgba(124,130,255,0.18);
+  color: var(--accent-hover);
+  border-color: var(--accent);
+}
+
+/* All / Clear — text-style buttons */
+.ctrl-chip {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0.1rem;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+.ctrl-chip:hover { color: var(--accent-hover); }
+.ctrl-chip.active { color: var(--accent-hover); }
 
 /* Manual month/year input row */
 .manual-month-row {
