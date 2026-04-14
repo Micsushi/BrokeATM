@@ -22,9 +22,14 @@
       display: flex;
       flex-direction: column;
       gap: 0.6rem;
-      transition: border-color 0.15s;
+      transition: border-color 0.15s, background 0.15s;
+      position: relative;
     }
     .cat-card:hover { border-color: var(--accent); }
+    .cat-card.selected {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+    }
     .cat-card-header { display: flex; align-items: center; gap: 0.6rem; }
     .cat-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; cursor: pointer; }
     .cat-name { font-weight: 600; font-size: 0.9rem; flex: 1; }
@@ -89,6 +94,74 @@
       font-size: 0.8rem;
       padding: 0.3rem 0.5rem;
     }
+
+    /* Checkboxes on cards */
+    .cat-checkbox {
+      width: 16px; height: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      flex-shrink: 0;
+      accent-color: var(--accent);
+      margin-right: 0.1rem;
+    }
+
+    /* Bulk action bar - matches records.html pattern */
+    .bulk-bar {
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+      padding: 0.6rem 1rem;
+      background: rgba(99,102,241,0.1);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: var(--radius);
+      margin-bottom: 0.75rem;
+      font-size: 0.875rem;
+    }
+    .bulk-count { font-weight: 600; color: var(--accent); }
+
+    /* Keyword info box */
+    .kw-info-box {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+    .kw-info-box summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text);
+      padding: 0.5rem 0.75rem;
+      user-select: none;
+      font-size: 0.82rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .kw-info-box[open] summary { border-bottom: 1px solid var(--border); }
+    .kw-info-body {
+      padding: 0.65rem 0.75rem;
+      line-height: 1.6;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .kw-info-body li { margin-left: 1rem; }
+
+    /* Conflict warnings (non-blocking) */
+    .conflict-shadow {
+      font-size: 0.8rem;
+      background: color-mix(in srgb, #f59e0b 12%, var(--surface));
+      border: 1px solid #f59e0b88;
+      border-radius: 6px;
+      padding: 0.5rem 0.75rem;
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .conflict-shadow-title { font-weight: 600; color: #d97706; margin-bottom: 0.2rem; font-size: 0.82rem; }
+    .conflict-shadow ul { margin: 0.25rem 0 0 1rem; }
+    .conflict-shadow li { font-size: 0.78rem; }
   </style>
 </head>
 <body>
@@ -144,16 +217,26 @@
     </div>
   </div>
 
-  <!-- Stats summary -->
-  <div class="flex items-center justify-between mb-1">
+  <!-- Stats + controls row -->
+  <div class="flex items-center justify-between mb-1" style="gap:0.5rem">
     <span id="cat-count" class="text-muted" style="font-size:0.85rem"></span>
     <div class="flex items-center gap-1">
-      <select id="sort-cats" style="width:200px;font-size:0.95rem;padding:0.5rem 0.85rem">
+      <select id="sort-cats" style="font-size:0.95rem;padding:0.5rem 0.85rem">
         <option value="alpha">A to Z</option>
         <option value="created">Newest first</option>
       </select>
       <input type="text" id="search-cats" placeholder="🔍 Search…" style="width:200px;font-size:0.95rem;padding:0.5rem 0.85rem" />
     </div>
+  </div>
+
+  <!-- Bulk action bar (always visible, matches records.html) -->
+  <div class="bulk-bar" id="bulk-bar">
+    <span class="bulk-count" id="bulk-count">0 selected</span>
+    <button class="btn btn-ghost btn-sm" id="btn-select-all">Select all</button>
+    <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Deselect all</button>
+    <div style="height:20px;width:1px;background:var(--border)"></div>
+    <button class="btn btn-ghost btn-sm" id="btn-bulk-merge" style="min-width:120px;display:none">Merge</button>
+    <button class="btn btn-danger btn-sm" id="btn-bulk-delete" style="display:none">Delete selected</button>
   </div>
 
   <!-- Category grid -->
@@ -162,7 +245,7 @@
   </div>
 </div>
 
-<!-- Merge modal -->
+<!-- Single-category merge modal -->
 <div class="modal-overlay hidden" id="merge-modal">
   <div class="modal">
     <h2>Merge Category</h2>
@@ -180,16 +263,60 @@
   </div>
 </div>
 
+<!-- Bulk merge modal -->
+<div class="modal-overlay hidden" id="bulk-merge-modal">
+  <div class="modal">
+    <h2>Merge Categories</h2>
+    <p class="text-muted mb-2" style="font-size:0.85rem">
+      Combine <strong id="bulk-merge-count"></strong> categories into a new one, then delete the originals.
+    </p>
+    <div id="bulk-merge-sources" style="margin-bottom:0.75rem;font-size:0.82rem;color:var(--text-muted)"></div>
+    <div id="bulk-merge-error" class="hidden" style="margin-bottom:0.75rem"></div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:0.75rem;align-items:end">
+      <div class="form-group">
+        <label>New category name</label>
+        <input type="text" id="bulk-merge-name" placeholder="e.g. combined" />
+      </div>
+      <div class="form-group">
+        <label>Color</label>
+        <div style="position:relative;display:inline-block;width:44px;height:36px">
+          <input type="color" id="bulk-merge-color" value="#6366f1"
+            style="position:absolute;inset:0;width:100%;height:100%;cursor:pointer;border:none;padding:0;border-radius:7px" />
+          <div class="color-swatch-btn" id="bulk-merge-color-swatch"
+            style="position:absolute;inset:0;pointer-events:none;z-index:1"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" id="bulk-merge-cancel">Cancel</button>
+      <button class="btn btn-primary" id="bulk-merge-confirm">Merge</button>
+    </div>
+  </div>
+</div>
+
 <!-- Keywords modal -->
 <div class="modal-overlay hidden" id="kw-modal">
-  <div class="modal" style="max-width:520px">
+  <div class="modal" style="max-width:540px">
     <h2>Keywords: <span id="kw-cat-name"></span></h2>
-    <p class="text-muted mb-2" style="font-size:0.82rem">
-      One keyword or phrase per line. Matched case-insensitively against merchant names during import.
-    </p>
+
+    <!-- How keywords work -->
+    <details class="kw-info-box mb-2">
+      <summary>ℹ How keywords work</summary>
+      <div class="kw-info-body">
+        <ul>
+          <li>Matched as <strong>substrings</strong> of the merchant name, case-insensitively.</li>
+          <li>During import, the <strong>first matching category wins</strong> — match order is not alphabetical, it depends on when the category was created. Avoid overlapping keywords.</li>
+          <li>Example: if "cash" and "cashback" are in different categories, any merchant containing "cashback" will also trigger "cash". The category whose keyword was stored first wins.</li>
+          <li>More specific keywords (longer) are safer. Short keywords like "bar" or "gas" can produce false positives.</li>
+          <li>Duplicate keywords (exact match in two categories) are blocked. Substring overlaps show a warning.</li>
+        </ul>
+      </div>
+    </details>
+
     <div id="kw-conflicts" class="hidden" style="margin-bottom:0.75rem"></div>
+    <div id="kw-shadow-warnings" class="hidden" style="margin-bottom:0.75rem"></div>
     <div>
-      <label>Keywords</label>
+      <label>Keywords <span style="font-weight:400;color:var(--text-muted);font-size:0.8rem">(one per line)</span></label>
       <textarea id="kw-input" rows="8"
         style="width:100%;resize:vertical;font-size:0.85rem;font-family:monospace;line-height:1.6"
         placeholder="uber&#10;lyft&#10;taxi&#10;transit"></textarea>
@@ -201,12 +328,15 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=6"></script>
+<script src="/static/js/utils.js?v=7"></script>
 <script src="/static/js/api.js"></script>
 <script>
 let allStats = [];
 let mergingId = null;
-let newlyAddedId = null;  // pinned to top until next full reload
+let newlyAddedId = null;
+let selectedIds = new Set();
+
+// ── Alert helpers ──
 
 function renderFormIssues(el, title, lines) {
   if (!lines || !lines.length) {
@@ -227,6 +357,8 @@ function clearFormIssues(el) {
   el.innerHTML = "";
 }
 
+// ── Load / render ──
+
 async function loadStats(keepNew = false) {
   const res = await fetch("/api/categories/stats");
   allStats = await res.json();
@@ -241,10 +373,8 @@ function sortedStats(stats) {
   if (sort === "alpha") {
     copy.sort((a, b) => a.name.localeCompare(b.name));
   } else {
-    // newest first = descending id (higher id = created later)
     copy.sort((a, b) => b.id - a.id);
   }
-  // pin newly added to top regardless of sort
   if (newlyAddedId !== null) {
     const idx = copy.findIndex(c => c.id === newlyAddedId);
     if (idx > 0) {
@@ -266,9 +396,13 @@ function renderGrid(stats) {
     return;
   }
 
-  grid.innerHTML = filtered.map(c => `
-    <div class="cat-card" data-id="${c.id}">
+  grid.innerHTML = filtered.map(c => {
+    const isSelected = selectedIds.has(c.id);
+    return `
+    <div class="cat-card${isSelected ? " selected" : ""}" data-id="${c.id}">
       <div class="cat-card-header">
+        <input type="checkbox" class="cat-checkbox" ${isSelected ? "checked" : ""}
+          onchange="toggleSelect(${c.id})" />
         <span class="cat-dot" style="background:${c.color || '#6366f1'}" title="Click to change color"
           onclick="pickColor(${c.id}, this)"></span>
         <span class="cat-name" id="name-${c.id}">${escHtml(c.name)}</span>
@@ -285,9 +419,136 @@ function renderGrid(stats) {
         <button class="btn btn-ghost btn-sm" onclick="startMerge(${c.id}, '${escHtml(c.name)}')">Merge</button>
         <button class="btn btn-danger btn-sm" onclick="deleteCat(${c.id})" ${c.tx_count > 0 ? 'title="Has transactions: they will become uncategorized"' : ''}>Delete</button>
       </div>
-    </div>
-  `).join("");
+    </div>`;
+  }).join("");
 }
+
+// ── Selection ──
+
+document.getElementById("btn-select-all").addEventListener("click", () => {
+  const filter = document.getElementById("search-cats").value.toLowerCase();
+  const visible = allStats.filter(c => !filter || c.name.includes(filter));
+  const allVisible = visible.every(c => selectedIds.has(c.id));
+  if (allVisible) {
+    visible.forEach(c => selectedIds.delete(c.id));
+  } else {
+    visible.forEach(c => selectedIds.add(c.id));
+  }
+  renderGrid(allStats);
+  updateBulkBar();
+});
+
+function toggleSelect(id) {
+  if (selectedIds.has(id)) {
+    selectedIds.delete(id);
+  } else {
+    selectedIds.add(id);
+  }
+  renderGrid(allStats);
+  updateBulkBar();
+}
+
+function updateBulkBar() {
+  const n = selectedIds.size;
+  document.getElementById("bulk-count").textContent = n === 0 ? "0 selected" : `${n} selected`;
+  document.getElementById("btn-bulk-delete").style.display = n >= 1 ? "" : "none";
+  document.getElementById("btn-bulk-merge").style.display = n >= 2 ? "" : "none";
+}
+
+document.getElementById("btn-deselect-all").addEventListener("click", () => {
+  selectedIds.clear();
+  renderGrid(allStats);
+  updateBulkBar();
+});
+
+// ── Bulk delete ──
+
+document.getElementById("btn-bulk-delete").addEventListener("click", async () => {
+  const ids = [...selectedIds];
+  if (!ids.length) return;
+  const cats = allStats.filter(c => ids.includes(c.id));
+  const totalTx = cats.reduce((s, c) => s + c.tx_count, 0);
+  const names = cats.map(c => c.name).join(", ");
+  const msg = totalTx > 0
+    ? `Delete ${ids.length} categories (${names})?\n\nTheir ${totalTx} transaction(s) will become uncategorized.`
+    : `Delete ${ids.length} categories (${names})?`;
+  if (!confirm(msg)) return;
+  try {
+    await Promise.all(ids.map(id => API.deleteCategory(id)));
+    selectedIds.clear();
+    await loadStats();
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  }
+});
+
+// ── Bulk merge ──
+
+document.getElementById("btn-bulk-merge").addEventListener("click", () => {
+  const ids = [...selectedIds];
+  if (ids.length < 2) return;
+  const cats = allStats.filter(c => ids.includes(c.id));
+  const totalTx = cats.reduce((s, c) => s + c.tx_count, 0);
+
+  document.getElementById("bulk-merge-count").textContent = `${ids.length}`;
+  document.getElementById("bulk-merge-sources").innerHTML =
+    `Merging: ${cats.map(c => `<strong>${escHtml(c.name)}</strong>`).join(", ")} `
+    + `(${totalTx} transaction${totalTx !== 1 ? "s" : ""} total)`;
+  document.getElementById("bulk-merge-name").value = "";
+  clearFormIssues(document.getElementById("bulk-merge-error"));
+  document.getElementById("bulk-merge-modal").classList.remove("hidden");
+  document.getElementById("bulk-merge-name").focus();
+});
+
+document.getElementById("bulk-merge-cancel").addEventListener("click", () => {
+  document.getElementById("bulk-merge-modal").classList.add("hidden");
+});
+
+document.getElementById("bulk-merge-color").addEventListener("input", (e) => {
+  document.getElementById("bulk-merge-color-swatch").style.background = e.target.value;
+});
+
+document.getElementById("bulk-merge-confirm").addEventListener("click", async () => {
+  const nameRaw = document.getElementById("bulk-merge-name").value.trim();
+  const color = document.getElementById("bulk-merge-color").value;
+  const errorEl = document.getElementById("bulk-merge-error");
+  const ids = [...selectedIds];
+
+  if (!nameRaw) {
+    renderFormIssues(errorEl, "Enter a name for the new category.", []);
+    errorEl.className = "alert alert-error";
+    errorEl.textContent = "Enter a name for the new category.";
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  const norm = nameRaw.toLowerCase();
+  const existingConflict = allStats.find(c => c.name === norm && !ids.includes(c.id));
+  if (existingConflict) {
+    errorEl.className = "alert alert-error";
+    errorEl.textContent = `A category named "${norm}" already exists.`;
+    errorEl.classList.remove("hidden");
+    return;
+  }
+  clearFormIssues(errorEl);
+
+  try {
+    // Create the new merged category
+    const created = await API.createCategory({ name: nameRaw, color, keywords: null });
+    // Reassign all transactions from each selected category to the new one
+    for (const srcId of ids) {
+      const txData = await API.getTransactions({ category_id: srcId, page_size: 1000 });
+      await Promise.all(txData.items.map(tx => API.updateTransaction(tx.id, { category_id: created.id })));
+      await API.deleteCategory(srcId);
+    }
+    document.getElementById("bulk-merge-modal").classList.add("hidden");
+    selectedIds.clear();
+    await loadStats();
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), e.message, "error");
+  }
+});
+
+// ── Add category ──
 
 function collectAddCategoryIssues(nameRaw, keywords) {
   const issues = [];
@@ -301,7 +562,7 @@ function collectAddCategoryIssues(nameRaw, keywords) {
       );
     }
   }
-  for (const c of findConflicts(keywords, null)) {
+  for (const c of findExactConflicts(keywords, null)) {
     issues.push(
       `"${c.keyword}" is already a keyword on "${c.category}". Remove it here or edit that category.`
     );
@@ -309,7 +570,6 @@ function collectAddCategoryIssues(nameRaw, keywords) {
   return issues;
 }
 
-// ── Add ──
 document.getElementById("btn-add").addEventListener("click", async () => {
   const conflictEl = document.getElementById("add-conflicts");
   const nameRaw = document.getElementById("new-name").value;
@@ -346,12 +606,12 @@ document.getElementById("new-name").addEventListener("input", () => {
 document.getElementById("new-keywords").addEventListener("input", () => {
   clearFormIssues(document.getElementById("add-conflicts"));
 });
-
 document.getElementById("new-name").addEventListener("keydown", (e) => {
   if (e.key === "Enter") document.getElementById("btn-add").click();
 });
 
 // ── Rename ──
+
 function startRename(id) {
   const span = document.getElementById(`name-${id}`);
   const current = span.textContent;
@@ -385,6 +645,7 @@ function startRename(id) {
 }
 
 // ── Color picker ──
+
 function pickColor(id, dotEl) {
   const picker = document.createElement("input");
   picker.type = "color";
@@ -407,7 +668,8 @@ function pickColor(id, dotEl) {
   picker.addEventListener("blur", () => picker.remove());
 }
 
-// ── Merge ──
+// ── Single merge ──
+
 function startMerge(id, name) {
   mergingId = id;
   document.getElementById("merge-from-name").textContent = name;
@@ -427,7 +689,6 @@ document.getElementById("merge-confirm").addEventListener("click", async () => {
   const targetId = +document.getElementById("merge-target").value;
   if (!targetId || !mergingId) return;
   try {
-    // Re-assign all transactions from mergingId to targetId
     const txData = await API.getTransactions({ category_id: mergingId, page_size: 1000 });
     await Promise.all(txData.items.map(tx => API.updateTransaction(tx.id, { category_id: targetId })));
     await API.deleteCategory(mergingId);
@@ -439,6 +700,7 @@ document.getElementById("merge-confirm").addEventListener("click", async () => {
 });
 
 // ── Delete ──
+
 async function deleteCat(id) {
   const cat = allStats.find(c => c.id === id);
   const msg = cat?.tx_count > 0
@@ -459,7 +721,11 @@ function parseLines(raw) {
   return raw.split(/[\n,]/).map(k => k.trim().toLowerCase()).filter(Boolean);
 }
 
-function findConflicts(keywords, excludeId) {
+/**
+ * Exact-match conflicts: keyword appears in another category verbatim.
+ * These are blocking — cannot save.
+ */
+function findExactConflicts(keywords, excludeId) {
   const conflicts = [];
   for (const kw of keywords) {
     for (const cat of allStats) {
@@ -473,15 +739,62 @@ function findConflicts(keywords, excludeId) {
   return conflicts;
 }
 
-function showConflicts(el, conflicts) {
+/**
+ * Shadow conflicts: one keyword is a substring of another in a different category.
+ * These are warnings — they can cause unexpected first-match-wins behavior.
+ * Returns array of { myKw, otherKw, category, note }
+ */
+function findShadowConflicts(keywords, excludeId) {
+  const warnings = [];
+  const seen = new Set();
+  for (const kw of keywords) {
+    for (const cat of allStats) {
+      if (cat.id === excludeId) continue;
+      const catKws = (cat.keywords || "").split(",").map(k => k.trim().toLowerCase()).filter(Boolean);
+      for (const otherKw of catKws) {
+        if (kw === otherKw) continue; // already caught by exact conflict
+        const key = [kw, otherKw, cat.name].join("|");
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (kw.includes(otherKw)) {
+          // their shorter keyword "otherKw" would match anything my "kw" matches too
+          warnings.push({ myKw: kw, otherKw, category: cat.name,
+            note: `"${otherKw}" (in "${cat.name}") is shorter and will match any merchant that also matches "${kw}" — it may win first.` });
+        } else if (otherKw.includes(kw)) {
+          // my shorter keyword "kw" would match anything their "otherKw" matches too
+          warnings.push({ myKw: kw, otherKw, category: cat.name,
+            note: `"${kw}" is shorter than "${otherKw}" (in "${cat.name}") — this category may capture merchants intended for "${cat.name}".` });
+        }
+      }
+    }
+  }
+  return warnings;
+}
+
+function showExactConflicts(el, conflicts) {
   const lines = conflicts.map(
-    (c) =>
-      `"${c.keyword}" is already a keyword on "${c.category}". Remove it here or edit that category.`
+    (c) => `"${c.keyword}" is already a keyword on "${c.category}". Remove it here or edit that category.`
   );
   renderFormIssues(el, "Keyword conflicts:", lines);
 }
 
+function showShadowWarnings(el, warnings) {
+  if (!warnings.length) {
+    el.classList.add("hidden");
+    el.innerHTML = "";
+    return;
+  }
+  el.className = "conflict-shadow";
+  el.innerHTML =
+    `<div class="conflict-shadow-title">⚠ Keyword overlap warnings (will still save)</div>` +
+    `<ul>` +
+    warnings.map(w => `<li>${escHtml(w.note)}</li>`).join("") +
+    `</ul>`;
+  el.classList.remove("hidden");
+}
+
 // ── Keywords editor ──
+
 let kwEditingId = null;
 
 function editKeywords(id) {
@@ -489,19 +802,29 @@ function editKeywords(id) {
   const cat = allStats.find(c => c.id === id);
   document.getElementById("kw-cat-name").textContent = cat?.name || "";
 
-  // Convert stored comma-separated to one per line
   const existing = (cat?.keywords || "").split(",").map(k => k.trim()).filter(Boolean);
   document.getElementById("kw-input").value = existing.join("\n");
 
-  // Show conflicts for existing keywords on open
   const conflictEl = document.getElementById("kw-conflicts");
-  const conflicts = findConflicts(existing, id);
-  if (conflicts.length) showConflicts(conflictEl, conflicts);
+  const shadowEl = document.getElementById("kw-shadow-warnings");
+  const exact = findExactConflicts(existing, id);
+  const shadows = findShadowConflicts(existing, id);
+  if (exact.length) showExactConflicts(conflictEl, exact);
   else clearFormIssues(conflictEl);
+  showShadowWarnings(shadowEl, shadows);
 
   document.getElementById("kw-modal").classList.remove("hidden");
   document.getElementById("kw-input").focus();
 }
+
+document.getElementById("kw-input").addEventListener("input", () => {
+  const raw = document.getElementById("kw-input").value;
+  const keywords = parseLines(raw);
+  const shadowEl = document.getElementById("kw-shadow-warnings");
+  showShadowWarnings(shadowEl, findShadowConflicts(keywords, kwEditingId));
+  // clear error state on input so user sees live feedback
+  clearFormIssues(document.getElementById("kw-conflicts"));
+});
 
 document.getElementById("kw-cancel").addEventListener("click", () => {
   document.getElementById("kw-modal").classList.add("hidden");
@@ -511,13 +834,16 @@ document.getElementById("kw-save").addEventListener("click", async () => {
   const raw = document.getElementById("kw-input").value;
   const keywords = parseLines(raw);
   const conflictEl = document.getElementById("kw-conflicts");
+  const shadowEl = document.getElementById("kw-shadow-warnings");
 
-  const conflicts = findConflicts(keywords, kwEditingId);
-  if (conflicts.length) {
-    showConflicts(conflictEl, conflicts);
+  const exact = findExactConflicts(keywords, kwEditingId);
+  if (exact.length) {
+    showExactConflicts(conflictEl, exact);
     return;
   }
   clearFormIssues(conflictEl);
+  // show shadow warnings but don't block
+  showShadowWarnings(shadowEl, findShadowConflicts(keywords, kwEditingId));
 
   try {
     await API.updateCategory(kwEditingId, { keywords: keywords.join(", ") || null });
@@ -537,7 +863,12 @@ document.getElementById("new-color").addEventListener("input", (e) => {
   document.getElementById("new-color-swatch").style.background = e.target.value;
 });
 
-loadStats();
+async function init() {
+  await loadAppSettings();
+  await loadStats();
+}
+
+init();
 </script>
 </body>
 </html>

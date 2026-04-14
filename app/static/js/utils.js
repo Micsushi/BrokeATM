@@ -1,9 +1,61 @@
-function fmtCurrency(amount, currency = "CAD") {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-  }).format(amount);
+window.__BROKEATM_SETTINGS = window.__BROKEATM_SETTINGS || { default_currency: "CAD" };
+window.__BROKEATM_SETTINGS_LOADED = window.__BROKEATM_SETTINGS_LOADED || false;
+
+function setAppSettingsCache(settings) {
+  const next = {
+    ...window.__BROKEATM_SETTINGS,
+    ...(settings || {}),
+    default_currency: (settings?.default_currency || window.__BROKEATM_SETTINGS.default_currency || "CAD").toUpperCase(),
+  };
+  window.__BROKEATM_SETTINGS = next;
+  window.__BROKEATM_SETTINGS_LOADED = true;
+  window.dispatchEvent(new CustomEvent("app-settings-updated", { detail: next }));
+  return next;
+}
+
+function getAppCurrency() {
+  return window.__BROKEATM_SETTINGS?.default_currency || "CAD";
+}
+
+async function loadAppSettings(force = false) {
+  if (!force && window.__BROKEATM_SETTINGS_LOADED) {
+    return window.__BROKEATM_SETTINGS;
+  }
+  try {
+    const res = await fetch("/api/settings");
+    if (!res.ok) throw new Error(`Request failed (${res.status})`);
+    return setAppSettingsCache(await res.json());
+  } catch (_) {
+    return setAppSettingsCache({ default_currency: "CAD" });
+  }
+}
+
+function fmtCurrency(amount, currency = getAppCurrency(), options = {}) {
+  const value = Number(amount) || 0;
+  const {
+    minimumFractionDigits = 2,
+    maximumFractionDigits = 2,
+    notation,
+  } = options;
+  try {
+    return new Intl.NumberFormat("en-CA", {
+      style: "currency",
+      currency,
+      minimumFractionDigits,
+      maximumFractionDigits,
+      notation,
+    }).format(value);
+  } catch (_) {
+    return `${currency} ${value.toFixed(maximumFractionDigits)}`;
+  }
+}
+
+function fmtCurrencyCompact(amount, currency = getAppCurrency()) {
+  return fmtCurrency(amount, currency, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+    notation: "compact",
+  });
 }
 
 function fmtDate(dateStr) {

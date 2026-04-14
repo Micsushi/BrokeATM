@@ -104,6 +104,20 @@
 
   <!-- Large Expense Detection -->
   <div class="card settings-section">
+    <h2>Currency</h2>
+    <div class="setting-row">
+      <div class="setting-label">
+        <strong>App currency</strong>
+        <span>Changes the currency code used across the app, including existing transactions, recurring rules, totals, charts, and labels.</span>
+      </div>
+      <div class="setting-control">
+        <select id="default-currency" style="min-width:140px"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Large Expense Detection -->
+  <div class="card settings-section">
     <h2>Large Expense Detection</h2>
     <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:1.25rem">
       Transactions shown in the <strong style="color:var(--text)">Large Expenses</strong> section on the Dashboard.
@@ -118,7 +132,7 @@
       <div class="setting-control">
         <input type="checkbox" id="enable-amount" />
         <input type="number" id="threshold-amount" min="0" step="1" placeholder="200" />
-        <span class="setting-unit">CAD</span>
+        <span class="setting-unit" id="threshold-currency-unit">CAD</span>
       </div>
     </div>
 
@@ -213,6 +227,8 @@
 
 <div class="saved-toast" id="saved-toast">Saved</div>
 
+<script src="/static/js/utils.js?v=7"></script>
+<script src="/static/js/api.js?v=7"></script>
 <script>
 // ── Column definitions (id matches what records.html expects) ─────────────────
 const ALL_COLUMNS = [
@@ -225,6 +241,7 @@ const ALL_COLUMNS = [
 ];
 
 const DEFAULTS = {
+  defaultCurrency: "CAD",
   enableAmount: false,
   thresholdAmount: 200,
   enablePct: false,
@@ -257,6 +274,7 @@ function readForm() {
     .filter(c => document.getElementById(`col-${c.id}`)?.checked)
     .map(c => c.id);
   return {
+    defaultCurrency: document.getElementById("default-currency").value || DEFAULTS.defaultCurrency,
     enableAmount: document.getElementById("enable-amount").checked,
     thresholdAmount: parseFloat(document.getElementById("threshold-amount").value) || DEFAULTS.thresholdAmount,
     enablePct: document.getElementById("enable-pct").checked,
@@ -268,6 +286,7 @@ function readForm() {
 }
 
 function fillForm(s) {
+  document.getElementById("default-currency").value = s.defaultCurrency;
   document.getElementById("enable-amount").checked = s.enableAmount;
   document.getElementById("threshold-amount").value = s.thresholdAmount;
   document.getElementById("enable-pct").checked = s.enablePct;
@@ -281,6 +300,25 @@ function fillForm(s) {
   });
   updatePreview(s);
   updateInputStates(s);
+  updateCurrencyUi(s.defaultCurrency);
+}
+
+function getAvailableCurrencies() {
+  const fallback = ["AUD", "CAD", "CHF", "EUR", "GBP", "JPY", "MXN", "NZD", "SEK", "USD"];
+  if (typeof Intl.supportedValuesOf !== "function") return fallback;
+  try {
+    return Intl.supportedValuesOf("currency").map(c => c.toUpperCase()).sort();
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function buildCurrencyOptions(selected) {
+  const sel = document.getElementById("default-currency");
+  const codes = getAvailableCurrencies();
+  if (selected && !codes.includes(selected)) codes.push(selected);
+  codes.sort();
+  sel.innerHTML = codes.map(code => `<option value="${code}"${code === selected ? " selected" : ""}>${code}</option>`).join("");
 }
 
 // ── Column grid ───────────────────────────────────────────────────────────────
@@ -312,10 +350,14 @@ function updateInputStates(s) {
   document.getElementById("threshold-pct").disabled = !s.enablePct;
 }
 
+function updateCurrencyUi(currency) {
+  document.getElementById("threshold-currency-unit").textContent = currency;
+}
+
 function updatePreview(s) {
   const box = document.getElementById("preview-box");
   const parts = [];
-  if (s.enableAmount) parts.push(`amount ≥ <strong>$${s.thresholdAmount}</strong>`);
+  if (s.enableAmount) parts.push(`amount ≥ <strong>${fmtCurrency(s.thresholdAmount, s.defaultCurrency, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong>`);
   if (s.enablePct) parts.push(`≥ <strong>${s.thresholdPct}%</strong> of period total`);
   box.innerHTML = parts.length
     ? `Flagging expenses where: ${parts.join(" <em>or</em> ")}.`
@@ -324,14 +366,31 @@ function updatePreview(s) {
 
 // ── Auto-save on any change ───────────────────────────────────────────────────
 
-function onAnyChange() {
+async function onAnyChange() {
   const s = readForm();
   updatePreview(s);
   updateInputStates(s);
+  updateCurrencyUi(s.defaultCurrency);
   saveSettings(s);
+  const current = getAppCurrency();
+  if (s.defaultCurrency !== current) {
+    const next = await API.updateAppSettings({ default_currency: s.defaultCurrency });
+    setAppSettingsCache(next);
+  }
 }
 
-document.addEventListener("change", onAnyChange);
+document.addEventListener("change", (e) => {
+  Promise.resolve(onAnyChange()).catch((err) => {
+    showAlert(document.getElementById("clear-alerts"), err.message || "Could not save currency.", "error");
+    if (e.target?.id === "default-currency") {
+      e.target.value = getAppCurrency();
+      const restored = readForm();
+      saveSettings(restored);
+      updatePreview(restored);
+      updateCurrencyUi(restored.defaultCurrency);
+    }
+  });
+});
 // Also fire on number input blur (so typing then tabbing away saves)
 document.addEventListener("input", e => {
   if (e.target.type === "number") {
@@ -345,16 +404,25 @@ document.addEventListener("focusout", e => {
 
 // ── Reset ─────────────────────────────────────────────────────────────────────
 
-document.getElementById("btn-reset").addEventListener("click", () => {
+document.getElementById("btn-reset").addEventListener("click", async () => {
+  buildCurrencyOptions(DEFAULTS.defaultCurrency);
   fillForm({ ...DEFAULTS });
   saveSettings({ ...DEFAULTS });
+  const next = await API.updateAppSettings({ default_currency: DEFAULTS.defaultCurrency });
+  setAppSettingsCache(next);
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
 
-const s = loadSettings();
-buildColumnGrid(s);
-fillForm(s);
+async function initSettingsPage() {
+  const appSettings = await loadAppSettings();
+  const s = { ...loadSettings(), defaultCurrency: appSettings.default_currency || DEFAULTS.defaultCurrency };
+  buildCurrencyOptions(s.defaultCurrency);
+  buildColumnGrid(s);
+  fillForm(s);
+}
+
+initSettingsPage();
 
 // ── Danger zone ───────────────────────────────────────────────────────────────
 

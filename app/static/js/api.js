@@ -15,6 +15,22 @@ async function parseApiError(res) {
 }
 
 const API = {
+  async getAppSettings() {
+    const res = await fetch("/api/settings");
+    if (!res.ok) throw new Error(await parseApiError(res));
+    return res.json();
+  },
+
+  async updateAppSettings(payload) {
+    const res = await fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(await parseApiError(res));
+    return res.json();
+  },
+
   async parseCSV(file) {
     const fd = new FormData();
     fd.append("file", file);

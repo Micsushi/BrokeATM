@@ -28,7 +28,7 @@
       display: flex; flex-direction: column; align-items: center; gap: 0.2rem;
       flex: 1;
       padding: 0 1rem;
-      border-right: 1px solid var(--border);
+      border-right: 2px solid rgba(255,255,255,0.25);
       text-align: center;
     }
     .total-item:last-child { border-right: none; }
@@ -47,8 +47,9 @@
       margin-bottom: 0.75rem;
       font-size: 0.875rem;
     }
-    .bulk-bar.hidden { display: none !important; }
+
     .bulk-count { font-weight: 600; color: var(--accent); }
+    .bulk-divider { width: 2px; height: 22px; background: rgba(255,255,255,0.25); border-radius: 1px; flex-shrink: 0; }
 
     /* Row selected highlight */
     tr.selected td { background: rgba(99,102,241,0.07) !important; }
@@ -224,18 +225,18 @@
     </div>
   </div>
 
-  <!-- Bulk action bar (hidden until rows selected) -->
-  <div class="bulk-bar hidden" id="bulk-bar">
+  <!-- Bulk action bar (always visible) -->
+  <div class="bulk-bar" id="bulk-bar">
     <span class="bulk-count" id="bulk-count">0 selected</span>
     <button class="btn btn-ghost btn-sm" id="btn-select-all-page">Select page</button>
     <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Deselect all</button>
-    <div style="height:20px;width:1px;background:var(--border)"></div>
+    <div class="bulk-divider"></div>
     <label style="font-size:0.8rem;color:var(--text-muted);margin:0">Set category:</label>
     <select id="bulk-cat-sel" style="width:160px;font-size:0.8rem;padding:0.3rem 0.5rem">
       <option value="">pick...</option>
     </select>
-    <button class="btn btn-secondary btn-sm" id="btn-bulk-cat">Apply</button>
-    <div style="height:20px;width:1px;background:var(--border)"></div>
+    <button class="btn btn-secondary btn-sm" id="btn-bulk-cat" disabled>Apply</button>
+    <div class="bulk-divider"></div>
     <label style="font-size:0.8rem;color:var(--text-muted);margin:0">Set type:</label>
     <select id="bulk-type-sel" style="width:120px;font-size:0.8rem;padding:0.3rem 0.5rem">
       <option value="">pick...</option>
@@ -244,9 +245,9 @@
       <option value="refund">Refund</option>
       <option value="transfer">Transfer</option>
     </select>
-    <button class="btn btn-secondary btn-sm" id="btn-bulk-type">Apply</button>
-    <div style="height:20px;width:1px;background:var(--border)"></div>
-    <button class="btn btn-danger btn-sm" id="btn-bulk-delete">Delete selected</button>
+    <button class="btn btn-secondary btn-sm" id="btn-bulk-type" disabled>Apply</button>
+    <div class="bulk-divider"></div>
+    <button class="btn btn-danger btn-sm" id="btn-bulk-delete" disabled>Delete selected</button>
   </div>
 
   <!-- Table -->
@@ -255,13 +256,11 @@
       <table id="records-table">
         <thead>
           <tr>
-            <th class="chk-col">
-              <input type="checkbox" id="chk-header" title="Select all on this page" />
-            </th>
+            <th class="chk-col"></th>
             <th class="sortable-th" data-sort="date">Date <span class="sort-icon"></span></th>
             <th class="sortable-th" data-sort="date_added" data-col="date_added">Date added <span class="sort-icon"></span></th>
             <th class="sortable-th" data-sort="merchant">Merchant <span class="sort-icon"></span></th>
-            <th data-col="category">Category</th>
+            <th class="sortable-th" data-sort="category" data-col="category">Category <span class="sort-icon"></span></th>
             <th class="sortable-th" data-sort="type" data-col="type">Type <span class="sort-icon"></span></th>
             <th class="sortable-th text-right" data-sort="amount">Amount <span class="sort-icon"></span></th>
             <th>Actions</th>
@@ -276,7 +275,17 @@
 
   <!-- Pagination -->
   <div class="flex items-center justify-between mt-2">
-    <span id="page-info" class="text-muted" style="font-size:0.85rem"></span>
+    <div style="display:flex;align-items:center;gap:0.5rem">
+      <span id="page-info" class="text-muted" style="font-size:0.85rem"></span>
+      <span class="text-muted" style="font-size:0.85rem">·</span>
+      <label style="font-size:0.85rem;color:var(--text-muted);margin:0">Show</label>
+      <select id="page-size-sel" style="font-size:0.8rem;padding:0.2rem 0.4rem;width:auto">
+        <option value="10">10</option>
+        <option value="20">20</option>
+        <option value="50">50</option>
+        <option value="5000">All</option>
+      </select>
+    </div>
     <div class="pagination" id="pagination"></div>
   </div>
 </div>
@@ -292,7 +301,7 @@
           <input type="date" id="edit-date" required />
         </div>
         <div>
-          <label>Amount (CAD) <span style="color:var(--danger)">*</span></label>
+          <label id="edit-amount-label">Amount <span style="color:var(--danger)">*</span></label>
           <input type="number" id="edit-amount" step="0.01" min="0" required />
         </div>
       </div>
@@ -331,8 +340,8 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=6"></script>
-<script src="/static/js/api.js?v=6"></script>
+<script src="/static/js/utils.js?v=7"></script>
+<script src="/static/js/api.js?v=7"></script>
 <script src="/static/js/add-tx-modal.js?v=3"></script>
 <script>
 /** Calendar date portion of API ``created_at`` (matches Date column formatting). */
@@ -344,7 +353,7 @@ function fmtDateAdded(isoVal) {
 }
 let duplicatesView = false;
 let currentPage = 1;
-const pageSize = 10;
+let pageSize = 10;
 let sortBy = "date";
 let sortDir = "asc";
 let categories = [];
@@ -386,6 +395,8 @@ function applyColumnVisibility() {
 }
 
 async function init() {
+  await loadAppSettings();
+  updateCurrencyLabels();
   [categories, accounts] = await Promise.all([API.getCategories(), API.getAccounts()]);
   populateFilterDropdowns();
   await setDefaultMonth();
@@ -394,6 +405,12 @@ async function init() {
   applyColumnVisibility();
   processRecurringOnLoad();
   loadRecords();
+}
+
+function updateCurrencyLabels() {
+  const currency = getAppCurrency();
+  document.getElementById("edit-amount-label").innerHTML =
+    `Amount (${escHtml(currency)}) <span style="color:var(--danger)">*</span>`;
 }
 
 async function setDefaultMonth() {
@@ -513,7 +530,6 @@ function renderTable(data) {
       ? "No exact duplicate groups found. Rows are compared on all business fields (date, merchant, amount, type, category, etc.) — import batch is ignored."
       : "No transactions found";
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted)">${escHtml(dupMsg)}</td></tr>`;
-    document.getElementById("chk-header").checked = false;
     updateBulkBar();
   } else {
     data.items.forEach(tx => {
@@ -548,7 +564,6 @@ function renderTable(data) {
         const tr = chk.closest("tr");
         if (chk.checked) { selectedIds.add(id); tr.classList.add("selected"); }
         else { selectedIds.delete(id); tr.classList.remove("selected"); }
-        syncHeaderCheckbox();
         updateBulkBar();
       });
     });
@@ -561,37 +576,19 @@ function renderTable(data) {
   document.getElementById("page-info").textContent =
     `${total} transaction${total !== 1 ? "s" : ""} · Page ${currentPage} of ${pages || 1}`;
   renderPagination(pages);
-  syncHeaderCheckbox();
 }
-
-function syncHeaderCheckbox() {
-  const chks = document.querySelectorAll(".row-chk");
-  const checked = [...chks].filter(c => c.checked).length;
-  const hdr = document.getElementById("chk-header");
-  hdr.checked = chks.length > 0 && checked === chks.length;
-  hdr.indeterminate = checked > 0 && checked < chks.length;
-}
-
-// ── Header checkbox: select/deselect page ──
-document.getElementById("chk-header").addEventListener("change", (e) => {
-  document.querySelectorAll(".row-chk").forEach(chk => {
-    chk.checked = e.target.checked;
-    const id = +chk.dataset.id;
-    const tr = chk.closest("tr");
-    if (e.target.checked) { selectedIds.add(id); tr.classList.add("selected"); }
-    else { selectedIds.delete(id); tr.classList.remove("selected"); }
-  });
-  updateBulkBar();
-});
 
 // ── Bulk bar ──
 function updateBulkBar() {
-  const bar = document.getElementById("bulk-bar");
   const n = selectedIds.size;
-  if (n === 0) { bar.classList.add("hidden"); return; }
-  bar.classList.remove("hidden");
-  document.getElementById("bulk-count").textContent = `${n} selected`;
+  document.getElementById("bulk-count").textContent = n === 0 ? "0 selected" : `${n} selected`;
+  document.getElementById("btn-bulk-delete").disabled = n === 0;
+  document.getElementById("btn-bulk-cat").disabled = n === 0 || !document.getElementById("bulk-cat-sel").value;
+  document.getElementById("btn-bulk-type").disabled = n === 0 || !document.getElementById("bulk-type-sel").value;
 }
+
+document.getElementById("bulk-cat-sel").addEventListener("change", updateBulkBar);
+document.getElementById("bulk-type-sel").addEventListener("change", updateBulkBar);
 
 document.getElementById("btn-select-all-page").addEventListener("click", () => {
   document.querySelectorAll(".row-chk").forEach(chk => {
@@ -599,22 +596,20 @@ document.getElementById("btn-select-all-page").addEventListener("click", () => {
     selectedIds.add(+chk.dataset.id);
     chk.closest("tr").classList.add("selected");
   });
-  syncHeaderCheckbox();
   updateBulkBar();
 });
 
 document.getElementById("btn-deselect-all").addEventListener("click", () => {
+  if (!selectedIds.size) return;
   selectedIds.clear();
   document.querySelectorAll(".row-chk").forEach(chk => {
     chk.checked = false;
     chk.closest("tr").classList.remove("selected");
   });
-  syncHeaderCheckbox();
   updateBulkBar();
 });
 
 document.getElementById("btn-bulk-delete").addEventListener("click", async () => {
-  if (!selectedIds.size) return;
   if (!confirm(`Delete ${selectedIds.size} transaction(s)? This cannot be undone.`)) return;
   try {
     const res = await API.bulkDelete([...selectedIds]);
@@ -628,7 +623,6 @@ document.getElementById("btn-bulk-delete").addEventListener("click", async () =>
 
 document.getElementById("btn-bulk-cat").addEventListener("click", async () => {
   const catId = document.getElementById("bulk-cat-sel").value;
-  if (!catId || !selectedIds.size) return;
   try {
     const res = await API.bulkUpdate([...selectedIds], { category_id: +catId });
     showAlert(document.getElementById("alerts"), `Updated ${res.updated} transaction(s).`, "success");
@@ -640,7 +634,6 @@ document.getElementById("btn-bulk-cat").addEventListener("click", async () => {
 
 document.getElementById("btn-bulk-type").addEventListener("click", async () => {
   const type = document.getElementById("bulk-type-sel").value;
-  if (!type || !selectedIds.size) return;
   try {
     const res = await API.bulkUpdate([...selectedIds], { transaction_type: type });
     showAlert(document.getElementById("alerts"), `Updated ${res.updated} transaction(s).`, "success");
@@ -744,6 +737,12 @@ const debouncedLoad = debounce(() => { currentPage = 1; loadRecords(); }, 300);
 ["f-search", "f-date-from", "f-date-to", "f-type", "f-category"].forEach(id => {
   document.getElementById(id).addEventListener("input", debouncedLoad);
   document.getElementById(id).addEventListener("change", debouncedLoad);
+});
+
+document.getElementById("page-size-sel").addEventListener("change", (e) => {
+  pageSize = +e.target.value;
+  currentPage = 1;
+  loadRecords();
 });
 
 document.getElementById("btn-all-dates").addEventListener("click", () => {

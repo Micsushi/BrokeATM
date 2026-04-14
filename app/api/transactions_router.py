@@ -21,7 +21,7 @@ from app.core.schemas import (
     TransactionOut,
     TransactionUpdate,
 )
-from app.models.models import Transaction
+from app.models.models import Category, Transaction
 from app.services.transaction_duplicates import find_exact_duplicate_groups, prune_exact_duplicates
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
@@ -61,12 +61,29 @@ def _apply_month_filter(q: Any, months: str | None, year: int | None, month: int
     return q
 
 
+def _apply_date_range_filter(q: Any, date_from: str | None, date_to: str | None) -> Any:
+    if date_from:
+        try:
+            y, m = int(date_from[:4]), int(date_from[5:7])
+            q = q.filter(Transaction.transaction_date >= date(y, m, 1))
+        except (ValueError, IndexError):
+            pass
+    if date_to:
+        try:
+            y, m = int(date_to[:4]), int(date_to[5:7])
+            q = q.filter(Transaction.transaction_date <= date(y, m, calendar.monthrange(y, m)[1]))
+        except (ValueError, IndexError):
+            pass
+    return q
+
+
 _SORTABLE = {
     "date": Transaction.transaction_date,
     "date_added": Transaction.created_at,
     "merchant": Transaction.merchant_name,
     "amount": Transaction.amount,
     "type": Transaction.transaction_type,
+    "category": Category.name,
 }
 
 
@@ -86,13 +103,7 @@ def list_transactions(
     include_excluded: bool = Query(False),
     sort_by: str = Query("date", description="Column to sort by: date, date_added, merchant, amount, type"),
     sort_dir: str = Query("asc", description="asc or desc"),
-    duplicate_only: bool = Query(
-        False,
-        description=(
-            "Only rows that are part of an exact duplicate group (same fields except id and timestamps). "
-            "Year/month/months filters are ignored so every copy in a group is visible."
-        ),
-    ),
+    duplicate_only: bool = Query(False, description="Only rows in an exact duplicate group; date filters ignored"),
     db: Session = Depends(get_db),
 ) -> Any:
     dup_groups = find_exact_duplicate_groups(db)
@@ -106,22 +117,7 @@ def list_transactions(
 
     if not duplicate_only:
         if date_from or date_to:
-            # date_from / date_to are YYYY-MM strings; match whole months
-            if date_from:
-                try:
-                    y, m = int(date_from[:4]), int(date_from[5:7])
-                    from_date = date(y, m, 1)
-                    q = q.filter(Transaction.transaction_date >= from_date)
-                except (ValueError, IndexError):
-                    pass
-            if date_to:
-                try:
-                    y, m = int(date_to[:4]), int(date_to[5:7])
-                    last_day = calendar.monthrange(y, m)[1]
-                    to_date = date(y, m, last_day)
-                    q = q.filter(Transaction.transaction_date <= to_date)
-                except (ValueError, IndexError):
-                    pass
+            q = _apply_date_range_filter(q, date_from, date_to)
         else:
             q = _apply_month_filter(q, months, year, month)
 
@@ -146,6 +142,8 @@ def list_transactions(
             )
         )
 
+    if sort_by == "category":
+        q = q.outerjoin(Category, Transaction.category_id == Category.id)
     sort_col = _SORTABLE.get(sort_by, Transaction.transaction_date)
     order_fn = asc if sort_dir == "asc" else desc
     # Always secondary-sort by date asc so pages are stable
@@ -207,18 +205,7 @@ def summary(
     ).filter(Transaction.is_excluded.is_(False))
 
     if date_from or date_to:
-        if date_from:
-            try:
-                y, m = int(date_from[:4]), int(date_from[5:7])
-                q = q.filter(Transaction.transaction_date >= date(y, m, 1))
-            except (ValueError, IndexError):
-                pass
-        if date_to:
-            try:
-                y, m = int(date_to[:4]), int(date_to[5:7])
-                q = q.filter(Transaction.transaction_date <= date(y, m, calendar.monthrange(y, m)[1]))
-            except (ValueError, IndexError):
-                pass
+        q = _apply_date_range_filter(q, date_from, date_to)
     else:
         q = _apply_month_filter(q, months, year, month)
 

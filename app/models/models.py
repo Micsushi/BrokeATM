@@ -103,7 +103,11 @@ class BudgetRule(Base):
     )
     limit_amount: Mapped[float] = mapped_column(Float, nullable=False)
     is_total: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 class RecurringRule(Base):
@@ -114,10 +118,16 @@ class RecurringRule(Base):
     amount: Mapped[float] = mapped_column(Float, nullable=False)
     transaction_type: Mapped[str] = mapped_column(String(20), default="expense", nullable=False)
     currency: Mapped[str] = mapped_column(String(3), default="CAD", nullable=False)
-    category_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("categories.id"), nullable=True)
-    account_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("accounts.id"), nullable=True)
+    category_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("categories.id"), nullable=True
+    )
+    account_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("accounts.id"), nullable=True
+    )
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    frequency: Mapped[str] = mapped_column(String(20), nullable=False)  # monthly, weekly, biweekly, yearly
+    frequency: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )  # monthly, weekly, biweekly, yearly
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # null = forever
     last_created_date: Mapped[date | None] = mapped_column(Date, nullable=True)
@@ -135,3 +145,10 @@ class ImportBatch(Base):
     imported_rows: Mapped[int] = mapped_column(Integer, default=0)
     skipped_rows: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class AppSetting(Base):
+    __tablename__ = "app_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    default_currency: Mapped[str] = mapped_column(String(3), default="CAD", nullable=False)

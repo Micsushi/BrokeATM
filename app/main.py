@@ -11,16 +11,19 @@ from app.api import (
     dashboard_router,
     import_router,
     recurring_router,
+    settings_router,
     transactions_router,
 )
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
+from app.services.app_settings import ensure_app_settings
 from app.services.import_service import seed_defaults
 
 Base.metadata.create_all(bind=engine)
 
 with SessionLocal() as _db:
     seed_defaults(_db)
+    ensure_app_settings(_db)
 
 app = FastAPI(
     title=settings.app_name,
@@ -36,6 +39,7 @@ app.include_router(accounts_router.router)
 app.include_router(dashboard_router.router)
 app.include_router(recurring_router.router)
 app.include_router(budget_router.router)
+app.include_router(settings_router.router)
 
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"

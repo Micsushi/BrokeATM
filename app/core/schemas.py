@@ -261,7 +261,11 @@ class BudgetSave(BaseModel):
 class BudgetCategoryAvg(BaseModel):
     category_id: int | None
     category_name: str
+    category_color: str | None = None
     avg_monthly: float
+    avg_6m: float = 0.0
+    avg_3m: float = 0.0
+    avg_1m: float = 0.0
     limit_amount: float | None = None
 
 
@@ -274,6 +278,7 @@ class BudgetSettingsOut(BaseModel):
 class BudgetMonthItem(BaseModel):
     category_id: int | None
     category_name: str
+    category_color: str | None = None
     budget: float | None
     spent: float
     over: bool
@@ -292,6 +297,16 @@ class BudgetSummaryResponse(BaseModel):
     months: int
     total_budget: float | None
     monthly: list[BudgetMonthSummary]
+
+
+class AppSettingsOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    default_currency: str
+
+
+class AppSettingsUpdate(BaseModel):
+    default_currency: str
 
 
 class RecurringRuleCreate(BaseModel):

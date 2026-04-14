@@ -1,17 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.database import SessionLocal
+from app.core.database import get_db
 from app.core.schemas import ProcessRecurringResponse, RecurringRuleCreate, RecurringRuleOut
 from app.models.models import RecurringRule
 from app.services.recurring_service import process_due_rules
 
 router = APIRouter(prefix="/api/recurring", tags=["recurring"])
-
-
-def get_db():
-    with SessionLocal() as db:
-        yield db
 
 
 @router.get("", response_model=list[RecurringRuleOut])

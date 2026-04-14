@@ -31,5 +31,10 @@ def save_budget(payload: BudgetSave, db: Session = Depends(get_db)):
 
 
 @router.get("/summary", response_model=BudgetSummaryResponse)
-def budget_summary(months: int = 6, db: Session = Depends(get_db)):
-    return get_monthly_summary(db, months)
+def budget_summary(
+    months: int = 6,
+    from_ym: str | None = None,
+    to_ym: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return get_monthly_summary(db, months=months, from_ym=from_ym, to_ym=to_ym)

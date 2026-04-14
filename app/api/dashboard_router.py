@@ -180,7 +180,6 @@ def large_expenses(
     page_size: int = Query(10, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> Any:
-    """Return expense rows that exceed either threshold, sorted latest first, paginated."""
     base_q = db.query(Transaction).filter(
         Transaction.transaction_type == TransactionType.expense,
         Transaction.is_excluded.is_(False),

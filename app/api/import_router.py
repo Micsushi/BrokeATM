@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.schemas import CommitRequest, CommitResponse, ParseResponse
+from app.services.app_settings import get_default_currency
 from app.services.csv_parser import parse_csv
 from app.services.import_service import check_duplicates, commit_import
 
@@ -15,11 +16,11 @@ router = APIRouter(prefix="/api/import", tags=["import"])
 
 
 @router.post("/parse", response_model=ParseResponse)
-async def parse_upload(file: UploadFile = File(...)) -> Any:
+async def parse_upload(file: UploadFile = File(...), db: Session = Depends(get_db)) -> Any:
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported.")
     content = await file.read()
-    return parse_csv(content)
+    return parse_csv(content, default_currency=get_default_currency(db))
 
 
 @router.post("/check-duplicates")

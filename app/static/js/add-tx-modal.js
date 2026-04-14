@@ -21,7 +21,7 @@
                 <input type="date" id="atx-date" required />
               </div>
               <div>
-                <label>Amount (CAD) <span style="color:var(--danger)">*</span></label>
+                <label id="atx-amount-label">Amount <span style="color:var(--danger)">*</span></label>
                 <input type="number" id="atx-amount" step="0.01" min="0" required />
               </div>
             </div>
@@ -135,6 +135,12 @@
     document.getElementById("atx-save").addEventListener("click", saveEntry);
   }
 
+  function updateCurrencyLabel() {
+    const currency = getAppCurrency();
+    document.getElementById("atx-amount-label").innerHTML =
+      `Amount (${escHtml(currency)}) <span style="color:var(--danger)">*</span>`;
+  }
+
   function updatePreview() {
     const el = document.getElementById("atx-recur-preview");
     if (!document.getElementById("atx-recur-toggle").checked) { el.textContent = ""; return; }
@@ -185,7 +191,7 @@
       account_id: document.getElementById("atx-account").value
         ? +document.getElementById("atx-account").value : null,
       notes: document.getElementById("atx-notes").value.trim() || null,
-      currency: "CAD",
+      currency: getAppCurrency(),
     };
 
     try {
@@ -227,6 +233,8 @@
   async function open(opts = {}) {
     injectHTML();
     _onSuccess = opts.onSuccess || null;
+    await loadAppSettings();
+    updateCurrencyLabel();
 
     const [cats, accs] = await Promise.all([
       API.getCategories().catch(() => []),

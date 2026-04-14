@@ -30,7 +30,7 @@ def _digits_only(s: str) -> str:
 
 
 def _find_account_by_card_mask(db: Session, card: str) -> Account | None:
-    """Resolve account by masked card: exact match, else same last-4 digits (``3600`` vs ``************3600``)."""
+    """Exact match on card mask, falling back to last-4 digits ('3600' vs '************3600')."""
     card = _normalize_card_masked(card)
     if not card:
         return None
@@ -98,7 +98,7 @@ def _row_statement_date(row: dict[str, Any]) -> date | None:
     return None
 
 
-# Merchant substrings for rows that often repeat reference numbers across statement cycles.
+# Interest rows often reuse reference numbers across cycles; match by amount/date instead.
 _INTEREST_MERCHANT_MARKERS = (
     "cash interest",
     "interest payment",
@@ -303,7 +303,7 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
                     dup_in_db = True
                 seen_interest_fp.add(fp_key)
 
-        # Caller may set ``exclude``; duplicates are advisory only (UI defaults unchecked).
+        # duplicate flag is advisory; UI defaults to unchecked so user decides
         exclude = bool(row.get("exclude"))
         out = {
             **row,
@@ -326,7 +326,6 @@ def _row_import_batch_group(
     default_month: int,
     default_year: int,
 ) -> tuple[str, int, int]:
-    """(batch filename label, statement month, statement year) for ImportBatch metadata."""
     label = (row.get("source_file") or default_filename or "import").strip()[:255]
     try:
         im = int(row["import_month"]) if row.get("import_month") is not None else int(default_month)

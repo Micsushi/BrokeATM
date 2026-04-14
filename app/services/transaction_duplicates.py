@@ -25,8 +25,8 @@ def _duplicate_groups_sql() -> str:
           ROUND(amount, 4),
           currency,
           transaction_type,
-          IFNULL(account_id, -999999999),
-          IFNULL(category_id, -999999999),
+          IFNULL(account_id, -999999999),   -- NULLs don't group together in SQL; sentinel makes them match
+          IFNULL(category_id, -999999999),  -- same reason
           IFNULL(notes, ''),
           is_excluded
         HAVING COUNT(*) > 1

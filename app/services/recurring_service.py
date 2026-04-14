@@ -1,28 +1,20 @@
-import calendar
 from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.utils import add_months
 from app.models.models import RecurringRule, Transaction
-
-
-def _add_months(d: date, n: int) -> date:
-    month = d.month - 1 + n
-    year = d.year + month // 12
-    month = month % 12 + 1
-    day = min(d.day, calendar.monthrange(year, month)[1])
-    return date(year, month, day)
 
 
 def _next_date(current: date, frequency: str) -> date:
     if frequency == "monthly":
-        return _add_months(current, 1)
+        return add_months(current, 1)
     if frequency == "weekly":
         return current + timedelta(weeks=1)
     if frequency == "biweekly":
         return current + timedelta(weeks=2)
     if frequency == "yearly":
-        return _add_months(current, 12)
+        return add_months(current, 12)
     raise ValueError(f"Unknown frequency: {frequency}")
 
 

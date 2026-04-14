@@ -8,7 +8,13 @@ from datetime import date, datetime
 from typing import Any
 
 from app.models.models import TransactionType
-from app.services.mcc_map import DEFAULT_CATEGORIES, is_cashback, is_payment, match_by_keywords, mcc_to_category
+from app.services.mcc_map import (
+    DEFAULT_CATEGORIES,
+    is_cashback,
+    is_payment,
+    match_by_keywords,
+    mcc_to_category,
+)
 
 # Build a static keyword map from the default categories for use during parse preview.
 # At parse time we don't have DB access, so we use the built-in defaults.
@@ -70,6 +76,9 @@ REQUIRED_FIELDS = {"date", "amount"}
 _DEBIT_ALIASES = ["Debit", "Withdrawals", "Withdrawal", "Debit Amount"]
 _CREDIT_ALIASES = ["Credit", "Deposits", "Deposit", "Credit Amount"]
 
+# Sentinel used in col_map when amount comes from separate debit/credit columns
+_SPLIT_AMOUNT = object()
+
 
 def _norm(h: str) -> str:
     return h.strip().lower()
@@ -86,12 +95,18 @@ def _build_col_map(headers: list[str]) -> dict[str, str] | None:
                 break
 
     if "amount" not in col_map:
-        debit_key = next((norm_to_actual[_norm(a)] for a in _DEBIT_ALIASES if _norm(a) in norm_to_actual), None)
-        credit_key = next((norm_to_actual[_norm(a)] for a in _CREDIT_ALIASES if _norm(a) in norm_to_actual), None)
+        debit_key = next(
+            (norm_to_actual[_norm(a)] for a in _DEBIT_ALIASES if _norm(a) in norm_to_actual),
+            None,
+        )
+        credit_key = next(
+            (norm_to_actual[_norm(a)] for a in _CREDIT_ALIASES if _norm(a) in norm_to_actual),
+            None,
+        )
         if debit_key or credit_key:
             col_map["_debit_col"] = debit_key or ""
             col_map["_credit_col"] = credit_key or ""
-            col_map["amount"] = "__split__"
+            col_map["amount"] = _SPLIT_AMOUNT
 
     if any(req not in col_map for req in REQUIRED_FIELDS):
         return None
@@ -100,7 +115,7 @@ def _build_col_map(headers: list[str]) -> dict[str, str] | None:
 
 
 def _resolve_amount(raw_row: dict[str, str], col_map: dict[str, str]) -> float:
-    if col_map["amount"] == "__split__":
+    if col_map["amount"] == _SPLIT_AMOUNT:
         debit_raw = raw_row.get(col_map.get("_debit_col", ""), "") or ""
         credit_raw = raw_row.get(col_map.get("_credit_col", ""), "") or ""
         debit = _parse_amount(debit_raw) if debit_raw.strip() else 0.0
@@ -135,7 +150,7 @@ def _parse_date(raw: str) -> date:
 
 def _get(raw_row: dict[str, str], col_map: dict[str, str], field: str) -> str:
     col = col_map.get(field, "")
-    if not col or col == "__split__":
+    if not col or col == _SPLIT_AMOUNT:
         return ""
     return (raw_row.get(col) or "").strip()
 
@@ -157,7 +172,9 @@ def detect_month_year(rows: list[dict[str, Any]]) -> tuple[int, int]:
     return 1, 2000
 
 
-def classify_transaction(amount_raw: float, merchant_name: str, mcc_description: str) -> tuple[str, float]:
+def classify_transaction(
+    amount_raw: float, merchant_name: str, mcc_description: str
+) -> tuple[str, float]:
     if is_payment(merchant_name, mcc_description):
         return TransactionType.transfer, abs(amount_raw)
     if is_cashback(merchant_name, mcc_description):
@@ -174,7 +191,7 @@ def _suggest_category(mcc_desc: str, merchant_name: str) -> str:
     return match_by_keywords(merchant_name, _STATIC_KW_MAP) or "uncategorized"
 
 
-def parse_csv(content: bytes) -> dict[str, Any]:
+def parse_csv(content: bytes, *, default_currency: str = "CAD") -> dict[str, Any]:
     text = content.decode("utf-8-sig", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
     headers = reader.fieldnames or []
@@ -215,7 +232,7 @@ def parse_csv(content: bytes) -> dict[str, Any]:
                 "merchant_country": _get(raw_row, col_map, "merchant_country"),
                 "mcc_description": mcc_desc,
                 "amount": amount,
-                "currency": "CAD",
+                "currency": default_currency,
                 "transaction_type": tx_type,
                 "suggested_category": _suggest_category(mcc_desc, merchant_name),
                 "card_number_masked": _get(raw_row, col_map, "card_number"),
