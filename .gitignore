@@ -22,3 +22,5 @@ uploads/
 
 # Env
 .env
+
+.claude/settings.local.json
