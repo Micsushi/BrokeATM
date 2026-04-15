@@ -45,6 +45,7 @@ class ParseResponse(BaseModel):
     detected_month: int | None
     detected_year: int | None
     errors: list[str]
+    col_map: dict[str, str] = Field(default_factory=dict)
 
 
 class CommitRow(BaseModel):

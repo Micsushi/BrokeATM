@@ -6,7 +6,7 @@
   <title>Settings | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=8" />
+  <link rel="stylesheet" href="/static/css/main.css?v=9" />
   <style>
     .settings-section { margin-bottom: 2rem; }
     .settings-section h2 {
@@ -179,6 +179,23 @@
     </div>
   </div>
 
+  <!-- Import: Auto-Sort Categories -->
+  <div class="card settings-section">
+    <h2>Import: Auto-Sort Categories</h2>
+    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:1.25rem">
+      When a PDF or OFX import contains a category name in this list, it will automatically use keyword matching
+      against your existing categories instead of prompting you to create a new one.
+      Add category names exactly as they appear in your bank statements.
+    </p>
+    <div id="autosort-list" style="display:flex;flex-wrap:wrap;gap:0.4rem;min-height:1.5rem;margin-bottom:1rem"></div>
+    <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap">
+      <input type="text" id="autosort-input" placeholder="Category name from bank statement"
+             style="flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);
+                    border-radius:8px;color:var(--text);font-size:0.9rem;padding:0.45rem 0.75rem" />
+      <button class="btn btn-ghost btn-sm" id="btn-autosort-add">Add</button>
+    </div>
+  </div>
+
   <!-- Danger Zone -->
   <div class="card settings-section" style="border-color:rgba(239,68,68,0.35)">
     <h2 style="color:var(--danger);border-bottom-color:rgba(239,68,68,0.25)">Danger Zone</h2>
@@ -240,6 +257,7 @@ const DEFAULTS = {
   defaultPieMonths: 1,
   defaultBarMonths: 6,
   visibleColumns: ALL_COLUMNS.filter(c => c.defaultOn).map(c => c.id),
+  autoSortCategories: [],
 };
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -292,6 +310,7 @@ function fillForm(s) {
   updatePreview(s);
   updateInputStates(s);
   updateCurrencyUi(s.defaultCurrency);
+  buildAutoSortList(s);
 }
 
 function getAvailableCurrencies() {
@@ -401,6 +420,55 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
   saveSettings({ ...DEFAULTS });
   const next = await API.updateAppSettings({ default_currency: DEFAULTS.defaultCurrency });
   setAppSettingsCache(next);
+});
+
+// ── Auto-sort categories ──────────────────────────────────────────────────────
+
+function buildAutoSortList(s) {
+  const list = document.getElementById("autosort-list");
+  if (!list) return;
+  const cats = Array.isArray(s.autoSortCategories) ? s.autoSortCategories : [];
+  if (!cats.length) {
+    list.innerHTML = `<span style="font-size:0.82rem;color:var(--text-muted)">No categories added yet.</span>`;
+    return;
+  }
+  list.innerHTML = cats.map((c, i) => `
+    <span style="display:inline-flex;align-items:center;gap:0.35rem;padding:0.2rem 0.5rem 0.2rem 0.65rem;
+                 border-radius:99px;background:rgba(124,130,255,0.18);border:1px solid rgba(124,130,255,0.35);
+                 font-size:0.8rem;color:var(--accent-hover);font-weight:500">
+      ${c.replace(/</g,"&lt;")}
+      <button onclick="removeAutoSortCat(${i})" style="background:none;border:none;cursor:pointer;
+              color:var(--text-muted);font-size:0.85rem;line-height:1;padding:0 0.1rem"
+              title="Remove">×</button>
+    </span>`).join("");
+}
+
+function removeAutoSortCat(idx) {
+  const s = loadSettings();
+  const cats = Array.isArray(s.autoSortCategories) ? s.autoSortCategories : [];
+  cats.splice(idx, 1);
+  s.autoSortCategories = cats;
+  saveSettings(s);
+  buildAutoSortList(s);
+}
+
+document.getElementById("btn-autosort-add").addEventListener("click", () => {
+  const input = document.getElementById("autosort-input");
+  const val = input.value.trim();
+  if (!val) return;
+  const s = loadSettings();
+  const cats = Array.isArray(s.autoSortCategories) ? s.autoSortCategories : [];
+  if (!cats.includes(val)) {
+    cats.push(val);
+    s.autoSortCategories = cats;
+    saveSettings(s);
+    buildAutoSortList(s);
+  }
+  input.value = "";
+});
+
+document.getElementById("autosort-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") document.getElementById("btn-autosort-add").click();
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

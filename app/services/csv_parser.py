@@ -223,6 +223,7 @@ def parse_csv(
                 "Unrecognized CSV format: could not find a date column and an amount column. "
                 "Expected headers like 'Date'/'Transaction Date' and 'Amount'/'Debit'/'Credit'."
             ],
+            "col_map": {},
         }
 
     rows: list[dict[str, Any]] = []
@@ -266,10 +267,25 @@ def parse_csv(
             errors.append(f"Row {i}: {exc}")
 
     month, year = detect_month_year(rows)
+
+    # Build human-readable col_map for the UI (logical field → actual CSV header)
+    col_map_display: dict[str, str] = {}
+    for field, actual in col_map.items():
+        if field.startswith("_"):
+            continue  # skip internal keys like _debit_col, _credit_col
+        if actual is _SPLIT_AMOUNT:
+            debit = col_map.get("_debit_col") or ""
+            credit = col_map.get("_credit_col") or ""
+            parts = " / ".join(c for c in [debit, credit] if c)
+            col_map_display[field] = parts or "Debit / Credit"
+        else:
+            col_map_display[field] = str(actual)
+
     return {
         "format": fmt_name,
         "rows": rows,
         "detected_month": month,
         "detected_year": year,
         "errors": errors,
+        "col_map": col_map_display,
     }

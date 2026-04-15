@@ -201,15 +201,15 @@
 }
 
 .btn-primary {
-  background: var(--accent);
+  background: color-mix(in srgb, var(--accent) 48%, var(--color-surface-700) 52%);
   color: var(--color-text-inverse);
-  box-shadow: 0 2px 12px rgba(124, 130, 255, 0.35);
-  border-color: rgba(124, 130, 255, 0.42);
+  box-shadow: 0 2px 8px rgba(124, 130, 255, 0.12);
+  border-color: rgba(124, 130, 255, 0.32);
 }
 
 .btn-primary:hover {
-  background: var(--accent-hover);
-  box-shadow: 0 3px 18px rgba(124, 130, 255, 0.5);
+  background: color-mix(in srgb, var(--accent) 62%, var(--color-surface-700) 38%);
+  box-shadow: 0 2px 10px rgba(124, 130, 255, 0.22);
 }
 
 .btn-secondary {

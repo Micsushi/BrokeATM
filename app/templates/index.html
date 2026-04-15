@@ -6,10 +6,11 @@
   <title>Import | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=8" />
+  <link rel="stylesheet" href="/static/css/main.css?v=9" />
   <style>
     /* Review table inline inputs */
-    #review-table .review-inp {
+    #review-table .review-inp,
+    #parser-preview-table .review-inp {
       width: 100%;
       padding: 0.3rem 0.45rem;
       font-size: 0.82rem;
@@ -19,19 +20,28 @@
       color: var(--text);
       box-sizing: border-box;
     }
-    #review-table .review-inp:focus {
+    #review-table .review-inp:focus,
+    #parser-preview-table .review-inp:focus {
       outline: none;
       border-color: var(--accent);
       background: var(--surface);
     }
-    #review-table select.review-inp { cursor: pointer; }
-    #review-table tr.review-excluded td { opacity: 0.38; }
+    #review-table select.review-inp,
+    #parser-preview-table select.review-inp { cursor: pointer; }
+    #review-table tr.review-excluded td,
+    #parser-preview-table tr.review-excluded td { opacity: 0.38; }
     #review-table input.row-chk:disabled {
       opacity: 0.4;
       cursor: not-allowed;
       accent-color: var(--muted, #64748b);
     }
-    #review-table tr.review-dup { background: rgba(239,68,68,0.12); }
+    #review-table tr.review-dup,
+    #parser-preview-table tr.review-dup { background: rgba(239,68,68,0.12); }
+    .review-inp.required-missing {
+      border-color: rgba(245,83,83,0.7) !important;
+      background: rgba(245,83,83,0.06) !important;
+    }
+    .badge-missing { background: rgba(245,83,83,0.2); color: #ffa0a0; }
     .review-dup-banner {
       padding: 1.25rem 1.5rem;
       border-radius: var(--radius);
@@ -92,6 +102,59 @@
       color: var(--tone-warning-text);
       max-width: 60rem;
     }
+
+    /* ── Parser selection ──────────────────────────────────────────── */
+    .parser-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    .parser-tab {
+      display: flex; flex-direction: column; gap: 0.2rem;
+      padding: 0.65rem 1rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      min-width: 148px;
+    }
+    .parser-tab:hover { border-color: var(--accent); }
+    .parser-tab.active { border-color: var(--accent); background: rgba(124,130,255,0.12); }
+    .parser-tab-name { font-size: 0.88rem; font-weight: 600; color: var(--text); }
+    .parser-star { color: var(--warning); }
+    .parser-tab-meta { display: flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; color: var(--text-muted); }
+    .parser-confidence { font-size: 0.82rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; }
+    .parser-confidence.high { color: var(--success); }
+    .parser-confidence.mid  { color: var(--warning); }
+    .parser-confidence.low  { color: var(--danger); }
+    .parser-warning-banner {
+      padding: 1rem 1.35rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--tone-warning-border);
+      border-left: 6px solid var(--warning);
+      background: var(--tone-warning-bg);
+    }
+    .parser-warning-title { font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 0.4rem; }
+    .parser-warning-list { list-style: none; padding: 0; margin: 0; }
+    .parser-warning-list li { font-size: 0.85rem; color: var(--tone-warning-text); padding: 0.1rem 0; }
+    .parser-warning-list li::before { content: "⚠ "; }
+    .parser-error-list li { color: #fecaca; }
+    .parser-error-list li::before { content: "✕ "; }
+    .parser-preview-header { padding: 0.55rem 1rem; border-bottom: 1px solid var(--border); }
+
+    /* ── Unknown PDF categories banner ────────────────────────────── */
+    .unknown-cats-banner {
+      padding: 1.1rem 1.35rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--tone-warning-border);
+      border-left: 6px solid var(--warning);
+      background: var(--tone-warning-bg);
+    }
+    .unknown-cats-title { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 0.3rem; }
+    .unknown-cats-pills { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0 0.75rem; }
+    .unknown-cats-pill {
+      padding: 0.2rem 0.65rem; border-radius: 99px;
+      background: rgba(124,130,255,0.18); border: 1px solid rgba(124,130,255,0.35);
+      font-size: 0.78rem; color: var(--accent-hover); font-weight: 500;
+    }
+    .unknown-cats-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
   </style>
 </head>
 <body>
@@ -110,14 +173,15 @@
 <div class="page">
   <div class="page-header">
     <h1>Import Transactions</h1>
-    <p>Upload one or more CSV files. Duplicates are checked across this upload and your database.</p>
+    <p>Upload CSV, PDF, or OFX/QFX bank statements. Duplicates are checked across this upload and your database.</p>
   </div>
 
   <div class="steps" id="steps">
     <div class="step active" data-step="1">1 · Upload</div>
-    <div class="step" data-step="2">2 · File periods</div>
-    <div class="step" data-step="3">3 · Review</div>
-    <div class="step" data-step="4">4 · Done</div>
+    <div class="step" data-step="2">2 · Parse</div>
+    <div class="step" data-step="3">3 · File periods</div>
+    <div class="step" data-step="4">4 · Review</div>
+    <div class="step" data-step="5">5 · Done</div>
   </div>
 
   <div id="alerts"></div>
@@ -127,9 +191,9 @@
     <div class="card mb-2">
       <div class="drop-zone" id="drop-zone">
         <div class="drop-icon">📂</div>
-        <p><strong>Drop CSV files here</strong> or click to browse</p>
-        <p class="mt-1" style="font-size:0.8rem">CIBC credit card CSVs only · use Ctrl to pick more than one</p>
-        <input type="file" id="file-input" accept=".csv" multiple style="display:none" />
+        <p><strong>Drop files here</strong> or click to browse</p>
+        <p class="mt-1" style="font-size:0.8rem">CSV · PDF · OFX · QFX &nbsp;·&nbsp; Multiple CSV files supported · PDF/OFX one at a time</p>
+        <input type="file" id="file-input" accept=".csv,.pdf,.ofx,.qfx" multiple style="display:none" />
       </div>
       <div id="parse-loading" class="hidden mt-2 flex items-center gap-1 text-muted">
         <span class="spinner"></span>
@@ -146,11 +210,53 @@
     </div>
   </div>
 
-  <!-- Step 2: Confirm period per file -->
-  <div id="step-2" class="card hidden">
+  <!-- Step 2: Parser Selection (PDF/OFX only) -->
+  <div id="step-2" class="hidden">
+    <div class="card mb-2">
+      <h2 style="font-size:1rem;font-weight:600">Choose a parsing method</h2>
+      <p class="text-muted" style="font-size:0.82rem;margin-top:0.2rem;line-height:1.45">
+        Each method analyzed your file differently. Select the one that looks most accurate, then check the warnings below.
+      </p>
+      <div class="parser-tabs" id="parser-tabs"></div>
+    </div>
+
+    <div id="parser-warnings" class="parser-warning-banner mb-2 hidden"></div>
+    <div id="parser-unknown-cats" class="unknown-cats-banner mb-2 hidden"></div>
+
+    <div class="card card-flush mb-2">
+      <div class="review-table-scroll">
+        <table id="parser-preview-table">
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th style="width:120px">Date</th>
+              <th>Merchant</th>
+              <th style="width:100px">Amount</th>
+              <th style="width:100px">Type</th>
+              <th style="width:140px">Category</th>
+            </tr>
+          </thead>
+          <tbody id="parser-preview-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card card-tight">
+      <div class="review-actions-bar">
+        <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+        <div class="flex gap-1 items-center">
+          <span id="parser-preview-label" class="text-muted" style="font-size:0.85rem"></span>
+          <button class="btn btn-primary" id="btn-use-parser">Continue with this parser →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 3: Confirm period per file -->
+  <div id="step-3" class="card hidden">
     <h2 style="font-size:1rem;font-weight:600;margin-bottom:0.5rem">Confirm file periods</h2>
     <p class="text-muted mb-2" style="font-size:0.82rem;line-height:1.45">
-      Month and year are saved on the <strong>import batch</strong>. Row dates still come from the CSV.
+      Month and year are saved on the <strong>import batch</strong>. Row dates still come from the file.
     </p>
     <div id="file-periods" class="mt-2"></div>
     <div id="parse-summary" class="mt-2 text-muted" style="font-size:0.85rem"></div>
@@ -158,13 +264,14 @@
       Duplicates are checked against your database and <strong>earlier rows in this upload</strong>.
     </p>
     <div class="flex gap-1 mt-3">
-      <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
+      <button class="btn btn-secondary" id="btn-back-to-parser">← Back</button>
       <button class="btn btn-primary" id="btn-check-dups">Check Duplicates →</button>
     </div>
   </div>
 
-  <!-- Step 3: Review Rows -->
-  <div id="step-3" class="hidden">
+  <!-- Step 4: Review Rows -->
+  <div id="step-4" class="hidden">
+    <div id="review-unknown-cats-banner" class="unknown-cats-banner mb-2 hidden"></div>
     <div id="review-dup-banner" class="review-dup-banner mb-2 hidden">
       <strong>Duplicate rows</strong>
       <p id="review-dup-banner-text" class="review-dup-banner-body" style="margin:0"></p>
@@ -193,7 +300,7 @@
 
     <div class="card card-tight mb-2">
       <div class="review-actions-bar">
-        <button type="button" class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+        <button type="button" class="btn btn-secondary" onclick="goStep(3)">← Back</button>
         <div class="flex gap-1 items-center">
           <span class="review-selected-count text-muted" style="font-size:0.85rem"></span>
           <button type="button" class="btn btn-primary review-btn-commit">Import Selected</button>
@@ -225,7 +332,7 @@
 
     <div class="card card-tight">
       <div class="review-actions-bar">
-        <button type="button" class="btn btn-secondary" onclick="goStep(2)">← Back</button>
+        <button type="button" class="btn btn-secondary" onclick="goStep(3)">← Back</button>
         <div class="flex gap-1 items-center">
           <span class="review-selected-count text-muted" style="font-size:0.85rem"></span>
           <button type="button" class="btn btn-primary review-btn-commit">Import Selected</button>
@@ -234,8 +341,8 @@
     </div>
   </div>
 
-  <!-- Step 4: Done -->
-  <div id="step-4" class="card hidden" style="text-align:center;padding:3rem">
+  <!-- Step 5: Done -->
+  <div id="step-5" class="card hidden" style="text-align:center;padding:3rem">
     <div style="font-size:3rem;margin-bottom:1rem">✅</div>
     <h2 style="font-size:1.3rem;font-weight:700" id="done-title">Import complete</h2>
     <p class="text-muted mt-1" id="done-summary"></p>
@@ -259,6 +366,31 @@ let reviewRows = [];
 let categories = [];
 /** Comma-separated names for the import batch (single or multi file). */
 let importFilename = "";
+let isPdfMode = false;
+let selectedParserId = null;
+let parserResults = [];
+
+// ── Mock parser data (used until backend supports PDF) ──────────────
+const _MOCK_ROWS = [
+  { transaction_date: "2025-01-03", merchant_name: "Tim Hortons #4821",                         amount:  12.47, transaction_type: "expense",  suggested_category: "Food & Dining",      is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "keyword", normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-05", merchant_name: "Netflix",                                   amount:  18.99, transaction_type: "expense",  suggested_category: "Subscriptions",      is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "keyword", normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-07", merchant_name: "Shoppers Drug Mart",                        amount:  34.20, transaction_type: "expense",  suggested_category: "Health & Pharmacy",  is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "mcc",     normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-09", merchant_name: "GIC paid out at maturity from 117667928",  amount: 2100.27, transaction_type: "income",   suggested_category: "Investment Income",  is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "keyword", normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-09", merchant_name: "Interac e-Transfer sent to Wenjian Shi",   amount: 2100.00, transaction_type: "transfer", suggested_category: "uncategorized",      is_payment: true,  is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "none",    normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-12", merchant_name: "Uber Eats",                                 amount:  29.85, transaction_type: "expense",  suggested_category: "Food & Dining",      is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "keyword", normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-15", merchant_name: "PRESTO Transit",                            amount:  50.00, transaction_type: "expense",  suggested_category: "Transportation",     is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "mcc",     normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-18", merchant_name: "Amazon.ca",                                 amount:  67.43, transaction_type: "expense",  suggested_category: "Shopping",           is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "keyword", normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-22", merchant_name: "Foreign Currency Exchange",                 amount:  15.00, transaction_type: "expense",  suggested_category: "uncategorized",      is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "none",    normalized_merchant: "", source_file: "" },
+  { transaction_date: "2025-01-31", merchant_name: "Interest received",                         amount:   0.10, transaction_type: "income",   suggested_category: "Investment Income",  is_payment: false, is_refund: false, duplicate: false, exclude: false, keyword_matches: [], keyword_resolution_needed: false, keyword_conflict_categories: false, suggestion_source: "keyword", normalized_merchant: "", source_file: "" },
+];
+const MOCK_PARSER_RESULTS = [
+  { parser_id: "pdfplumber_coords", parser_label: "Bank-Specific",    confidence: 0.94, skipped_rows: 0, warnings: ["Year inferred from statement header: 2025"], errors: [], unknown_pdf_categories: ["Foreign Currency Transactions", "Health and Education"], rows: _MOCK_ROWS },
+  { parser_id: "camelot_lattice",   parser_label: "Camelot Lattice",  confidence: 0.82, skipped_rows: 0, warnings: ["Lattice mode uses table borders — EQ Bank is borderless, fallback stream applied"], errors: [], unknown_pdf_categories: [], rows: _MOCK_ROWS },
+  { parser_id: "pdfplumber_table",  parser_label: "Generic Table",    confidence: 0.71, skipped_rows: 1, warnings: ["1 row skipped: summary totals row included in table extraction", "Cannot reliably detect split debit/credit columns without bank profile"], errors: [], unknown_pdf_categories: [], rows: _MOCK_ROWS.slice(0, 4) },
+  { parser_id: "camelot_stream",    parser_label: "Camelot Stream",   confidence: 0.67, skipped_rows: 1, warnings: ["Whitespace-based column detection: may misalign on variable-width fonts"], errors: ["1 row: date format 'Jan 9' not recognized — skipped"], unknown_pdf_categories: [], rows: _MOCK_ROWS.slice(0, 4) },
+  { parser_id: "pdfplumber_text",   parser_label: "Generic Text",     confidence: 0.48, skipped_rows: 2, warnings: ["Regex-based: cannot distinguish transaction date vs post date", "2 rows skipped: ambiguous amount format ('- $2,100.00') not parsed"], errors: [], unknown_pdf_categories: [], rows: _MOCK_ROWS.slice(0, 3) },
+  { parser_id: "ofx_parser",        parser_label: "OFX / QFX",        confidence: 0.00, skipped_rows: 0, warnings: ["Not applicable for PDF files — upload an OFX or QFX file to use this parser"], errors: [], unknown_pdf_categories: [], rows: [] },
+];
 
 
 async function init() {
@@ -295,7 +427,10 @@ dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag-ove
 dropZone.addEventListener("drop", (e) => {
   e.preventDefault();
   dropZone.classList.remove("drag-over");
-  const files = [...e.dataTransfer.files].filter((f) => f.name.toLowerCase().endsWith(".csv"));
+  const files = [...e.dataTransfer.files].filter((f) => {
+    const n = f.name.toLowerCase();
+    return n.endsWith(".csv") || n.endsWith(".pdf") || n.endsWith(".ofx") || n.endsWith(".qfx");
+  });
   if (files.length) handleFileList(files);
 });
 fileInput.addEventListener("change", () => {
@@ -412,8 +547,203 @@ function renderFilePeriodPickers() {
   });
 }
 
+// ── Parser selection helpers ────────────────────────────────────────
+function confClass(c) { return c >= 0.85 ? "high" : c >= 0.65 ? "mid" : "low"; }
+
+function renderParserTabs() {
+  const container = document.getElementById("parser-tabs");
+  if (!container) return;
+  container.innerHTML = "";
+  const best = parserResults.reduce((a, b) => b.confidence > a.confidence ? b : a, parserResults[0]);
+  parserResults.forEach(r => {
+    const isActive = r.parser_id === selectedParserId;
+    const isRec = best && r.parser_id === best.parser_id;
+    const pct = Math.round(r.confidence * 100);
+    const tab = document.createElement("div");
+    tab.className = "parser-tab" + (isActive ? " active" : "");
+    tab.dataset.parserId = r.parser_id;
+    tab.innerHTML = `
+      <div class="parser-tab-name">${escHtml(r.parser_label)}${isRec ? ' <span class="parser-star" title="Recommended">★</span>' : ''}</div>
+      <div class="parser-tab-meta">
+        <span class="parser-confidence ${confClass(r.confidence)}">${pct}%</span>
+        <span>·</span>
+        <span>${r.rows.length} rows</span>
+        ${r.skipped_rows ? `<span>·</span><span class="text-danger">${r.skipped_rows} skipped</span>` : ""}
+      </div>`;
+    tab.addEventListener("click", () => selectParser(r.parser_id));
+    container.appendChild(tab);
+  });
+  refreshParserPanel();
+}
+
+function selectParser(id) {
+  selectedParserId = id;
+  document.querySelectorAll(".parser-tab").forEach(t => t.classList.toggle("active", t.dataset.parserId === id));
+  refreshParserPanel();
+}
+
+function refreshParserPanel() {
+  const r = parserResults.find(p => p.parser_id === selectedParserId);
+  if (r) {
+    reviewRows = r.rows.map(row => ({ ...row, exclude: !!row.exclude }));
+    refreshKeywordStateForAllRows();
+  }
+  renderParserWarnings();
+  renderParserPreviewTable();
+  renderUnknownCatsBannerStep2();
+}
+
+function renderParserWarnings() {
+  const banner = document.getElementById("parser-warnings");
+  if (!banner) return;
+  const r = parserResults.find(p => p.parser_id === selectedParserId);
+  if (!r || (!r.warnings.length && !r.errors.length)) { banner.classList.add("hidden"); return; }
+  const wItems = r.warnings.map(w => `<li>${escHtml(w)}</li>`).join("");
+  const eItems = r.errors.map(e => `<li>${escHtml(e)}</li>`).join("");
+  banner.innerHTML = `
+    <div class="parser-warning-title">Why this might not be perfect</div>
+    ${wItems ? `<ul class="parser-warning-list">${wItems}</ul>` : ""}
+    ${eItems ? `<ul class="parser-warning-list parser-error-list">${eItems}</ul>` : ""}`;
+  banner.classList.remove("hidden");
+}
+
+
+function _buildUnknownCatRows(cats) {
+  return cats.map(c => `
+    <label style="display:flex;align-items:center;gap:0.6rem;padding:0.28rem 0;cursor:pointer">
+      <input type="checkbox" class="unknown-cat-cb" data-cat="${escHtml(c)}" checked
+             style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
+      <span class="unknown-cats-pill">${escHtml(c)}</span>
+    </label>`).join("");
+}
+
+function renderUnknownCatsBannerStep2() {
+  const banner = document.getElementById("parser-unknown-cats");
+  if (!banner) return;
+  const r = parserResults.find(p => p.parser_id === selectedParserId);
+  const cats = (r && r.unknown_pdf_categories) || [];
+  if (!cats.length) { banner.classList.add("hidden"); return; }
+  banner.innerHTML = `
+    <div class="unknown-cats-title">Categories from PDF not in your system</div>
+    <p class="text-muted" style="font-size:0.82rem">These categories from the file don't match any in your system. <strong style="color:var(--tone-warning-text)">Optional</strong> — if you skip this, all unrecognized categories will fall back to keyword matching automatically.</p>
+    <div id="unknown-cats-list" style="margin:0.5rem 0 0.75rem">${_buildUnknownCatRows(cats)}</div>
+    <div class="unknown-cats-actions">
+      <button class="btn btn-ghost btn-sm" onclick="handleUnknownCatsSelectAll(true)">Select all</button>
+      <button class="btn btn-ghost btn-sm" onclick="handleUnknownCatsSelectAll(false)">Clear all</button>
+      <button class="btn btn-ghost btn-sm" onclick="handleUnknownCatsAction('create')" style="margin-left:auto">Add to categories</button>
+      <button class="btn btn-ghost btn-sm" onclick="handleUnknownCatsAction('autosort')">Use existing categories</button>
+    </div>`;
+  banner.classList.remove("hidden");
+}
+
+function handleUnknownCatsSelectAll(checked) {
+  const banner = document.getElementById("parser-unknown-cats");
+  if (!banner) return;
+  banner.querySelectorAll(".unknown-cat-cb").forEach(cb => { cb.checked = checked; });
+}
+
+function handleUnknownCatsAction(action) {
+  const banner = document.getElementById("parser-unknown-cats");
+  if (!banner) return;
+  const selected = [];
+  banner.querySelectorAll(".unknown-cat-cb").forEach(cb => {
+    if (cb.checked) selected.push(cb.dataset.cat);
+  });
+  if (!selected.length) return;
+
+  if (action === "autosort") {
+    // persist to settings so future imports auto-skip these
+    try {
+      const s = JSON.parse(localStorage.getItem("brokeAtmSettings") || "{}");
+      const existing = Array.isArray(s.autoSortCategories) ? s.autoSortCategories : [];
+      const merged = [...new Set([...existing, ...selected])];
+      s.autoSortCategories = merged;
+      localStorage.setItem("brokeAtmSettings", JSON.stringify(s));
+    } catch (_) {}
+    // show toast with settings link
+    const toast = document.getElementById("import-toast");
+    if (toast) {
+      toast.innerHTML = `${selected.length} categor${selected.length === 1 ? "y" : "ies"} added to auto-sort list. <a href="/settings" style="color:#fff;text-decoration:underline">Manage in Settings</a>`;
+      toast.classList.add("show");
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => { toast.classList.remove("show"); toast.innerHTML = ""; }, 4000);
+    }
+  }
+
+  // remove acted-on rows from the banner
+  const r = parserResults.find(p => p.parser_id === selectedParserId);
+  if (r) r.unknown_pdf_categories = (r.unknown_pdf_categories || []).filter(c => !selected.includes(c));
+  const remaining = r ? r.unknown_pdf_categories : [];
+
+  if (!remaining.length) { banner.classList.add("hidden"); return; }
+  const list = banner.querySelector("#unknown-cats-list");
+  if (list) list.innerHTML = _buildUnknownCatRows(remaining);
+}
+
+// kept for compat
+function handleUnknownCats() {}
+function handleUnknownCatsApply() { handleUnknownCatsAction("create"); }
+
+function isPdfOrOfx(f) {
+  const n = f.name.toLowerCase();
+  return n.endsWith(".pdf") || n.endsWith(".ofx") || n.endsWith(".qfx");
+}
+
+async function handlePdfOrOfxFile(file) {
+  isPdfMode = true;
+  parserResults = MOCK_PARSER_RESULTS.map(r => ({
+    ...r,
+    rows: r.rows.map(row => ({ ...row, source_file: file.name })),
+  }));
+  const best = parserResults.reduce((a, b) => b.confidence > a.confidence ? b : a);
+  selectedParserId = best.parser_id;
+  importFilename = file.name;
+  parsedData = {
+    format: "pdf",
+    rows: best.rows,
+    errors: [],
+    detected_month: 1,
+    detected_year: 2025,
+    source_files: [file.name],
+    perFilePeriod: {},
+  };
+  document.getElementById("parse-summary").textContent =
+    `${best.rows.length} rows detected from ${file.name} · parser: ${best.parser_label}`;
+  renderParserTabs();
+  goStep(2);
+}
+
 async function handleFileList(fileList) {
-  const files = [...fileList].filter((f) => f.name.toLowerCase().endsWith(".csv"));
+  const allFiles = [...fileList];
+  const pdfFiles = allFiles.filter(isPdfOrOfx);
+  const csvFiles = allFiles.filter(f => f.name.toLowerCase().endsWith(".csv"));
+
+  if (!pdfFiles.length && !csvFiles.length) {
+    showAlert(document.getElementById("alerts"), "Choose .csv, .pdf, .ofx, or .qfx files.", "error");
+    return;
+  }
+
+  // PDF/OFX: one at a time
+  if (pdfFiles.length) {
+    if (pdfFiles.length > 1 || csvFiles.length) {
+      showAlert(document.getElementById("alerts"), "PDF/OFX import: upload one file at a time.", "warning");
+    }
+    const msgEl = document.getElementById("parse-loading-msg");
+    document.getElementById("parse-loading").classList.remove("hidden");
+    if (msgEl) msgEl.textContent = `Analyzing ${pdfFiles[0].name}…`;
+    try {
+      await new Promise(r => setTimeout(r, 700));
+      handlePdfOrOfxFile(pdfFiles[0]);
+    } finally {
+      document.getElementById("parse-loading").classList.add("hidden");
+      if (msgEl) msgEl.textContent = "Parsing…";
+    }
+    return;
+  }
+
+  // CSV path (unchanged)
+  isPdfMode = false;
+  const files = csvFiles;
   if (!files.length) {
     showAlert(document.getElementById("alerts"), "Choose one or more .csv files.", "error");
     return;
@@ -460,6 +790,7 @@ async function handleFileList(fileList) {
     if (errLines.length) {
       showAlert(document.getElementById("alerts"), errLines.slice(0, 6).join("\n") + (errLines.length > 6 ? "\n…" : ""), "warning");
     }
+    renderCsvParseResult(merged);
     goStep(2);
   } catch (e) {
     showAlert(document.getElementById("alerts"), e.message, "error");
@@ -517,8 +848,51 @@ async function runDuplicateCheckAndGoReview() {
   const result = await API.checkDuplicates(rowsPayloadForDuplicateCheck(parsedData.rows));
   applyDuplicateCheckResult(result.rows, prevSnap);
   renderReviewTable();
+  renderReviewUnknownCatsBanner();
+  goStep(4);
+}
+
+function renderReviewUnknownCatsBanner() {
+  const banner = document.getElementById("review-unknown-cats-banner");
+  if (!banner) return;
+  if (!isPdfMode) { banner.classList.add("hidden"); return; }
+  const r = parserResults.find(p => p.parser_id === selectedParserId);
+  const cats = (r && r.unknown_pdf_categories) || [];
+  if (!cats.length) { banner.classList.add("hidden"); return; }
+  const pills = cats.map(c => `<span class="unknown-cats-pill">${escHtml(c)}</span>`).join("");
+  banner.innerHTML = `
+    <div class="unknown-cats-title">PDF categories not yet resolved</div>
+    <p class="text-muted" style="font-size:0.82rem">These categories from your PDF were not matched. Go back to Parser step to decide, or they will import as <em>uncategorized</em>.</p>
+    <div class="unknown-cats-pills">${pills}</div>`;
+  banner.classList.remove("hidden");
+}
+
+function rowMissingRequired(row) {
+  const m = [];
+  if (!row.transaction_date) m.push("date");
+  if (!row.merchant_name || !String(row.merchant_name).trim()) m.push("merchant");
+  if (row.amount === null || row.amount === undefined || isNaN(Number(row.amount))) m.push("amount");
+  const validTypes = ["expense","income","refund","transfer"];
+  if (!row.transaction_type || !validTypes.includes(row.transaction_type)) m.push("type");
+  return m; // empty = all required fields present
+}
+
+// Step-2 "Continue with this parser"
+function doUseParser() {
+  const r = parserResults.find(p => p.parser_id === selectedParserId);
+  if (!r) return;
+  parsedData.rows = r.rows.map(row => ({ ...row, source_file: importFilename }));
+  const my = detectMonthYearFromRows(parsedData.rows);
+  parsedData.detected_month = my.month;
+  parsedData.detected_year = my.year;
   goStep(3);
 }
+document.getElementById("btn-use-parser").addEventListener("click", doUseParser);
+
+// Step-3 "Back" — goes to parser step for PDF, upload for CSV
+document.getElementById("btn-back-to-parser").addEventListener("click", () => {
+  goStep(isPdfMode ? 2 : 1);
+});
 
 document.getElementById("btn-check-dups").addEventListener("click", async () => {
   const btn = document.getElementById("btn-check-dups");
@@ -551,9 +925,12 @@ document.getElementById("btn-recheck-dups").addEventListener("click", async () =
   }
 });
 
-// ── Step 3: Review table ──
-function renderReviewTable() {
-  const tbody = document.getElementById("review-tbody");
+// ── Step 3 / Parser preview: Review table ──
+// previewMode = true → skip dup banners/summary, target parser-preview-tbody
+function renderReviewTable(previewMode = false) {
+  const tbodyId = previewMode ? "parser-preview-tbody" : "review-tbody";
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
   tbody.innerHTML = "";
   const dupCount = reviewRows.filter((r) => r.duplicate).length;
   const dupExcluded = reviewRows.filter((r) => r.duplicate && r.exclude).length;
@@ -563,54 +940,56 @@ function renderReviewTable() {
   const payCount = reviewRows.filter((r) => r.is_payment).length;
   const keywordCount = reviewRows.filter((r) => r.keyword_resolution_needed).length;
   const dupIdxs = reviewRows.map((r, i) => (r.duplicate ? i + 1 : null)).filter((n) => n != null);
-  const showFileCol = !!(parsedData && parsedData.source_files && parsedData.source_files.length > 1);
-  const thSource = document.getElementById("th-source");
-  if (thSource) thSource.classList.toggle("hidden", !showFileCol);
-
-  const dupBanner = document.getElementById("review-dup-banner");
-  const dupBannerText = document.getElementById("review-dup-banner-text");
-  if (dupCount) {
-    dupBanner.classList.remove("hidden");
-    const list =
-      dupIdxs.length <= 15
-        ? dupIdxs.join(", ")
-        : dupIdxs.slice(0, 15).join(", ") + ", …";
-    const parts = [
-      `Rows ${list} match an earlier row in this upload or a saved transaction.`,
-    ];
-    if (dupInUpload) parts.push(`${dupInUpload} also repeat another row in this upload.`);
-    if (dupInDbOnly) parts.push(`${dupInDbOnly} already exist in your database.`);
-    parts.push(
-      `Same reference on a different date still counts as new. Duplicates start unchecked.`,
-    );
-    dupBannerText.textContent = parts.join(" ");
-  } else {
-    dupBanner.classList.add("hidden");
+  const showFileCol = !previewMode && !!(parsedData && parsedData.source_files && parsedData.source_files.length > 1);
+  if (!previewMode) {
+    const thSource = document.getElementById("th-source");
+    if (thSource) thSource.classList.toggle("hidden", !showFileCol);
   }
 
-  const keywordBanner = document.getElementById("review-keyword-banner");
-  const keywordBannerText = document.getElementById("review-keyword-banner-text");
-  if (keywordCount) {
-    keywordBanner.classList.remove("hidden");
-    keywordBannerText.textContent =
-      `${keywordCount} row(s) matched keywords from more than one category. ` +
-      `Pick the right category and remove saved keywords if needed. ` +
-      `Same-category matches are handled automatically.`;
-  } else {
-    keywordBanner.classList.add("hidden");
-  }
+  if (!previewMode) {
+    const dupBanner = document.getElementById("review-dup-banner");
+    const dupBannerText = document.getElementById("review-dup-banner-text");
+    if (dupCount) {
+      dupBanner.classList.remove("hidden");
+      const list =
+        dupIdxs.length <= 15
+          ? dupIdxs.join(", ")
+          : dupIdxs.slice(0, 15).join(", ") + ", …";
+      const parts = [
+        `Rows ${list} match an earlier row in this upload or a saved transaction.`,
+      ];
+      if (dupInUpload) parts.push(`${dupInUpload} also repeat another row in this upload.`);
+      if (dupInDbOnly) parts.push(`${dupInDbOnly} already exist in your database.`);
+      parts.push(`Same reference on a different date still counts as new. Duplicates start unchecked.`);
+      dupBannerText.textContent = parts.join(" ");
+    } else {
+      dupBanner.classList.add("hidden");
+    }
 
-  document.getElementById("review-summary").textContent = `${reviewRows.length} rows`;
-  const warn = [];
-  if (dupCount) {
-    let d = `${dupExcluded} duplicates off`;
-    if (dupOptedIn) d += `, ${dupOptedIn} kept`;
-    if (dupInUpload || dupInDbOnly) d += ` (${dupInUpload} upload, ${dupInDbOnly} database)`;
-    warn.push(d);
+    const keywordBanner = document.getElementById("review-keyword-banner");
+    const keywordBannerText = document.getElementById("review-keyword-banner-text");
+    if (keywordCount) {
+      keywordBanner.classList.remove("hidden");
+      keywordBannerText.textContent =
+        `${keywordCount} row(s) matched keywords from more than one category. ` +
+        `Pick the right category and remove saved keywords if needed. ` +
+        `Same-category matches are handled automatically.`;
+    } else {
+      keywordBanner.classList.add("hidden");
+    }
+
+    document.getElementById("review-summary").textContent = `${reviewRows.length} rows`;
+    const warn = [];
+    if (dupCount) {
+      let d = `${dupExcluded} duplicates off`;
+      if (dupOptedIn) d += `, ${dupOptedIn} kept`;
+      if (dupInUpload || dupInDbOnly) d += ` (${dupInUpload} upload, ${dupInDbOnly} database)`;
+      warn.push(d);
+    }
+    if (payCount) warn.push(`${payCount} payments`);
+    if (keywordCount) warn.push(`${keywordCount} conflicts`);
+    document.getElementById("dup-warning").textContent = warn.join(" · ");
   }
-  if (payCount) warn.push(`${payCount} payments`);
-  if (keywordCount) warn.push(`${keywordCount} conflicts`);
-  document.getElementById("dup-warning").textContent = warn.join(" · ");
 
   const sugCatBase = `<option value="">-- none --</option>` + categories.map(c =>
     `<option value="${escHtml(c.name)}">${escHtml(c.name)}</option>`
@@ -667,6 +1046,21 @@ function renderReviewTable() {
     const srcCell = showFileCol
       ? `<td class="text-muted" style="font-size:0.75rem;max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(row.source_file || "")}">${escHtml((row.source_file || "—").slice(0, 22))}${(row.source_file || "").length > 22 ? "…" : ""}</td>`
       : "";
+
+    // required-field check — highlight in both preview and review
+    const missingFields = rowMissingRequired(row);
+    const missingDate     = missingFields.includes("date");
+    const missingMerchant = missingFields.includes("merchant");
+    const missingAmount   = missingFields.includes("amount");
+    const missingType     = missingFields.includes("type");
+
+    const statusCell = previewMode
+      ? `<td style="white-space:nowrap">${payBadge}${missingFields.length ? `<span class="badge badge-missing" title="Missing: ${missingFields.join(', ')}">!</span>` : ""}</td>`
+      : `<td style="white-space:nowrap">
+          ${dupBadge}${payBadge}${kwBadge}
+          ${row.duplicate ? `<span class="text-muted dup-import-hint" style="font-size:0.72rem;margin-left:0.25rem" data-dup-hint="${i}">${row.exclude ? "deselected" : "will import"}</span>` : ""}
+         </td>`;
+
     tr.innerHTML = `
       <td style="padding-left:0.75rem">
         <input type="checkbox" class="row-chk" data-idx="${i}" ${checked} ${dupChkAttrs} />
@@ -674,19 +1068,19 @@ function renderReviewTable() {
       <td class="text-muted" style="font-size:0.8rem">${i + 1}</td>
       ${srcCell}
       <td>
-        <input type="date" class="review-inp date-inp" data-idx="${i}"
+        <input type="date" class="review-inp date-inp${missingDate ? " required-missing" : ""}" data-idx="${i}"
           value="${row.transaction_date || ""}" tabindex="${ti.date}" />
       </td>
       <td>
-        <input type="text" class="review-inp merchant-inp" data-idx="${i}"
+        <input type="text" class="review-inp merchant-inp${missingMerchant ? " required-missing" : ""}" data-idx="${i}"
           value="${escHtml(row.merchant_name || "")}" placeholder="merchant…" tabindex="${ti.merchant}" />
       </td>
       <td>
-        <input type="number" class="review-inp amount-inp" data-idx="${i}"
-          value="${row.amount}" step="0.01" min="0" tabindex="${ti.amount}" style="width:90px" />
+        <input type="number" class="review-inp amount-inp${missingAmount ? " required-missing" : ""}" data-idx="${i}"
+          value="${row.amount ?? ""}" step="0.01" min="0" tabindex="${ti.amount}" style="width:90px" />
       </td>
       <td>
-        <select class="review-inp type-sel" data-idx="${i}" tabindex="${ti.type}">${typeOpts}</select>
+        <select class="review-inp type-sel${missingType ? " required-missing" : ""}" data-idx="${i}" tabindex="${ti.type}">${typeOpts}</select>
       </td>
       <td>
         <select class="review-inp cat-sel" data-idx="${i}" tabindex="${ti.cat}">${catOpts}</select>
@@ -695,16 +1089,43 @@ function renderReviewTable() {
         <input type="text" class="review-inp notes-inp" data-idx="${i}"
           placeholder="notes…" value="${escHtml(row.notes || "")}" tabindex="${ti.notes}" />
       </td>
-      <td style="white-space:nowrap">
-        ${dupBadge}${payBadge}${kwBadge}
-        ${row.duplicate ? `<span class="text-muted dup-import-hint" style="font-size:0.72rem;margin-left:0.25rem" data-dup-hint="${i}">${row.exclude ? "deselected" : "will import"}</span>` : ""}
-      </td>
+      ${statusCell}
     `;
     tbody.appendChild(tr);
   });
 
   attachReviewListeners();
   updateSelectedCount();
+}
+
+function renderParserPreviewTable() {
+  const tbody = document.getElementById("parser-preview-tbody");
+  const lbl   = document.getElementById("parser-preview-label");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const r = parserResults.find(p => p.parser_id === selectedParserId);
+  const rows = (r && r.rows) || [];
+  const skipped = (r && r.skipped_rows) ? ` · ${r.skipped_rows} skipped` : "";
+  if (lbl) lbl.textContent = `${rows.length} row${rows.length !== 1 ? "s" : ""}${skipped}`;
+
+  rows.forEach((row, i) => {
+    const missing = rowMissingRequired(row);
+    const tr = document.createElement("tr");
+    const catDisplay = row.category_name || row.suggested_category || "";
+    const missingHint = missing.length
+      ? `<span class="badge badge-missing" title="Missing: ${missing.join(', ')}" style="margin-left:0.3rem">!</span>`
+      : "";
+    tr.innerHTML = `
+      <td class="text-muted" style="font-size:0.8rem">${i + 1}</td>
+      <td>${escHtml(String(row.transaction_date || "—"))}</td>
+      <td>${escHtml(row.merchant_name || "—")}${missingHint}</td>
+      <td>${row.amount ?? "—"}</td>
+      <td>${escHtml(row.transaction_type || "—")}</td>
+      <td class="text-muted" style="font-size:0.85rem">${escHtml(catDisplay || "uncategorized")}</td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
 function attachReviewListeners() {
@@ -941,6 +1362,16 @@ document.getElementById("btn-deselect-all").addEventListener("click", () => {
 
 // ── Commit ──
 async function runCommitImport() {
+  // Block if any non-excluded rows are missing required fields
+  const badRows = reviewRows
+    .map((row, i) => ({ row, i }))
+    .filter(({ row }) => !row.exclude && rowMissingRequired(row).length > 0);
+  if (badRows.length > 0) {
+    const names = badRows.slice(0, 5).map(({ i, row }) => `Row ${i + 1}: missing ${rowMissingRequired(row).join(", ")}`).join("; ");
+    const more = badRows.length > 5 ? ` and ${badRows.length - 5} more` : "";
+    showAlert(document.getElementById("alerts"), `${badRows.length} row${badRows.length !== 1 ? "s" : ""} have missing required fields. Fill them before importing. ${names}${more}.`, "error");
+    return;
+  }
   const buttons = document.querySelectorAll(".review-btn-commit");
   buttons.forEach((b) => { b.disabled = true; b.textContent = "Importing…"; });
   try {
@@ -958,7 +1389,7 @@ async function runCommitImport() {
         : "";
     document.getElementById("done-summary").textContent =
       `${result.imported} imported, ${result.skipped} skipped${batchNote}. Batch ${(result.batch_id || "").slice(0, 8)}…`;
-    goStep(4);
+    goStep(5);
   } catch (e) {
     showAlert(document.getElementById("alerts"), e.message, "error");
   } finally {
@@ -978,17 +1409,21 @@ document.getElementById("btn-review-keyword-conflicts").addEventListener("click"
 
 // ── Navigation ──
 function goStep(n) {
-  [1,2,3,4].forEach(i => {
+  [1,2,3,4,5].forEach(i => {
     document.getElementById(`step-${i}`).classList.toggle("hidden", i !== n);
     const stepEl = document.querySelector(`.step[data-step="${i}"]`);
-    stepEl.classList.remove("active","done");
+    if (!stepEl) return;
+    stepEl.classList.remove("active", "done");
     if (i === n) stepEl.classList.add("active");
     else if (i < n) stepEl.classList.add("done");
   });
-  if (n === 2 && parsedData) renderFilePeriodPickers();
+  if (n === 3 && parsedData) renderFilePeriodPickers();
 }
 
 function resetImport() {
+  isPdfMode = false;
+  parserResults = [];
+  selectedParserId = null;
   parsedData = null;
   reviewRows = [];
   importFilename = "";
@@ -1010,5 +1445,6 @@ document.getElementById("btn-add-entry-import").addEventListener("click", () => 
 });
 </script>
 
+<div class="app-toast" id="import-toast" style="max-width:360px;line-height:1.4"></div>
 </body>
 </html>
