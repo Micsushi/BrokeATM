@@ -1,7 +1,6 @@
 (function () {
   const MODAL_ID = "keyword-conflict-modal";
   const STYLE_ID = "keyword-conflict-modal-styles";
-  const TOAST_ID = "keyword-conflict-toast";
 
   function injectStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -14,8 +13,8 @@
         max-height: min(92vh, 920px);
         display: grid;
         grid-template-rows: auto auto minmax(0, 1fr) auto;
-        gap: 0.85rem;
-        padding: 1.25rem 1.45rem 1rem;
+        gap: 1rem;
+        padding: 1.35rem 1.45rem;
         overflow: hidden;
       }
       #${MODAL_ID} .modal h2 {
@@ -86,10 +85,7 @@
         display: grid;
         grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);
         gap: 1rem;
-        align-items: stretch;
-      }
-      #${MODAL_ID} .kcm-merchant-full {
-        grid-column: 1 / -1;
+        align-items: start;
       }
       #${MODAL_ID} .kcm-merchant-main,
       #${MODAL_ID} .kcm-merchant-side {
@@ -106,26 +102,10 @@
         display: grid;
         gap: 0.45rem;
         padding: 1rem 1.05rem;
-        min-height: 164px;
-        height: 100%;
-        align-content: start;
         border-radius: 14px;
         border: 1px solid rgba(124, 130, 255, 0.24);
         background:
           linear-gradient(135deg, rgba(124, 130, 255, 0.12), rgba(255, 209, 102, 0.06)),
-          color-mix(in srgb, var(--surface2) 90%, white 2%);
-      }
-      #${MODAL_ID} .kcm-choice-card {
-        display: grid;
-        align-content: start;
-        gap: 0.9rem;
-        padding: 1rem 1.05rem;
-        min-height: 164px;
-        height: 100%;
-        border-radius: 14px;
-        border: 1px solid rgba(124, 130, 255, 0.24);
-        background:
-          linear-gradient(135deg, rgba(124, 130, 255, 0.12), rgba(124, 130, 255, 0.04)),
           color-mix(in srgb, var(--surface2) 90%, white 2%);
       }
       #${MODAL_ID} .kcm-entry-label {
@@ -165,10 +145,6 @@
         gap: 0.75rem;
         flex-wrap: wrap;
       }
-      #${MODAL_ID} .kcm-toolbar-sub {
-        align-items: flex-end;
-        margin-top: -0.15rem;
-      }
       #${MODAL_ID} .kcm-selection-copy {
         font-size: 0.84rem;
         color: var(--text-muted);
@@ -183,16 +159,15 @@
       }
       #${MODAL_ID} .kcm-option-grid {
         display: grid;
-        gap: 0.6rem;
+        gap: 0.7rem;
         grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       }
       #${MODAL_ID} .kcm-option {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr);
         gap: 0.8rem;
-        align-items: center;
+        align-items: start;
         padding: 0.9rem 1rem;
-        min-height: 96px;
         border-radius: 12px;
         border: 1px solid var(--border);
         background: color-mix(in srgb, var(--surface2) 92%, white 2%);
@@ -215,20 +190,12 @@
       #${MODAL_ID} .kcm-option input[type="checkbox"] {
         width: 18px;
         height: 18px;
-        margin-top: 0;
+        margin-top: 0.18rem;
         accent-color: var(--accent);
       }
       #${MODAL_ID} .kcm-option-copy {
         display: grid;
-        gap: 0.3rem;
-        align-content: center;
-      }
-      #${MODAL_ID} .kcm-option-label {
-        font-size: 0.74rem;
-        font-weight: 700;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
-        color: var(--text-muted);
+        gap: 0.2rem;
       }
       #${MODAL_ID} .kcm-option-title {
         font-size: 0.92rem;
@@ -248,106 +215,7 @@
         border-radius: 12px;
         border: 1px solid var(--border);
         background: color-mix(in srgb, var(--surface2) 92%, white 2%);
-        padding: 0.9rem 1rem;
-        min-height: 96px;
-        display: grid;
-        align-content: center;
-      }
-      #${MODAL_ID} .kcm-match-scroll {
-        display: grid;
-        gap: 0.55rem;
-        max-height: min(44vh, 360px);
-        overflow: auto;
-        padding-right: 0.2rem;
-      }
-      #${MODAL_ID} .kcm-merchant-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 1rem;
-        min-height: 68px;
-        padding: 0.72rem 1.15rem;
-        border-radius: 12px;
-        border: 1px solid rgba(124, 130, 255, 0.24);
-        background:
-          linear-gradient(135deg, rgba(124, 130, 255, 0.12), rgba(124, 130, 255, 0.04)),
-          color-mix(in srgb, var(--surface2) 90%, white 2%);
-        cursor: pointer;
-      }
-      #${MODAL_ID} .kcm-merchant-row:hover {
-        border-color: rgba(124, 130, 255, 0.24);
-        background:
-          linear-gradient(135deg, rgba(124, 130, 255, 0.12), rgba(124, 130, 255, 0.04)),
-          color-mix(in srgb, var(--surface2) 90%, white 2%);
-      }
-      #${MODAL_ID} .kcm-merchant-row.is-checked {
-        border-color: rgba(124, 130, 255, 0.24);
-        background:
-          linear-gradient(135deg, rgba(124, 130, 255, 0.12), rgba(124, 130, 255, 0.04)),
-          color-mix(in srgb, var(--surface2) 90%, white 2%);
-        box-shadow: none;
-      }
-      #${MODAL_ID} .kcm-merchant-summary {
-        display: grid;
-        grid-template-columns: minmax(0, 272px) 48px minmax(0, 272px) auto;
-        align-items: center;
-        column-gap: 0.85rem;
-        row-gap: 0.45rem;
-        min-width: 0;
-        width: 100%;
-      }
-      #${MODAL_ID} .kcm-merchant-piece {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        align-items: center;
-        gap: 0.45rem;
-        min-width: 0;
-        white-space: nowrap;
-      }
-      #${MODAL_ID} .kcm-value-slot {
-        display: flex;
-        align-items: center;
-        min-width: 0;
-        width: 100%;
-      }
-      #${MODAL_ID} .kcm-inline-key {
-        font-size: 0.7rem;
-        font-weight: 700;
-        letter-spacing: 0.05em;
-        text-transform: uppercase;
-        color: var(--text-muted);
-      }
-      #${MODAL_ID} .kcm-merchant-remove {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.55rem;
-        font-size: 0.88rem;
-        font-weight: 700;
-        color: var(--text);
-        white-space: nowrap;
-      }
-      #${MODAL_ID} .kcm-merchant-remove input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        accent-color: var(--accent);
-      }
-      #${MODAL_ID} .kcm-match-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
-        align-items: center;
-        gap: 0.75rem;
-      }
-      #${MODAL_ID} .kcm-match-block {
-        display: grid;
-        gap: 0.35rem;
-        min-width: 0;
-      }
-      #${MODAL_ID} .kcm-match-label {
-        font-size: 0.74rem;
-        font-weight: 700;
-        letter-spacing: 0.07em;
-        text-transform: uppercase;
-        color: var(--text-muted);
+        padding: 0.8rem 0.95rem;
       }
       #${MODAL_ID} .kcm-match-line {
         display: flex;
@@ -361,63 +229,26 @@
       #${MODAL_ID} .kcm-token {
         display: inline-flex;
         align-items: center;
-        min-height: 28px;
-        padding: 0.1rem 0.68rem;
+        min-height: 30px;
+        padding: 0.1rem 0.7rem;
         border-radius: 999px;
-        font-size: 0.76rem;
+        font-size: 0.84rem;
         font-weight: 700;
         line-height: 1.2;
-        min-width: 0;
-        width: fit-content;
-        max-width: 100%;
       }
       #${MODAL_ID} .kcm-token-keyword {
-        background: rgba(124, 130, 255, 0.12);
-        border: 1px solid rgba(124, 130, 255, 0.24);
-        color: #d9deff;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 100%;
+        background: rgba(255, 209, 102, 0.12);
+        border: 1px solid rgba(255, 209, 102, 0.24);
+        color: #ffe8ac;
       }
       #${MODAL_ID} .kcm-token-category {
         background: rgba(124, 130, 255, 0.12);
         border: 1px solid rgba(124, 130, 255, 0.24);
         color: #d9deff;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 100%;
-      }
-      #${MODAL_ID} .kcm-strongest-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-self: start;
-        min-height: 28px;
-        padding: 0.1rem 0.68rem;
-        border-radius: 999px;
-        background: rgba(255, 209, 102, 0.16);
-        border: 1px solid rgba(255, 209, 102, 0.28);
-        color: #ffe3a0;
-        font-size: 0.72rem;
-        font-weight: 800;
-        line-height: 1.2;
-        white-space: nowrap;
       }
       #${MODAL_ID} .kcm-arrow {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 48px;
         color: var(--text-muted);
         font-weight: 700;
-        font-size: 1.2rem;
-      }
-      #${MODAL_ID} #kcm-category-select {
-        min-height: 48px;
-        padding: 0.72rem 0.95rem;
-        font-size: 1.14rem;
-        font-weight: 600;
       }
       #${MODAL_ID} .kcm-inline-note {
         font-size: 0.8rem;
@@ -438,7 +269,7 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0.75rem;
         margin-top: 0;
-        padding-top: 0.35rem;
+        padding-top: 0.85rem;
         border-top: 1px solid rgba(148, 163, 184, 0.12);
         background: linear-gradient(180deg, rgba(19, 22, 42, 0), rgba(19, 22, 42, 0.92) 40%);
       }
@@ -452,27 +283,44 @@
         justify-content: center;
         box-shadow: none;
       }
+      #${MODAL_ID} .kcm-btn-neutral {
+        background: linear-gradient(180deg, color-mix(in srgb, var(--surface3, #273362) 86%, white 14%), color-mix(in srgb, var(--surface3, #273362) 94%, black 6%));
+        color: var(--text);
+        border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border));
+      }
+      #${MODAL_ID} .kcm-btn-neutral:hover {
+        border-color: color-mix(in srgb, var(--accent) 52%, white 8%);
+        background: linear-gradient(180deg, color-mix(in srgb, var(--surface3, #273362) 78%, white 22%), color-mix(in srgb, var(--surface3, #273362) 90%, black 10%));
+      }
+      #${MODAL_ID} .kcm-btn-muted {
+        background: rgba(124, 130, 255, 0.08);
+        color: var(--text);
+        border: 1px solid rgba(124, 130, 255, 0.18);
+      }
+      #${MODAL_ID} .kcm-btn-muted:hover {
+        color: #f7f8ff;
+        border-color: rgba(124, 130, 255, 0.36);
+        background: rgba(124, 130, 255, 0.15);
+      }
+      #${MODAL_ID} .kcm-btn-action {
+        background: linear-gradient(180deg, #c27a1a, #a55b10);
+        color: #fff7ea;
+        border: 1px solid rgba(251, 191, 36, 0.45);
+      }
+      #${MODAL_ID} .kcm-btn-action:hover {
+        background: linear-gradient(180deg, #d18a24, #b96815);
+        border-color: rgba(252, 211, 77, 0.6);
+      }
+      #${MODAL_ID} .kcm-btn-primary {
+        background: color-mix(in srgb, var(--accent) 78%, white 22%);
+        color: #fff;
+        border: 1px solid rgba(124, 130, 255, 0.45);
+      }
+      #${MODAL_ID} .kcm-btn-primary:hover {
+        filter: brightness(1.04);
+      }
       #${MODAL_ID} .kcm-merchant-side .kcm-option-grid {
         grid-template-columns: 1fr;
-      }
-      #${TOAST_ID} {
-        position: fixed;
-        bottom: 1.5rem;
-        right: 1.5rem;
-        background: var(--accent);
-        color: #fff;
-        padding: 0.5rem 1.1rem;
-        border-radius: 8px;
-        font-weight: 600;
-        font-size: 0.85rem;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-        z-index: 999;
-        opacity: 0;
-        transition: opacity 0.2s;
-        pointer-events: none;
-      }
-      #${TOAST_ID}.show {
-        opacity: 1;
       }
       @media (max-width: 920px) {
         #${MODAL_ID} .modal {
@@ -502,32 +350,6 @@
         #${MODAL_ID} .kcm-option-grid {
           grid-template-columns: 1fr;
         }
-        #${MODAL_ID} .kcm-merchant-row {
-          grid-template-columns: 1fr;
-          align-items: start;
-        }
-        #${MODAL_ID} .kcm-merchant-summary {
-          grid-template-columns: 1fr;
-          gap: 0.65rem;
-        }
-        #${MODAL_ID} .kcm-merchant-piece {
-          white-space: normal;
-        }
-        #${MODAL_ID} .kcm-arrow {
-          width: auto;
-          justify-content: flex-start;
-        }
-        #${MODAL_ID} .kcm-merchant-remove {
-          justify-self: start;
-        }
-        #${MODAL_ID} .kcm-match-row {
-          grid-template-columns: 1fr;
-          gap: 0.55rem;
-        }
-        #${TOAST_ID} {
-          right: 1rem;
-          bottom: 1rem;
-        }
       }
     `;
     document.head.appendChild(style);
@@ -548,7 +370,6 @@
           <div class="kcm-actions" id="kcm-actions"></div>
         </div>
       </div>
-      <div id="${TOAST_ID}" aria-live="polite"></div>
     `);
 
     document.getElementById(MODAL_ID).addEventListener("click", (e) => {
@@ -559,20 +380,10 @@
   }
 
   let _resolver = null;
-  let _toastTimer = null;
 
   function clearAlerts() {
     const alerts = document.getElementById("kcm-alerts");
     if (alerts) alerts.innerHTML = "";
-  }
-
-  function showToast(message) {
-    const toast = document.getElementById(TOAST_ID);
-    if (!toast) return;
-    toast.textContent = message;
-    toast.classList.add("show");
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => toast.classList.remove("show"), 1500);
   }
 
   function closeCurrent(result) {
@@ -602,7 +413,7 @@
     for (const btn of buttons) {
       const el = document.createElement("button");
       el.type = "button";
-      el.className = btn.className || "btn btn-secondary";
+      el.className = btn.className || "btn kcm-btn-neutral";
       el.textContent = btn.label;
       el.addEventListener("click", btn.onClick);
       host.appendChild(el);
@@ -642,8 +453,8 @@
       <div class="kcm-toolbar">
         <div class="kcm-selection-copy" id="kcm-selection-copy"></div>
         <div class="kcm-toggle-row">
-          <button type="button" class="btn btn-ghost btn-sm kcm-toggle-btn" id="kcm-select-all">Select All</button>
-          <button type="button" class="btn btn-ghost btn-sm kcm-toggle-btn" id="kcm-clear-all">Clear All</button>
+          <button type="button" class="btn btn-ghost btn-sm kcm-toggle-btn" id="kcm-select-all">Select all</button>
+          <button type="button" class="btn btn-ghost btn-sm kcm-toggle-btn" id="kcm-clear-all">Clear all</button>
         </div>
       </div>
       <div class="kcm-option-grid">
@@ -656,9 +467,8 @@
               data-keyword="${escHtml(item.keyword)}"
               checked />
             <span class="kcm-option-copy">
-              <span class="kcm-option-label">Keyword</span>
-              <span class="kcm-option-title">${escHtml(item.keyword)}</span>
-              <span class="kcm-option-meta">Category <strong>${escHtml(item.categoryName)}</strong></span>
+              <span class="kcm-option-title">Remove "${escHtml(item.keyword)}"</span>
+              <span class="kcm-option-meta">From <strong>${escHtml(item.categoryName)}</strong></span>
             </span>
           </label>
         `).join("")}
@@ -717,7 +527,7 @@
     const modal = document.getElementById(MODAL_ID);
     const body = document.getElementById("kcm-body");
     let currentCategories = categories || [];
-    document.getElementById("kcm-title").textContent = title || "Review keyword conflicts";
+    document.getElementById("kcm-title").textContent = title || "Keyword conflicts";
     setNav();
     modal.classList.remove("hidden");
 
@@ -743,12 +553,12 @@
       body.innerHTML = `
         <div class="kcm-callout" data-tone="${hasExact ? "danger" : "warning"}">
           ${hasExact
-            ? "These keywords already exist in other categories."
-            : "These keywords may overlap saved keywords in other categories."}
+            ? "These keywords already exist on other categories."
+            : "These keywords overlap saved keywords on other categories."}
         </div>
         ${hasExact ? `
           <div class="kcm-section">
-            <div class="kcm-section-title">Exact duplicates</div>
+            <div class="kcm-section-title">Duplicates</div>
             <ul class="kcm-bullets">
               ${analysis.exact.map((item) => `<li>${escHtml(item.note)}</li>`).join("")}
             </ul>
@@ -756,7 +566,7 @@
         ` : ""}
         ${hasOverlap ? `
           <div class="kcm-section">
-            <div class="kcm-section-title">Possible overlaps</div>
+            <div class="kcm-section-title">Overlaps</div>
             <ul class="kcm-bullets">
               ${analysis.overlaps.map((item) => `<li>${escHtml(item.note)}</li>`).join("")}
             </ul>
@@ -766,7 +576,7 @@
           <div class="kcm-section-title">Remove saved keywords</div>
           ${renderRemovalChecklist(
             analysis.removalCandidates || [],
-            "No saved keywords to remove."
+            "There are no saved keywords to remove for this set of conflicts."
           )}
         </div>
       `;
@@ -775,25 +585,25 @@
       setActions([
         {
           label: "Back",
-          className: "btn btn-secondary",
+          className: "btn kcm-btn-neutral",
           onClick: () => closeCurrent({ action: "cancel", removals: [], categories: currentCategories }),
         },
         ...(!hasExact ? [{
           label: "Keep for now",
-          className: "btn btn-ghost",
+          className: "btn kcm-btn-muted",
           onClick: () => closeCurrent({ action: "save_anyway", removals: [], categories: currentCategories }),
         }] : []),
         {
-          label: "Remove selected",
-          className: "btn btn-danger",
+          label: "Remove selected keywords",
+          className: "btn kcm-btn-primary",
           onClick: async () => {
             const removals = selectedRemovalItems();
             if (!removals.length) {
               showAlert(
                 document.getElementById("kcm-alerts"),
                 hasExact
-                  ? "Select a conflicting keyword to remove, or go back."
-                  : "Select a keyword to remove, or keep these for now.",
+                  ? "Pick at least one conflicting keyword to remove, or go back and edit the draft."
+                  : "Pick at least one keyword to remove, or use Save anyway.",
                 "error"
               );
               return;
@@ -807,7 +617,7 @@
             } catch (err) {
               showAlert(
                 document.getElementById("kcm-alerts"),
-                err?.message || "Couldn't remove the selected keywords.",
+                err?.message || "Could not remove the selected keywords.",
                 "error"
               );
             }
@@ -829,215 +639,140 @@
     rowIsDuplicate,
     rowExcluded,
     navigation,
-    onApplyRemovals,
   }) {
     injectModal();
     const modal = document.getElementById(MODAL_ID);
     const body = document.getElementById("kcm-body");
-    let currentMatches = [...(matches || [])];
-    let currentNavigation = navigation || {};
-    let currentCategory = selectedCategory || "";
-    let currentRowIsDuplicate = !!rowIsDuplicate;
-    let currentRowExcluded = !!rowExcluded;
+    const uniqueCategories = [...new Set((matches || []).map((item) => item.categoryName))].sort();
+    const currentCategory = selectedCategory || uniqueCategories[0] || "";
+    const bestLength = matches?.length ? matches[0].length : 0;
+    const removalCandidates = CategoryKeywordTools.uniqueBy(
+      (matches || []).map((item) => ({
+        categoryId: item.categoryId,
+        categoryName: item.categoryName,
+        keyword: item.keyword,
+      })),
+      (item) => `${item.categoryId}|${item.keyword}`
+    );
     let allowRemoveAll = false;
-    document.getElementById("kcm-title").textContent = title || "Review matches";
+    document.getElementById("kcm-title").textContent = title || "Keyword matches";
+    setNav({
+      current: navigation?.current || 1,
+      total: navigation?.total || 1,
+      onPrev: navigation?.hasPrev
+        ? () => closeCurrent({
+          action: "prev",
+          removals: [],
+          selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
+        })
+        : null,
+      onNext: navigation?.hasNext
+        ? () => closeCurrent({
+          action: "next",
+          removals: [],
+          selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
+        })
+        : null,
+    });
     clearAlerts();
 
-    const promise = new Promise((resolve) => {
-      _resolver = resolve;
-    });
-
-    function renderMerchantRows(uniqueCategories, bestLength) {
-      return currentMatches.map((item) => {
-        const checked = item.categoryName !== currentCategory;
-        return `
-          <label class="kcm-merchant-row${checked ? " is-checked" : ""}">
-            <span class="kcm-merchant-summary">
-              <span class="kcm-merchant-piece">
-                <span class="kcm-inline-key">Keyword:</span>
-                <span class="kcm-value-slot">
-                  <span class="kcm-token kcm-token-keyword" title="${escHtml(item.keyword)}">${escHtml(item.keyword)}</span>
-                </span>
-              </span>
-              <span class="kcm-arrow">→</span>
-              <span class="kcm-merchant-piece">
-                <span class="kcm-inline-key">Category:</span>
-                <span class="kcm-value-slot">
-                  <span class="kcm-token kcm-token-category" title="${escHtml(item.categoryName)}">${escHtml(item.categoryName)}</span>
-                </span>
-              </span>
-              ${item.length === bestLength ? `<span class="kcm-strongest-badge">strongest match</span>` : ""}
-            </span>
-            <span class="kcm-merchant-remove">
-              <input type="checkbox"
-                data-removal-key="${escHtml(item.categoryId + "|" + item.keyword)}"
-                data-category-id="${escHtml(item.categoryId)}"
-                data-category-name="${escHtml(item.categoryName)}"
-                data-keyword="${escHtml(item.keyword)}"
-                ${checked ? "checked" : ""} />
-              <span>Remove</span>
-            </span>
-          </label>
-        `;
-      }).join("");
-    }
-
-    function applySelectedCategoryDefaults() {
-      const selected = document.getElementById("kcm-category-select")?.value || currentCategory;
-      currentCategory = selected;
-      const checkboxes = [...document.querySelectorAll("#kcm-body input[data-removal-key]")];
-      checkboxes.forEach((checkbox) => {
-        checkbox.checked = (checkbox.dataset.categoryName || "") !== selected;
-      });
-      updateRemovalSelectionUi();
-      allowRemoveAll = false;
-    }
-
-    async function handleApplyRemovals() {
-      const removals = selectedRemovalItems();
-      if (!removals.length) {
-        showAlert(document.getElementById("kcm-alerts"), "Select at least one keyword.", "error");
-        return;
-      }
-      if (currentMatches.length && removals.length === currentMatches.length && !confirm(
-        "Remove all matched keywords? This row will be uncategorized."
-      )) {
-        return;
-      }
-      if (typeof onApplyRemovals !== "function") {
-        closeCurrent({
-          action: "remove",
-          removals,
-          selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
-        });
-        return;
-      }
-      try {
-        const nextState = await onApplyRemovals({
-          removals,
-          selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
-        });
-        if (nextState?.toastMessage) {
-          showToast(nextState.toastMessage);
-        }
-        if (nextState?.status === "multiple") {
-          currentMatches = [...(nextState.matches || currentMatches)];
-          currentCategory = nextState.selectedCategory || currentCategory;
-          currentNavigation = nextState.navigation || currentNavigation;
-          currentRowIsDuplicate = !!nextState.rowIsDuplicate;
-          currentRowExcluded = !!nextState.rowExcluded;
-          renderMerchantState();
-          return;
-        }
-        closeCurrent({
-          action: "done",
-          removals: [],
-          selectedCategory: nextState?.selectedCategory || "",
-        });
-      } catch (err) {
-        showAlert(
-          document.getElementById("kcm-alerts"),
-          err?.message || "Couldn't remove the selected keywords.",
-          "error"
-        );
-      }
-    }
-
-    function renderMerchantState() {
-      const uniqueCategories = [...new Set(currentMatches.map((item) => item.categoryName))].sort();
-      if (!uniqueCategories.includes(currentCategory)) {
-        currentCategory = uniqueCategories[0] || "";
-      }
-      const bestLength = currentMatches.length ? currentMatches[0].length : 0;
-      clearAlerts();
-      setNav({
-        current: currentNavigation?.current || 1,
-        total: currentNavigation?.total || 1,
-        onPrev: currentNavigation?.hasPrev
-          ? () => closeCurrent({
-            action: "prev",
-            removals: [],
-            selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
-          })
-          : null,
-        onNext: currentNavigation?.hasNext
-          ? () => closeCurrent({
-            action: "next",
-            removals: [],
-            selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
-          })
-          : null,
-      });
-
-      body.innerHTML = `
-        <div class="kcm-merchant-layout">
+    body.innerHTML = `
+      <div class="kcm-merchant-layout">
+        <div class="kcm-merchant-main">
           <div class="kcm-entry-card">
             <div class="kcm-entry-label">Entry</div>
             <div class="kcm-entry-text">${escHtml(merchantName || "Untitled entry")}</div>
-            <div class="kcm-entry-normalized">Normalized text for matching: <code>${escHtml(normalizedMerchant || "") || "—"}</code></div>
+            <div class="kcm-entry-normalized">Match text: <code>${escHtml(normalizedMerchant || "") || "—"}</code></div>
           </div>
-          <div class="kcm-choice-card">
-            <div class="kcm-entry-label">Select category</div>
+          <div class="kcm-section">
+            <div class="kcm-section-title">Multiple keyword matches</div>
+            <div class="kcm-match-grid">
+              ${(matches || []).map((item) => `
+                <div class="kcm-match-card">
+                  <div class="kcm-match-line">
+                    <span class="kcm-token kcm-token-keyword">${escHtml(item.keyword)}</span>
+                    <span class="kcm-arrow">→</span>
+                    <span class="kcm-token kcm-token-category">${escHtml(item.categoryName)}</span>
+                    ${item.length === bestLength ? `<span class="badge">strongest</span>` : ""}
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+        <div class="kcm-merchant-side">
+          <div class="kcm-section">
+            <label class="kcm-category-label">Category for this row</label>
             <select id="kcm-category-select" class="review-inp" style="width:100%">
               ${uniqueCategories.map((name) => `
                 <option value="${escHtml(name)}"${name === currentCategory ? " selected" : ""}>${escHtml(name)}</option>
               `).join("")}
             </select>
           </div>
-          <div class="kcm-section kcm-merchant-full">
-            <div class="kcm-toolbar">
-              <div class="kcm-section-title">Matches</div>
-            </div>
-            <div class="kcm-toolbar kcm-toolbar-sub">
-              <div class="kcm-selection-copy" id="kcm-selection-copy"></div>
-              <div class="kcm-toggle-row">
-                <button type="button" class="btn btn-ghost btn-sm kcm-toggle-btn" id="kcm-select-all">Select All</button>
-                <button type="button" class="btn btn-ghost btn-sm kcm-toggle-btn" id="kcm-clear-all">Clear All</button>
-              </div>
-            </div>
-            <div class="kcm-match-scroll">
-              ${renderMerchantRows(uniqueCategories, bestLength)}
+          <div class="kcm-section">
+            <div class="kcm-section-title">Remove keywords</div>
+            ${renderRemovalChecklist(removalCandidates, "No removable keywords were found for this merchant.")}
+            <div class="kcm-inline-note">
+              Saves immediately.
             </div>
           </div>
         </div>
-      `;
+      </div>
+    `;
+    bindRemovalChecklist(() => {
+      allowRemoveAll = false;
+    });
 
-      bindRemovalChecklist(() => {
-        allowRemoveAll = false;
-      });
-      document.getElementById("kcm-category-select")?.addEventListener("change", applySelectedCategoryDefaults);
-      updateRemovalSelectionUi();
-
-      setActions([
-        {
-          label: "Close",
-          className: "btn btn-secondary",
-          onClick: () => closeCurrent({
-            action: "close",
-            removals: [],
+    setActions([
+      {
+        label: "Close",
+        className: "btn kcm-btn-neutral",
+        onClick: () => closeCurrent({
+          action: "close",
+          removals: [],
+          selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
+        }),
+      },
+      {
+        label: "Apply removals",
+        className: "btn kcm-btn-action",
+        onClick: () => {
+          const removals = selectedRemovalItems();
+          if (!removals.length) {
+            showAlert(document.getElementById("kcm-alerts"), "Pick at least one keyword to remove.", "error");
+            return;
+          }
+          if (removalCandidates.length && removals.length === removalCandidates.length && !allowRemoveAll) {
+            showAlert(
+              document.getElementById("kcm-alerts"),
+              "All matched keywords are selected. Keep one for auto-categorization. Click again to remove all.",
+              "warning"
+            );
+            allowRemoveAll = true;
+            return;
+          }
+          closeCurrent({
+            action: "remove",
+            removals,
             selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
-          }),
+          });
         },
-        {
-          label: "Apply removals",
-          className: "btn btn-danger",
-          onClick: handleApplyRemovals,
-        },
-        {
-          label: "Use category",
-          className: "btn btn-primary",
-          onClick: () => closeCurrent({
-            action: "done",
-            removals: [],
-            selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
-          }),
-        },
-      ]);
-    }
+      },
+      {
+        label: "Use for this row",
+        className: "btn kcm-btn-primary",
+        onClick: () => closeCurrent({
+          action: "done",
+          removals: [],
+          selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
+        }),
+      },
+    ]);
 
-    renderMerchantState();
     modal.classList.remove("hidden");
-    return promise;
+    return new Promise((resolve) => {
+      _resolver = resolve;
+    });
   }
 
   async function resolveKeywordDraftConflicts({
