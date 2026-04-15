@@ -17,12 +17,12 @@ from app.api import (
 from app.core.config import settings
 from app.core.database import Base, SessionLocal, engine
 from app.services.app_settings import ensure_app_settings
-from app.services.import_service import seed_defaults
+from app.services.starter_categories import seed_starter_categories
 
 Base.metadata.create_all(bind=engine)
 
 with SessionLocal() as _db:
-    seed_defaults(_db)
+    seed_starter_categories(_db)
     ensure_app_settings(_db)
 
 app = FastAPI(

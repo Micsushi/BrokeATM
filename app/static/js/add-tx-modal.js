@@ -41,7 +41,10 @@
               </div>
               <div>
                 <label>Category</label>
-                <select id="atx-category"></select>
+                <div style="display:flex;gap:0.5rem;align-items:stretch">
+                  <select id="atx-category" style="flex:1"></select>
+                  <button type="button" class="btn btn-secondary btn-field-action" id="atx-new-category">+ Category</button>
+                </div>
               </div>
             </div>
             <div>
@@ -133,6 +136,17 @@
     );
 
     document.getElementById("atx-save").addEventListener("click", saveEntry);
+    document.getElementById("atx-new-category").addEventListener("click", async () => {
+      const created = await openCategoryCreateModal({
+        title: "Create Category",
+        onCategoriesUpdated: async (cats) => {
+          await refreshCategoryOptions(cats);
+        },
+      });
+      if (created) {
+        await refreshCategoryOptions(null, created.id);
+      }
+    });
   }
 
   function updateCurrencyLabel() {
@@ -168,6 +182,15 @@
 
   function closeModal() {
     document.getElementById(MODAL_ID).classList.add("hidden");
+  }
+
+  async function refreshCategoryOptions(providedCategories = null, selectedId = null) {
+    const cats = providedCategories || await API.getCategories().catch(() => []);
+    const html =
+      '<option value="">No category</option>' +
+      cats.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
+    document.getElementById("atx-category").innerHTML = html;
+    document.getElementById("atx-category").value = selectedId ? String(selectedId) : "";
   }
 
   async function saveEntry() {
@@ -241,9 +264,7 @@
       API.getAccounts().catch(() => []),
     ]);
 
-    document.getElementById("atx-category").innerHTML =
-      '<option value="">No category</option>' +
-      cats.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
+    await refreshCategoryOptions(cats);
 
     document.getElementById("atx-account").innerHTML =
       '<option value="">No account</option>' +

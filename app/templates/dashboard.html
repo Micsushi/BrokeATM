@@ -6,7 +6,7 @@
   <title>Dashboard | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=5" />
+  <link rel="stylesheet" href="/static/css/main.css?v=8" />
   <script src="/static/js/month-picker.js?v=1"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
@@ -874,10 +874,8 @@ function renderCatProgress(items) {
     let amountLabel;
     if (!hasLimit) {
       amountLabel = `${fmtBudget(item.spent)} spent`;
-    } else if (over) {
-      amountLabel = `${fmtBudget(item.spent - item.budget)} over on ${fmtBudget(item.budget)} budget`;
     } else {
-      amountLabel = `${fmtBudget(item.budget - item.spent)} remaining of ${fmtBudget(item.budget)} budget`;
+      amountLabel = `${fmtBudget(item.spent)} spent out of ${fmtBudget(item.budget)} budget`;
     }
 
     const dot = item.category_color

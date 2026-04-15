@@ -6,7 +6,7 @@
   <title>Categories | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=4" />
+  <link rel="stylesheet" href="/static/css/main.css?v=8" />
   <style>
     .cat-grid {
       display: grid;
@@ -73,8 +73,10 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.8rem;
-      color: rgba(255,255,255,0.8);
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: rgba(255,255,255,0.96);
+      text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
       transition: border-color 0.15s, filter 0.15s;
       flex-shrink: 0;
     }
@@ -104,18 +106,6 @@
       accent-color: var(--accent);
       margin-right: 0.1rem;
     }
-
-    /* Bulk action bar - matches records.html pattern */
-    .bulk-bar {
-      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
-      padding: 0.6rem 1rem;
-      background: rgba(99,102,241,0.1);
-      border: 1px solid rgba(99,102,241,0.3);
-      border-radius: var(--radius);
-      margin-bottom: 0.75rem;
-      font-size: 0.875rem;
-    }
-    .bulk-count { font-weight: 600; color: var(--accent); }
 
     /* Keyword info box */
     .kw-info-box {
@@ -152,14 +142,14 @@
     /* Conflict warnings (non-blocking) */
     .conflict-shadow {
       font-size: 0.8rem;
-      background: color-mix(in srgb, #f59e0b 12%, var(--surface));
-      border: 1px solid #f59e0b88;
+      background: color-mix(in srgb, var(--warning) 12%, var(--surface));
+      border: 1px solid var(--tone-warning-border);
       border-radius: 6px;
       padding: 0.5rem 0.75rem;
       color: var(--text);
       line-height: 1.5;
     }
-    .conflict-shadow-title { font-weight: 600; color: #d97706; margin-bottom: 0.2rem; font-size: 0.82rem; }
+    .conflict-shadow-title { font-weight: 600; color: var(--tone-warning-text); margin-bottom: 0.2rem; font-size: 0.82rem; }
     .conflict-shadow ul { margin: 0.25rem 0 0 1rem; }
     .conflict-shadow li { font-size: 0.78rem; }
   </style>
@@ -187,7 +177,7 @@
 
   <!-- Add new category -->
   <div class="card mb-2">
-    <h3 style="font-size:0.75rem;font-weight:700;margin-bottom:0.875rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em">Add Category</h3>
+    <h3 class="section-kicker">Add Category</h3>
     <div id="add-conflicts" class="hidden" style="margin-bottom:0.75rem"></div>
     <div class="add-form">
       <div class="form-group">
@@ -232,9 +222,9 @@
   <!-- Bulk action bar (always visible, matches records.html) -->
   <div class="bulk-bar" id="bulk-bar">
     <span class="bulk-count" id="bulk-count">0 selected</span>
-    <button class="btn btn-ghost btn-sm" id="btn-select-all">Select all</button>
-    <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Deselect all</button>
-    <div style="height:20px;width:1px;background:var(--border)"></div>
+    <button class="btn btn-ghost btn-sm" id="btn-select-all">Select All</button>
+    <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Clear All</button>
+    <div class="bulk-divider"></div>
     <button class="btn btn-ghost btn-sm" id="btn-bulk-merge" style="min-width:120px;display:none">Merge</button>
     <button class="btn btn-danger btn-sm" id="btn-bulk-delete" style="display:none">Delete selected</button>
   </div>
@@ -330,6 +320,9 @@
 
 <script src="/static/js/utils.js?v=7"></script>
 <script src="/static/js/api.js"></script>
+<script src="/static/js/category-keyword-tools.js?v=2"></script>
+<script src="/static/js/keyword-conflict-modal.js?v=18"></script>
+<script src="/static/js/category-create-modal.js?v=1"></script>
 <script>
 let allStats = [];
 let mergingId = null;
@@ -562,11 +555,6 @@ function collectAddCategoryIssues(nameRaw, keywords) {
       );
     }
   }
-  for (const c of findExactConflicts(keywords, null)) {
-    issues.push(
-      `"${c.keyword}" is already a keyword on "${c.category}". Remove it here or edit that category.`
-    );
-  }
   return issues;
 }
 
@@ -585,15 +573,19 @@ document.getElementById("btn-add").addEventListener("click", async () => {
   clearFormIssues(conflictEl);
 
   try {
-    const created = await API.createCategory({
+    const result = await createCategoryDraft({
       name: nameRaw.trim(),
       color,
-      keywords: keywords.length ? keywords.join(", ") : null,
+      keywords,
+      onCategoriesUpdated: async () => {
+        await loadStats(true);
+      },
     });
+    if (result.cancelled || !result.category) return;
     document.getElementById("new-name").value = "";
     document.getElementById("new-keywords").value = "";
     clearFormIssues(conflictEl);
-    newlyAddedId = created.id;
+    newlyAddedId = result.category.id;
     await loadStats(true);
   } catch (e) {
     renderFormIssues(conflictEl, "Could not add category:", [e.message || "Something went wrong. Try again."]);
@@ -718,7 +710,7 @@ async function deleteCat(id) {
 // ── Keyword helpers ──
 
 function parseLines(raw) {
-  return raw.split(/[\n,]/).map(k => k.trim().toLowerCase()).filter(Boolean);
+  return CategoryKeywordTools.parseKeywordText(raw);
 }
 
 /**
@@ -726,17 +718,10 @@ function parseLines(raw) {
  * These are blocking — cannot save.
  */
 function findExactConflicts(keywords, excludeId) {
-  const conflicts = [];
-  for (const kw of keywords) {
-    for (const cat of allStats) {
-      if (cat.id === excludeId) continue;
-      const catKws = (cat.keywords || "").split(",").map(k => k.trim().toLowerCase()).filter(Boolean);
-      if (catKws.includes(kw)) {
-        conflicts.push({ keyword: kw, category: cat.name });
-      }
-    }
-  }
-  return conflicts;
+  return CategoryKeywordTools
+    .analyzeDraftKeywordConflicts(allStats, keywords, excludeId)
+    .exact
+    .map((item) => ({ keyword: item.candidateKeyword, category: item.categoryName }));
 }
 
 /**
@@ -745,30 +730,15 @@ function findExactConflicts(keywords, excludeId) {
  * Returns array of { myKw, otherKw, category, note }
  */
 function findShadowConflicts(keywords, excludeId) {
-  const warnings = [];
-  const seen = new Set();
-  for (const kw of keywords) {
-    for (const cat of allStats) {
-      if (cat.id === excludeId) continue;
-      const catKws = (cat.keywords || "").split(",").map(k => k.trim().toLowerCase()).filter(Boolean);
-      for (const otherKw of catKws) {
-        if (kw === otherKw) continue; // already caught by exact conflict
-        const key = [kw, otherKw, cat.name].join("|");
-        if (seen.has(key)) continue;
-        seen.add(key);
-        if (kw.includes(otherKw)) {
-          // their shorter keyword "otherKw" would match anything my "kw" matches too
-          warnings.push({ myKw: kw, otherKw, category: cat.name,
-            note: `"${otherKw}" (in "${cat.name}") is shorter and will match any merchant that also matches "${kw}" — it may win first.` });
-        } else if (otherKw.includes(kw)) {
-          // my shorter keyword "kw" would match anything their "otherKw" matches too
-          warnings.push({ myKw: kw, otherKw, category: cat.name,
-            note: `"${kw}" is shorter than "${otherKw}" (in "${cat.name}") — this category may capture merchants intended for "${cat.name}".` });
-        }
-      }
-    }
-  }
-  return warnings;
+  return CategoryKeywordTools
+    .analyzeDraftKeywordConflicts(allStats, keywords, excludeId)
+    .overlaps
+    .map((item) => ({
+      myKw: item.candidateKeyword,
+      otherKw: item.otherKeyword,
+      category: item.categoryName,
+      note: item.note,
+    }));
 }
 
 function showExactConflicts(el, conflicts) {
@@ -819,11 +789,13 @@ function editKeywords(id) {
 
 document.getElementById("kw-input").addEventListener("input", () => {
   const raw = document.getElementById("kw-input").value;
-  const keywords = parseLines(raw);
+  const keywords = CategoryKeywordTools.parseCommittedKeywordText(raw);
+  const conflictEl = document.getElementById("kw-conflicts");
   const shadowEl = document.getElementById("kw-shadow-warnings");
+  const exact = findExactConflicts(keywords, kwEditingId);
+  if (exact.length) showExactConflicts(conflictEl, exact);
+  else clearFormIssues(conflictEl);
   showShadowWarnings(shadowEl, findShadowConflicts(keywords, kwEditingId));
-  // clear error state on input so user sees live feedback
-  clearFormIssues(document.getElementById("kw-conflicts"));
 });
 
 document.getElementById("kw-cancel").addEventListener("click", () => {
@@ -834,18 +806,20 @@ document.getElementById("kw-save").addEventListener("click", async () => {
   const raw = document.getElementById("kw-input").value;
   const keywords = parseLines(raw);
   const conflictEl = document.getElementById("kw-conflicts");
-  const shadowEl = document.getElementById("kw-shadow-warnings");
-
-  const exact = findExactConflicts(keywords, kwEditingId);
-  if (exact.length) {
-    showExactConflicts(conflictEl, exact);
-    return;
-  }
-  clearFormIssues(conflictEl);
-  // show shadow warnings but don't block
-  showShadowWarnings(shadowEl, findShadowConflicts(keywords, kwEditingId));
+  const cat = allStats.find(c => c.id === kwEditingId);
 
   try {
+    const resolved = await resolveKeywordDraftConflicts({
+      title: `Review keyword conflicts for "${cat?.name || "category"}"`,
+      categories: allStats,
+      draftKeywords: keywords,
+      excludeCategoryId: kwEditingId,
+      onCategoriesUpdated: async () => {
+        await loadStats(true);
+      },
+    });
+    if (resolved.cancelled) return;
+    clearFormIssues(conflictEl);
     await API.updateCategory(kwEditingId, { keywords: keywords.join(", ") || null });
     document.getElementById("kw-modal").classList.add("hidden");
     await loadStats();

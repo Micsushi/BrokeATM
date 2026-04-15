@@ -8,21 +8,12 @@ from datetime import date, datetime
 from typing import Any
 
 from app.models.models import TransactionType
+from app.services.keyword_matching import KeywordMatcher
 from app.services.mcc_map import (
-    DEFAULT_CATEGORIES,
     is_cashback,
     is_payment,
-    match_by_keywords,
     mcc_to_category,
 )
-
-# Build a static keyword map from the default categories for use during parse preview.
-# At parse time we don't have DB access, so we use the built-in defaults.
-_STATIC_KW_MAP: dict[str, list[str]] = {
-    name: [k.strip().lower() for k in kws.split(",") if k.strip()]
-    for name, _color, kws in DEFAULT_CATEGORIES
-    if kws
-}
 
 # Candidate header names per logical field, matched case-insensitively, first match wins.
 FIELD_ALIASES: dict[str, list[str]] = {
@@ -184,14 +175,39 @@ def classify_transaction(
     return TransactionType.expense, abs(amount_raw)
 
 
-def _suggest_category(mcc_desc: str, merchant_name: str) -> str:
+def _suggest_category(
+    mcc_desc: str,
+    merchant_name: str,
+    keyword_matcher: KeywordMatcher | None,
+) -> tuple[str, dict[str, Any]]:
     cat = mcc_to_category(mcc_desc)
     if cat and cat != "uncategorized" and cat != mcc_desc.strip().lower():
-        return cat
-    return match_by_keywords(merchant_name, _STATIC_KW_MAP) or "uncategorized"
+        return cat, {
+            "normalized_merchant": "",
+            "keyword_matches": [],
+            "keyword_resolution_needed": False,
+            "keyword_conflict_categories": False,
+            "suggestion_source": "mcc",
+        }
+    if keyword_matcher is None:
+        return "uncategorized", {
+            "normalized_merchant": "",
+            "keyword_matches": [],
+            "keyword_resolution_needed": False,
+            "keyword_conflict_categories": False,
+            "suggestion_source": "none",
+        }
+    analysis = keyword_matcher.analyze(merchant_name)
+    analysis["suggestion_source"] = "keyword" if analysis.get("keyword_matches") else "none"
+    return analysis["suggested_category"] or "uncategorized", analysis
 
 
-def parse_csv(content: bytes, *, default_currency: str = "CAD") -> dict[str, Any]:
+def parse_csv(
+    content: bytes,
+    *,
+    default_currency: str = "CAD",
+    keyword_matcher: KeywordMatcher | None = None,
+) -> dict[str, Any]:
     text = content.decode("utf-8-sig", errors="replace")
     reader = csv.DictReader(io.StringIO(text))
     headers = reader.fieldnames or []
@@ -218,6 +234,11 @@ def parse_csv(content: bytes, *, default_currency: str = "CAD") -> dict[str, Any
             merchant_name = _get(raw_row, col_map, "merchant_name")
             mcc_desc = _get(raw_row, col_map, "mcc_description")
             tx_type, amount = classify_transaction(amount_raw, merchant_name, mcc_desc)
+            suggested_category, keyword_analysis = _suggest_category(
+                mcc_desc,
+                merchant_name,
+                keyword_matcher,
+            )
 
             date_str = _get(raw_row, col_map, "date")
             posted_str = _get(raw_row, col_map, "posted_date")
@@ -234,11 +255,12 @@ def parse_csv(content: bytes, *, default_currency: str = "CAD") -> dict[str, Any
                 "amount": amount,
                 "currency": default_currency,
                 "transaction_type": tx_type,
-                "suggested_category": _suggest_category(mcc_desc, merchant_name),
+                "suggested_category": suggested_category,
                 "card_number_masked": _get(raw_row, col_map, "card_number"),
                 "cardholder": _get(raw_row, col_map, "cardholder"),
                 "is_payment": tx_type == TransactionType.transfer,
                 "is_refund": tx_type == TransactionType.refund,
+                **keyword_analysis,
             })
         except Exception as exc:
             errors.append(f"Row {i}: {exc}")

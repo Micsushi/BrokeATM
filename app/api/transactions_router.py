@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import calendar
+import re
 from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import asc, desc, extract, func, or_
+from sqlalchemy import String, asc, cast, desc, extract, func, or_
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -77,6 +78,66 @@ def _apply_date_range_filter(q: Any, date_from: str | None, date_to: str | None)
     return q
 
 
+def _apply_amount_filter(q: Any, min_amount: float | None, max_amount: float | None) -> Any:
+    if min_amount is not None:
+        q = q.filter(Transaction.amount >= min_amount)
+    if max_amount is not None:
+        q = q.filter(Transaction.amount <= max_amount)
+    return q
+
+
+def _apply_search_filter(q: Any, search: str | None) -> Any:
+    if not search:
+        return q
+
+    search_text = search.strip()
+    if not search_text:
+        return q
+
+    pattern = f"%{search_text}%"
+    clauses: list[Any] = [
+        Transaction.merchant_name.ilike(pattern),
+        Transaction.notes.ilike(pattern),
+        Transaction.merchant_city.ilike(pattern),
+        cast(Transaction.amount, String).ilike(pattern),
+    ]
+
+    numeric_search = re.sub(r"[^0-9.\-]", "", search_text.replace(",", ""))
+    if numeric_search:
+        try:
+            amount_value = float(numeric_search)
+        except ValueError:
+            amount_value = None
+        if amount_value is not None:
+            clauses.append(Transaction.amount == amount_value)
+            if numeric_search != search_text:
+                clauses.append(cast(Transaction.amount, String).ilike(f"%{numeric_search}%"))
+
+    return q.filter(or_(*clauses))
+
+
+def _apply_common_filters(
+    q: Any,
+    *,
+    transaction_type: str | None,
+    category_id: int | None,
+    account_id: int | None,
+    search: str | None,
+    min_amount: float | None,
+    max_amount: float | None,
+) -> Any:
+    if transaction_type:
+        q = q.filter(Transaction.transaction_type == transaction_type)
+    if category_id:
+        q = q.filter(Transaction.category_id == category_id)
+    if account_id:
+        q = q.filter(Transaction.account_id == account_id)
+
+    q = _apply_amount_filter(q, min_amount, max_amount)
+    q = _apply_search_filter(q, search)
+    return q
+
+
 _SORTABLE = {
     "date": Transaction.transaction_date,
     "date_added": Transaction.created_at,
@@ -100,6 +161,8 @@ def list_transactions(
     category_id: int | None = Query(None),
     account_id: int | None = Query(None),
     search: str | None = Query(None),
+    min_amount: float | None = Query(None, ge=0),
+    max_amount: float | None = Query(None, ge=0),
     include_excluded: bool = Query(False),
     sort_by: str = Query("date", description="Column to sort by: date, date_added, merchant, amount, type"),
     sort_dir: str = Query("asc", description="asc or desc"),
@@ -126,21 +189,15 @@ def list_transactions(
             return TransactionListResponse(items=[], total=0, page=page, page_size=page_size)
         q = q.filter(Transaction.id.in_(dup_set))
 
-    if transaction_type:
-        q = q.filter(Transaction.transaction_type == transaction_type)
-    if category_id:
-        q = q.filter(Transaction.category_id == category_id)
-    if account_id:
-        q = q.filter(Transaction.account_id == account_id)
-    if search:
-        pattern = f"%{search}%"
-        q = q.filter(
-            or_(
-                Transaction.merchant_name.ilike(pattern),
-                Transaction.notes.ilike(pattern),
-                Transaction.merchant_city.ilike(pattern),
-            )
-        )
+    q = _apply_common_filters(
+        q,
+        transaction_type=transaction_type,
+        category_id=category_id,
+        account_id=account_id,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+    )
 
     if sort_by == "category":
         q = q.outerjoin(Category, Transaction.category_id == Category.id)
@@ -196,6 +253,8 @@ def summary(
     category_id: int | None = Query(None),
     account_id: int | None = Query(None),
     search: str | None = Query(None),
+    min_amount: float | None = Query(None, ge=0),
+    max_amount: float | None = Query(None, ge=0),
     db: Session = Depends(get_db),
 ) -> Any:
     q = db.query(
@@ -209,21 +268,15 @@ def summary(
     else:
         q = _apply_month_filter(q, months, year, month)
 
-    if transaction_type:
-        q = q.filter(Transaction.transaction_type == transaction_type)
-    if category_id:
-        q = q.filter(Transaction.category_id == category_id)
-    if account_id:
-        q = q.filter(Transaction.account_id == account_id)
-    if search:
-        pattern = f"%{search}%"
-        q = q.filter(
-            or_(
-                Transaction.merchant_name.ilike(pattern),
-                Transaction.notes.ilike(pattern),
-                Transaction.merchant_city.ilike(pattern),
-            )
-        )
+    q = _apply_common_filters(
+        q,
+        transaction_type=transaction_type,
+        category_id=category_id,
+        account_id=account_id,
+        search=search,
+        min_amount=min_amount,
+        max_amount=max_amount,
+    )
 
     rows = q.group_by(Transaction.transaction_type).all()
     totals: dict[str, float] = {"expense": 0, "income": 0, "refund": 0, "transfer": 0}

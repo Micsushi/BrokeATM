@@ -32,6 +32,11 @@ class ParsedRow(BaseModel):
     source_file: str | None = None
     import_month: int | None = None
     import_year: int | None = None
+    normalized_merchant: str | None = None
+    keyword_matches: list[dict[str, Any]] = Field(default_factory=list)
+    keyword_resolution_needed: bool = False
+    keyword_conflict_categories: bool = False
+    suggestion_source: str | None = None
 
 
 class ParseResponse(BaseModel):

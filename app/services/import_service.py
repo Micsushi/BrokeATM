@@ -9,7 +9,8 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.models import Account, Category, ImportBatch, Transaction
-from app.services.mcc_map import DEFAULT_CATEGORIES, match_by_keywords
+from app.services.keyword_matching import KeywordMatcher
+from app.services.starter_categories import seed_starter_categories
 
 
 def _normalize_reference_number(value: Any) -> str | None:
@@ -193,36 +194,12 @@ def _find_existing_transaction_duplicate(
 
 
 def seed_defaults(db: Session) -> None:
-    existing = {c.name: c for c in db.query(Category).all()}
-    changed = False
-    for name, color, keywords in DEFAULT_CATEGORIES:
-        kw_val = keywords or None
-        if name not in existing:
-            db.add(Category(name=name, color=color, keywords=kw_val))
-            changed = True
-        else:
-            cat = existing[name]
-            updated = False
-            if cat.color is None:
-                cat.color = color
-                updated = True
-            if cat.keywords is None and kw_val:
-                cat.keywords = kw_val
-                updated = True
-            if updated:
-                changed = True
-    if changed:
-        db.commit()
+    # Backward-compatible wrapper; starter templates now live outside mcc_map.py.
+    seed_starter_categories(db)
 
 
-def _keyword_map(db: Session) -> dict[str, list[str]]:
-    cats = db.query(Category).filter(Category.keywords.isnot(None)).all()
-    result: dict[str, list[str]] = {}
-    for cat in cats:
-        kws = [k.strip().lower() for k in (cat.keywords or "").split(",") if k.strip()]
-        if kws:
-            result[cat.name] = kws
-    return result
+def _keyword_matcher(db: Session) -> KeywordMatcher:
+    return KeywordMatcher.from_categories(db.query(Category).all())
 
 
 def get_or_create_account(db: Session, card_number_masked: str, cardholder: str) -> Account:
@@ -356,7 +333,7 @@ def commit_import(
     imported_by: defaultdict[tuple[str, int, int], int] = defaultdict(int)
     skipped_by: defaultdict[tuple[str, int, int], int] = defaultdict(int)
 
-    kw_map = _keyword_map(db)
+    keyword_matcher = _keyword_matcher(db)
     seen_ref_line: set[tuple[str, int, str]] = set()
     seen_interest_fp: set[tuple[int, str, float, str]] = set()
     default_card = _default_card_masked_for_rows(rows)
@@ -417,7 +394,7 @@ def commit_import(
         raw_cat = row.get("category_name") or row.get("suggested_category")
         if not raw_cat or raw_cat == "uncategorized":
             merchant = row.get("merchant_name", "")
-            raw_cat = match_by_keywords(merchant, kw_map) or raw_cat or "uncategorized"
+            raw_cat = keyword_matcher.analyze(merchant)["suggested_category"] or raw_cat or "uncategorized"
 
         category = get_or_create_category(db, raw_cat)
         bid = batch_id_by_key[gk]

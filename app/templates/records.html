@@ -6,11 +6,12 @@
   <title>Records | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=4" />
+  <link rel="stylesheet" href="/static/css/main.css?v=8" />
   <style>
     .filters { display:flex; flex-wrap:wrap; gap:0.625rem; align-items:flex-end; }
     .filter-group { display:flex; flex-direction:column; min-width:120px; }
     .filter-group.wide { min-width:200px; flex:1; }
+    .filter-group.amount-filter { min-width:140px; }
     .amount-cell { font-family:'JetBrains Mono',monospace; }
     .actions-cell { white-space:nowrap; }
 
@@ -36,20 +37,6 @@
     .total-value { font-size:1.1rem; font-weight:700; font-family:'JetBrains Mono',monospace; }
     .total-divider { display: none; }
     .total-count { font-size:0.7rem; color:var(--text-muted); }
-
-    /* Bulk action bar */
-    .bulk-bar {
-      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
-      padding: 0.6rem 1rem;
-      background: rgba(99,102,241,0.1);
-      border: 1px solid rgba(99,102,241,0.3);
-      border-radius: var(--radius);
-      margin-bottom: 0.75rem;
-      font-size: 0.875rem;
-    }
-
-    .bulk-count { font-weight: 600; color: var(--accent); }
-    .bulk-divider { width: 2px; height: 22px; background: rgba(255,255,255,0.25); border-radius: 1px; flex-shrink: 0; }
 
     /* Row selected highlight */
     tr.selected td { background: rgba(99,102,241,0.07) !important; }
@@ -163,7 +150,7 @@
     <div class="filters">
       <div class="filter-group wide">
         <label>Search</label>
-        <input type="text" id="f-search" placeholder="Merchant, city, notes…" />
+        <input type="text" id="f-search" placeholder="Merchant, city, notes, amount…" />
       </div>
       <div class="filter-group">
         <label>From</label>
@@ -189,6 +176,14 @@
       <div class="filter-group">
         <label>Category</label>
         <select id="f-category"><option value="">All categories</option></select>
+      </div>
+      <div class="filter-group amount-filter">
+        <label>Min amount</label>
+        <input type="number" id="f-amount-min" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
+      </div>
+      <div class="filter-group amount-filter">
+        <label>Max amount</label>
+        <input type="number" id="f-amount-max" min="0" step="0.01" inputmode="decimal" placeholder="0.00" />
       </div>
       <div class="filter-group" style="justify-content:flex-end;align-self:flex-end">
         <button class="btn btn-secondary" id="btn-clear-filters">Clear all</button>
@@ -251,7 +246,7 @@
   </div>
 
   <!-- Table -->
-  <div class="card" style="padding:0">
+  <div class="card card-flush">
     <div class="table-wrap">
       <table id="records-table">
         <thead>
@@ -321,7 +316,10 @@
         </div>
         <div>
           <label>Category</label>
-          <select id="edit-category"></select>
+          <div style="display:flex;gap:0.5rem;align-items:stretch">
+            <select id="edit-category" style="flex:1"></select>
+            <button type="button" class="btn btn-secondary btn-field-action" id="edit-new-category">+ Category</button>
+          </div>
         </div>
       </div>
       <div>
@@ -342,7 +340,10 @@
 
 <script src="/static/js/utils.js?v=7"></script>
 <script src="/static/js/api.js?v=7"></script>
-<script src="/static/js/add-tx-modal.js?v=3"></script>
+<script src="/static/js/category-keyword-tools.js?v=2"></script>
+<script src="/static/js/keyword-conflict-modal.js?v=18"></script>
+<script src="/static/js/category-create-modal.js?v=1"></script>
+<script src="/static/js/add-tx-modal.js?v=4"></script>
 <script>
 /** Calendar date portion of API ``created_at`` (matches Date column formatting). */
 function fmtDateAdded(isoVal) {
@@ -443,6 +444,14 @@ function populateFilterDropdowns() {
   document.getElementById("bulk-cat-sel").innerHTML = bulkCatOpts;
 }
 
+async function refreshCategories(selectedEditId = null) {
+  categories = await API.getCategories();
+  populateFilterDropdowns();
+  if (selectedEditId != null) {
+    document.getElementById("edit-category").value = String(selectedEditId);
+  }
+}
+
 function syncSortHeaders() {
   document.querySelectorAll(".sortable-th").forEach(th => {
     const col = th.dataset.sort;
@@ -464,6 +473,8 @@ function getFilterParams() {
     date_to: document.getElementById("f-date-to").value,
     transaction_type: document.getElementById("f-type").value,
     category_id: document.getElementById("f-category").value,
+    min_amount: document.getElementById("f-amount-min").value,
+    max_amount: document.getElementById("f-amount-max").value,
     sort_by: sortBy,
     sort_dir: sortDir,
     duplicate_only: duplicatesView || undefined,
@@ -688,6 +699,19 @@ document.getElementById("edit-cancel").addEventListener("click", () => {
   document.getElementById("edit-modal").classList.add("hidden");
 });
 
+document.getElementById("edit-new-category").addEventListener("click", async () => {
+  const created = await openCategoryCreateModal({
+    title: "Create Category",
+    onCategoriesUpdated: async (cats) => {
+      categories = cats;
+      populateFilterDropdowns();
+    },
+  });
+  if (created) {
+    await refreshCategories(created.id);
+  }
+});
+
 document.getElementById("edit-save").addEventListener("click", async () => {
   const dateVal = document.getElementById("edit-date").value;
   const merchantVal = document.getElementById("edit-merchant").value.trim();
@@ -734,7 +758,7 @@ async function deleteTx(id) {
 
 // ── Filter listeners ──
 const debouncedLoad = debounce(() => { currentPage = 1; loadRecords(); }, 300);
-["f-search", "f-date-from", "f-date-to", "f-type", "f-category"].forEach(id => {
+["f-search", "f-date-from", "f-date-to", "f-type", "f-category", "f-amount-min", "f-amount-max"].forEach(id => {
   document.getElementById(id).addEventListener("input", debouncedLoad);
   document.getElementById(id).addEventListener("change", debouncedLoad);
 });
@@ -800,7 +824,7 @@ document.getElementById("btn-prune-dup-extras").addEventListener("click", async 
 });
 
 document.getElementById("btn-clear-filters").addEventListener("click", () => {
-  ["f-search", "f-date-from", "f-date-to", "f-type", "f-category"].forEach(id => {
+  ["f-search", "f-date-from", "f-date-to", "f-type", "f-category", "f-amount-min", "f-amount-max"].forEach(id => {
     document.getElementById(id).value = "";
   });
   duplicatesView = false;

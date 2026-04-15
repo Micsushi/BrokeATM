@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.schemas import CategoryCreate, CategoryOut, CategoryUpdate
 from app.models.models import Category, Transaction
+from app.services.keyword_matching import find_exact_keyword_conflicts, keywords_to_csv
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])
 
@@ -54,8 +55,23 @@ def create_category(payload: CategoryCreate, db: Session = Depends(get_db)) -> A
     existing = db.query(Category).filter(Category.name == normalized_name).first()
     if existing:
         raise HTTPException(status_code=409, detail="Category already exists")
+    normalized_keywords = keywords_to_csv((payload.keywords or "").split(","))
+    exact_conflicts = find_exact_keyword_conflicts(
+        db.query(Category).all(),
+        (normalized_keywords or "").split(","),
+    )
+    if exact_conflicts:
+        conflict = exact_conflicts[0]
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f'Keyword "{conflict["keyword"]}" already exists on '
+                f'"{conflict["category_name"]}".'
+            ),
+        )
     data = payload.model_dump()
     data["name"] = normalized_name
+    data["keywords"] = normalized_keywords
     cat = Category(**data)
     db.add(cat)
     db.commit()
@@ -68,9 +84,32 @@ def update_category(cat_id: int, payload: CategoryUpdate, db: Session = Depends(
     cat = db.get(Category, cat_id)
     if not cat:
         raise HTTPException(status_code=404, detail="Category not found")
-    updates = payload.model_dump(exclude_none=True)
+    updates = payload.model_dump(exclude_unset=True)
     if "name" in updates:
         updates["name"] = updates["name"].strip().lower()
+        existing = (
+            db.query(Category)
+            .filter(Category.name == updates["name"], Category.id != cat_id)
+            .first()
+        )
+        if existing:
+            raise HTTPException(status_code=409, detail="Category already exists")
+    if "keywords" in updates:
+        updates["keywords"] = keywords_to_csv((updates["keywords"] or "").split(","))
+        exact_conflicts = find_exact_keyword_conflicts(
+            db.query(Category).all(),
+            (updates["keywords"] or "").split(","),
+            exclude_category_id=cat_id,
+        )
+        if exact_conflicts:
+            conflict = exact_conflicts[0]
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f'Keyword "{conflict["keyword"]}" already exists on '
+                    f'"{conflict["category_name"]}".'
+                ),
+            )
     for field, value in updates.items():
         setattr(cat, field, value)
     db.commit()

@@ -6,7 +6,7 @@
   <title>Import | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=4" />
+  <link rel="stylesheet" href="/static/css/main.css?v=8" />
   <style>
     /* Review table inline inputs */
     #review-table .review-inp {
@@ -35,21 +35,21 @@
     .review-dup-banner {
       padding: 1.25rem 1.5rem;
       border-radius: var(--radius);
-      border: 1px solid rgba(248, 113, 113, 0.65);
-      border-left: 6px solid #ef4444;
-      background: linear-gradient(135deg, rgba(127, 29, 29, 0.55), rgba(69, 10, 10, 0.65));
+      border: 1px solid var(--tone-danger-border);
+      border-left: 6px solid var(--danger);
+      background: var(--tone-danger-bg);
       box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
     }
     .review-dup-banner strong {
       display: block;
       font-size: 1.1rem;
-      color: #fef2f2;
+      color: var(--text);
       margin-bottom: 0.35rem;
     }
     .review-dup-banner .review-dup-banner-body {
       font-size: 0.95rem;
       line-height: 1.55;
-      color: #fecaca;
+      color: var(--tone-danger-text);
       max-width: 72rem;
     }
     #review-table td { padding: 0.3rem 0.5rem; vertical-align: middle; }
@@ -74,6 +74,24 @@
       background: var(--surface2);
       box-shadow: 0 1px 0 var(--border);
     }
+    .review-keyword-banner {
+      padding: 1.1rem 1.35rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--tone-warning-border);
+      border-left: 6px solid var(--warning);
+      background: var(--tone-warning-bg);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .review-keyword-body {
+      font-size: 0.9rem;
+      line-height: 1.5;
+      color: var(--tone-warning-text);
+      max-width: 60rem;
+    }
   </style>
 </head>
 <body>
@@ -92,13 +110,13 @@
 <div class="page">
   <div class="page-header">
     <h1>Import Transactions</h1>
-    <p>Upload one or more CSV files to import in one batch (duplicates are checked across all files and your database)</p>
+    <p>Upload one or more CSV files. Duplicates are checked across this upload and your database.</p>
   </div>
 
   <div class="steps" id="steps">
     <div class="step active" data-step="1">1 · Upload</div>
-    <div class="step" data-step="2">2 · Period per file</div>
-    <div class="step" data-step="3">3 · Review Rows</div>
+    <div class="step" data-step="2">2 · File periods</div>
+    <div class="step" data-step="3">3 · Review</div>
     <div class="step" data-step="4">4 · Done</div>
   </div>
 
@@ -109,8 +127,8 @@
     <div class="card mb-2">
       <div class="drop-zone" id="drop-zone">
         <div class="drop-icon">📂</div>
-        <p><strong>Drop CSV files here</strong> or click to browse (hold Ctrl to pick several)</p>
-        <p class="mt-1" style="font-size:0.8rem">Supported: CIBC credit card exports · multiple files are merged in order</p>
+        <p><strong>Drop CSV files here</strong> or click to browse</p>
+        <p class="mt-1" style="font-size:0.8rem">CIBC credit card CSVs only · use Ctrl to pick more than one</p>
         <input type="file" id="file-input" accept=".csv" multiple style="display:none" />
       </div>
       <div id="parse-loading" class="hidden mt-2 flex items-center gap-1 text-muted">
@@ -119,10 +137,10 @@
       </div>
     </div>
 
-    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+    <div class="card card-split">
       <div>
-        <div style="font-weight:600;font-size:0.95rem">Add a single entry manually</div>
-        <div class="text-muted" style="font-size:0.82rem;margin-top:0.2rem">Record an expense, income, or refund without a CSV file</div>
+        <div style="font-weight:600;font-size:0.95rem">Add one entry manually</div>
+        <div class="text-muted" style="font-size:0.82rem;margin-top:0.2rem">Add an expense, income, or refund without a CSV.</div>
       </div>
       <button class="btn btn-primary" id="btn-add-entry-import" style="font-size:0.95rem;padding:0.55rem 1.4rem;white-space:nowrap">+ Add Entry</button>
     </div>
@@ -130,26 +148,33 @@
 
   <!-- Step 2: Confirm period per file -->
   <div id="step-2" class="card hidden">
-    <h2 style="font-size:1rem;font-weight:600;margin-bottom:0.5rem">Confirm statement period per file</h2>
+    <h2 style="font-size:1rem;font-weight:600;margin-bottom:0.5rem">Confirm file periods</h2>
     <p class="text-muted mb-2" style="font-size:0.82rem;line-height:1.45">
-      Month and year are saved on each <strong>import batch</strong> for your records. They do <strong>not</strong> change transaction dates on each row (those still come from the CSV).
+      Month and year are saved on the <strong>import batch</strong>. Row dates still come from the CSV.
     </p>
     <div id="file-periods" class="mt-2"></div>
     <div id="parse-summary" class="mt-2 text-muted" style="font-size:0.85rem"></div>
     <p class="mt-2 text-muted" style="font-size:0.82rem;line-height:1.45">
-      Duplicate check compares each row to your database and to <strong>earlier rows in this upload</strong> (including lines from other files in the same batch).
+      Duplicates are checked against your database and <strong>earlier rows in this upload</strong>.
     </p>
     <div class="flex gap-1 mt-3">
       <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
-      <button class="btn btn-primary" id="btn-check-dups">Check for Duplicates →</button>
+      <button class="btn btn-primary" id="btn-check-dups">Check Duplicates →</button>
     </div>
   </div>
 
   <!-- Step 3: Review Rows -->
   <div id="step-3" class="hidden">
     <div id="review-dup-banner" class="review-dup-banner mb-2 hidden">
-      <strong>Duplicate rows (unchecked by default)</strong>
+      <strong>Duplicate rows</strong>
       <p id="review-dup-banner-text" class="review-dup-banner-body" style="margin:0"></p>
+    </div>
+    <div id="review-keyword-banner" class="review-keyword-banner mb-2 hidden">
+      <div>
+        <strong style="display:block;font-size:1rem;color:var(--text);margin-bottom:0.25rem">Cross-category matches</strong>
+        <div id="review-keyword-banner-text" class="review-keyword-body"></div>
+      </div>
+      <button type="button" class="btn btn-secondary btn-sm" id="btn-review-keyword-conflicts">Review Conflict</button>
     </div>
     <div class="card mb-2">
       <div class="flex items-center justify-between">
@@ -158,25 +183,25 @@
           <span class="text-muted ml-1" style="font-size:0.8rem" id="dup-warning"></span>
         </div>
         <div class="flex gap-1 flex-wrap">
-          <button class="btn btn-ghost btn-sm" id="btn-recheck-dups">Re-check duplicates</button>
-          <button class="btn btn-ghost btn-sm" id="btn-exclude-payments">Exclude all payments</button>
-          <button class="btn btn-ghost btn-sm" id="btn-select-all">Select all</button>
-          <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Deselect all</button>
+          <button class="btn btn-ghost btn-sm" id="btn-recheck-dups">Recheck Duplicates</button>
+          <button class="btn btn-ghost btn-sm" id="btn-exclude-payments">Skip Payments</button>
+          <button class="btn btn-ghost btn-sm" id="btn-select-all">Select All</button>
+          <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Clear All</button>
         </div>
       </div>
     </div>
 
-    <div class="card mb-2" style="padding:0.75rem 1rem">
+    <div class="card card-tight mb-2">
       <div class="review-actions-bar">
         <button type="button" class="btn btn-secondary" onclick="goStep(2)">← Back</button>
         <div class="flex gap-1 items-center">
           <span class="review-selected-count text-muted" style="font-size:0.85rem"></span>
-          <button type="button" class="btn btn-primary review-btn-commit">Import Selected →</button>
+          <button type="button" class="btn btn-primary review-btn-commit">Import Selected</button>
         </div>
       </div>
     </div>
 
-    <div class="card mb-2" style="padding:0">
+    <div class="card card-flush mb-2">
       <div class="review-table-scroll">
         <table id="review-table">
           <thead>
@@ -190,7 +215,7 @@
               <th style="width:110px">Type</th>
               <th style="width:140px">Category</th>
               <th>Notes</th>
-              <th style="width:80px">Status</th>
+              <th style="width:160px">Status</th>
             </tr>
           </thead>
           <tbody id="review-tbody"></tbody>
@@ -198,12 +223,12 @@
       </div>
     </div>
 
-    <div class="card" style="padding:0.75rem 1rem">
+    <div class="card card-tight">
       <div class="review-actions-bar">
         <button type="button" class="btn btn-secondary" onclick="goStep(2)">← Back</button>
         <div class="flex gap-1 items-center">
           <span class="review-selected-count text-muted" style="font-size:0.85rem"></span>
-          <button type="button" class="btn btn-primary review-btn-commit">Import Selected →</button>
+          <button type="button" class="btn btn-primary review-btn-commit">Import Selected</button>
         </div>
       </div>
     </div>
@@ -212,19 +237,22 @@
   <!-- Step 4: Done -->
   <div id="step-4" class="card hidden" style="text-align:center;padding:3rem">
     <div style="font-size:3rem;margin-bottom:1rem">✅</div>
-    <h2 style="font-size:1.3rem;font-weight:700" id="done-title">Import Complete</h2>
+    <h2 style="font-size:1.3rem;font-weight:700" id="done-title">Import complete</h2>
     <p class="text-muted mt-1" id="done-summary"></p>
     <div class="flex gap-2 mt-3" style="justify-content:center">
       <a href="/records" class="btn btn-secondary">View Records</a>
-      <a href="/dashboard" class="btn btn-primary">Go to Dashboard</a>
-      <button class="btn btn-ghost" onclick="resetImport()">Import Another</button>
+      <a href="/dashboard" class="btn btn-primary">Dashboard</a>
+      <button class="btn btn-ghost" onclick="resetImport()">Import More</button>
     </div>
   </div>
 </div>
 
 <script src="/static/js/utils.js?v=7"></script>
 <script src="/static/js/api.js?v=7"></script>
-<script src="/static/js/add-tx-modal.js?v=3"></script>
+<script src="/static/js/category-keyword-tools.js?v=2"></script>
+<script src="/static/js/keyword-conflict-modal.js?v=18"></script>
+<script src="/static/js/category-create-modal.js?v=1"></script>
+<script src="/static/js/add-tx-modal.js?v=4"></script>
 <script>
 let parsedData = null;
 let reviewRows = [];
@@ -238,6 +266,24 @@ async function init() {
   processRecurringOnLoad();
 }
 init();
+
+function refreshKeywordStateForRow(row) {
+  if (!row) return;
+  if (row.suggestion_source !== "keyword" && !(row.keyword_matches || []).length) return;
+  const analysis = CategoryKeywordTools.analyzeMerchantKeywordMatches(row.merchant_name, categories);
+  row.normalized_merchant = analysis.normalizedMerchant;
+  row.keyword_matches = analysis.keywordMatches;
+  row.keyword_resolution_needed = analysis.keywordResolutionNeeded;
+  row.keyword_conflict_categories = analysis.keywordConflictCategories;
+  row.suggestion_source = analysis.keywordMatches.length ? "keyword" : "none";
+  if (!row.category_name) {
+    row.suggested_category = analysis.suggestedCategory || "";
+  }
+}
+
+function refreshKeywordStateForAllRows() {
+  reviewRows.forEach((row) => refreshKeywordStateForRow(row));
+}
 
 // ── Drop zone ──
 const dropZone = document.getElementById("drop-zone");
@@ -453,6 +499,7 @@ function applyDuplicateCheckResult(resultRows, previousRows) {
       duplicate_in_database: !!r.duplicate_in_database,
     };
   });
+  refreshKeywordStateForAllRows();
 }
 
 function refreshDupHintForRow(i) {
@@ -466,6 +513,7 @@ function refreshDupHintForRow(i) {
 async function runDuplicateCheckAndGoReview() {
   applyImportPeriodsToRows(parsedData.rows);
   const prevSnap = reviewRows.length ? reviewRows.slice() : [];
+  categories = await API.getCategories();
   const result = await API.checkDuplicates(rowsPayloadForDuplicateCheck(parsedData.rows));
   applyDuplicateCheckResult(result.rows, prevSnap);
   renderReviewTable();
@@ -482,7 +530,7 @@ document.getElementById("btn-check-dups").addEventListener("click", async () => 
     showAlert(document.getElementById("alerts"), e.message, "error");
   } finally {
     btn.disabled = false;
-    btn.textContent = "Check for Duplicates →";
+    btn.textContent = "Check Duplicates →";
   }
 });
 
@@ -492,6 +540,7 @@ document.getElementById("btn-recheck-dups").addEventListener("click", async () =
   try {
     const prevSnap = reviewRows.slice();
     applyImportPeriodsToRows(reviewRows);
+    categories = await API.getCategories();
     const result = await API.checkDuplicates(rowsPayloadForDuplicateCheck(reviewRows));
     applyDuplicateCheckResult(result.rows, prevSnap);
     renderReviewTable();
@@ -512,6 +561,7 @@ function renderReviewTable() {
   const dupInUpload = reviewRows.filter((r) => r.duplicate && r.duplicate_in_import).length;
   const dupInDbOnly = reviewRows.filter((r) => r.duplicate && r.duplicate_in_database && !r.duplicate_in_import).length;
   const payCount = reviewRows.filter((r) => r.is_payment).length;
+  const keywordCount = reviewRows.filter((r) => r.keyword_resolution_needed).length;
   const dupIdxs = reviewRows.map((r, i) => (r.duplicate ? i + 1 : null)).filter((n) => n != null);
   const showFileCol = !!(parsedData && parsedData.source_files && parsedData.source_files.length > 1);
   const thSource = document.getElementById("th-source");
@@ -526,27 +576,40 @@ function renderReviewTable() {
         ? dupIdxs.join(", ")
         : dupIdxs.slice(0, 15).join(", ") + ", …";
     const parts = [
-      `Rows ${list} are duplicates: they match an earlier row in this merged upload and/or a saved transaction (same reference and date, or same interest-style line without a reference).`,
+      `Rows ${list} match an earlier row in this upload or a saved transaction.`,
     ];
-    if (dupInUpload) parts.push(`${dupInUpload} repeat another line in this import (including another CSV in the same batch).`);
-    if (dupInDbOnly) parts.push(`${dupInDbOnly} match data already in your database.`);
+    if (dupInUpload) parts.push(`${dupInUpload} also repeat another row in this upload.`);
+    if (dupInDbOnly) parts.push(`${dupInDbOnly} already exist in your database.`);
     parts.push(
-      `The same bank reference on a different date is still a new line. Duplicate rows start unchecked; check any row to include it in the import.`,
+      `Same reference on a different date still counts as new. Duplicates start unchecked.`,
     );
     dupBannerText.textContent = parts.join(" ");
   } else {
     dupBanner.classList.add("hidden");
   }
 
-  document.getElementById("review-summary").textContent = `${reviewRows.length} rows to review`;
+  const keywordBanner = document.getElementById("review-keyword-banner");
+  const keywordBannerText = document.getElementById("review-keyword-banner-text");
+  if (keywordCount) {
+    keywordBanner.classList.remove("hidden");
+    keywordBannerText.textContent =
+      `${keywordCount} row(s) matched keywords from more than one category. ` +
+      `Pick the right category and remove saved keywords if needed. ` +
+      `Same-category matches are handled automatically.`;
+  } else {
+    keywordBanner.classList.add("hidden");
+  }
+
+  document.getElementById("review-summary").textContent = `${reviewRows.length} rows`;
   const warn = [];
   if (dupCount) {
-    let d = `${dupExcluded} duplicate row(s) off`;
-    if (dupOptedIn) d += `, ${dupOptedIn} opted in`;
-    if (dupInUpload || dupInDbOnly) d += ` (${dupInUpload} in this upload, ${dupInDbOnly} in database)`;
+    let d = `${dupExcluded} duplicates off`;
+    if (dupOptedIn) d += `, ${dupOptedIn} kept`;
+    if (dupInUpload || dupInDbOnly) d += ` (${dupInUpload} upload, ${dupInDbOnly} database)`;
     warn.push(d);
   }
-  if (payCount) warn.push(`${payCount} payment(s)`);
+  if (payCount) warn.push(`${payCount} payments`);
+  if (keywordCount) warn.push(`${keywordCount} conflicts`);
   document.getElementById("dup-warning").textContent = warn.join(" · ");
 
   const sugCatBase = `<option value="">-- none --</option>` + categories.map(c =>
@@ -574,12 +637,15 @@ function renderReviewTable() {
       ? `<span class="badge badge-dup">DUP</span><span class="text-muted" style="font-size:0.65rem;margin-left:0.2rem">${dupHint ? escHtml(dupHint) : ""}</span>`
       : "";
     const payBadge = row.is_payment ? `<span class="badge badge-transfer">PMT</span>` : "";
+    const kwBadge = row.keyword_resolution_needed
+      ? `<button type="button" class="btn btn-ghost btn-sm kw-review-btn" data-idx="${i}" style="margin-left:0.3rem">Resolve</button>`
+      : "";
 
     const typeOpts = ["expense","income","refund","transfer"].map(t =>
       `<option value="${t}" ${row.transaction_type === t ? "selected" : ""}>${t.charAt(0).toUpperCase()+t.slice(1)}</option>`
     ).join("");
 
-    const sugCat = row.suggested_category || row.category_name || "";
+    const sugCat = row.category_name || row.suggested_category || "";
     const catOpts = `<option value="">-- none --</option>` + categories.map(c =>
       `<option value="${escHtml(c.name)}" ${c.name === sugCat ? "selected" : ""}>${escHtml(c.name)}</option>`
     ).join("");
@@ -630,7 +696,7 @@ function renderReviewTable() {
           placeholder="notes…" value="${escHtml(row.notes || "")}" tabindex="${ti.notes}" />
       </td>
       <td style="white-space:nowrap">
-        ${dupBadge}${payBadge}
+        ${dupBadge}${payBadge}${kwBadge}
         ${row.duplicate ? `<span class="text-muted dup-import-hint" style="font-size:0.72rem;margin-left:0.25rem" data-dup-hint="${i}">${row.exclude ? "deselected" : "will import"}</span>` : ""}
       </td>
     `;
@@ -672,6 +738,11 @@ function attachReviewListeners() {
   });
   document.querySelectorAll(".merchant-inp").forEach(inp => {
     inp.addEventListener("input", () => { reviewRows[+inp.dataset.idx].merchant_name = inp.value; });
+    inp.addEventListener("change", () => {
+      const idx = +inp.dataset.idx;
+      refreshKeywordStateForRow(reviewRows[idx]);
+      renderReviewTable();
+    });
   });
   document.querySelectorAll(".amount-inp").forEach(inp => {
     inp.addEventListener("input", () => {
@@ -685,9 +756,124 @@ function attachReviewListeners() {
   document.querySelectorAll(".cat-sel").forEach(sel => {
     sel.addEventListener("change", () => { reviewRows[+sel.dataset.idx].category_name = sel.value; });
   });
+  document.querySelectorAll(".kw-review-btn").forEach((btn) => {
+    btn.addEventListener("click", () => reviewKeywordConflict(+btn.dataset.idx));
+  });
   document.querySelectorAll(".notes-inp").forEach(inp => {
     inp.addEventListener("input", () => { reviewRows[+inp.dataset.idx].notes = inp.value; });
   });
+}
+
+async function reviewKeywordConflict(idx) {
+  const row = reviewRows[idx];
+  if (!row || !(row.keyword_matches || []).length) return;
+  const conflictIndexes = reviewRows
+    .map((reviewRow, reviewIdx) => (reviewRow.keyword_resolution_needed ? reviewIdx : -1))
+    .filter((reviewIdx) => reviewIdx >= 0);
+  const position = conflictIndexes.indexOf(idx);
+  const prevIdx = position > 0 ? conflictIndexes[position - 1] : null;
+  const nextIdx = position >= 0 && position < conflictIndexes.length - 1 ? conflictIndexes[position + 1] : null;
+
+  async function applyConflictRemovals({ removals, selectedCategory }) {
+    categories = await CategoryKeywordTools.removeKeywords(removals);
+    refreshKeywordStateForAllRows();
+    const updatedRow = reviewRows[idx];
+    if (!updatedRow) {
+      renderReviewTable();
+      return { status: "resolved", selectedCategory: "" };
+    }
+
+    const remainingMatches = (updatedRow.keyword_matches || []).map((item) => ({
+      categoryId: item.category_id ?? item.categoryId,
+      categoryName: item.category_name ?? item.categoryName,
+      keyword: item.keyword,
+      length: item.length,
+    }));
+    const remainingCategories = [...new Set(remainingMatches.map((item) => item.categoryName))].sort();
+
+    if (!remainingCategories.length) {
+      updatedRow.category_name = "";
+      renderReviewTable();
+      return {
+        status: "resolved",
+        selectedCategory: "",
+        toastMessage: "Set to uncategorized.",
+      };
+    }
+
+    if (remainingCategories.length === 1) {
+      updatedRow.category_name = remainingCategories[0];
+      renderReviewTable();
+      return {
+        status: "resolved",
+        selectedCategory: remainingCategories[0],
+        toastMessage: `Set to ${remainingCategories[0]}.`,
+      };
+    }
+
+    const nextSelectedCategory = remainingCategories.includes(selectedCategory)
+      ? selectedCategory
+      : remainingCategories[0];
+    updatedRow.category_name = nextSelectedCategory;
+    renderReviewTable();
+
+    const nextConflictIndexes = reviewRows
+      .map((reviewRow, reviewIdx) => (reviewRow.keyword_resolution_needed ? reviewIdx : -1))
+      .filter((reviewIdx) => reviewIdx >= 0);
+    const nextPosition = nextConflictIndexes.indexOf(idx);
+
+    return {
+      status: "multiple",
+      matches: remainingMatches,
+      selectedCategory: nextSelectedCategory,
+      rowIsDuplicate: !!updatedRow.duplicate,
+      rowExcluded: !!updatedRow.exclude,
+      navigation: {
+        current: nextPosition + 1,
+        total: nextConflictIndexes.length,
+        hasPrev: nextPosition > 0,
+        hasNext: nextPosition >= 0 && nextPosition < nextConflictIndexes.length - 1,
+      },
+    };
+  }
+
+  const result = await openMerchantKeywordModal({
+    title: "Resolve category conflict",
+    merchantName: row.merchant_name,
+    normalizedMerchant: row.normalized_merchant,
+    matches: row.keyword_matches.map((item) => ({
+      categoryId: item.category_id ?? item.categoryId,
+      categoryName: item.category_name ?? item.categoryName,
+      keyword: item.keyword,
+      length: item.length,
+    })),
+    selectedCategory: row.category_name || row.suggested_category || "",
+    rowIsDuplicate: !!row.duplicate,
+    rowExcluded: !!row.exclude,
+    navigation: {
+      current: position + 1,
+      total: conflictIndexes.length,
+      hasPrev: prevIdx != null,
+      hasNext: nextIdx != null,
+    },
+    onApplyRemovals: applyConflictRemovals,
+  });
+  if (!result) return;
+  if (result.selectedCategory) {
+    row.category_name = result.selectedCategory;
+  }
+  if (result.action === "prev" && prevIdx != null) {
+    await reviewKeywordConflict(prevIdx);
+    return;
+  }
+  if (result.action === "next" && nextIdx != null) {
+    await reviewKeywordConflict(nextIdx);
+    return;
+  }
+  if (result.action === "close" || result.action === "done") {
+    renderReviewTable();
+    return;
+  }
 }
 
 function syncReviewMasterCheckbox() {
@@ -704,7 +890,7 @@ function updateSelectedCount() {
   const selected = reviewRows.filter((r) => !r.exclude).length;
   let text;
   if (nDup > 0) {
-    text = `${selected} of ${reviewRows.length} selected · ${dupOff} duplicate row(s) off`;
+    text = `${selected} of ${reviewRows.length} selected · ${dupOff} duplicates off`;
   } else {
     text = `${selected} of ${reviewRows.length} selected`;
   }
@@ -765,22 +951,29 @@ async function runCommitImport() {
       year: parsedData.detected_year || 2000,
       rows: reviewRows,
     });
-    document.getElementById("done-title").textContent = "Import Complete!";
+    document.getElementById("done-title").textContent = "Import complete";
     const batchNote =
       result.batch_ids && result.batch_ids.length > 1
         ? ` (${result.batch_ids.length} import batches)`
         : "";
     document.getElementById("done-summary").textContent =
-      `${result.imported} transactions imported, ${result.skipped} skipped${batchNote}. Primary batch: ${(result.batch_id || "").slice(0, 8)}…`;
+      `${result.imported} imported, ${result.skipped} skipped${batchNote}. Batch ${(result.batch_id || "").slice(0, 8)}…`;
     goStep(4);
   } catch (e) {
     showAlert(document.getElementById("alerts"), e.message, "error");
   } finally {
-    buttons.forEach((b) => { b.disabled = false; b.textContent = "Import Selected →"; });
+    buttons.forEach((b) => { b.disabled = false; b.textContent = "Import Selected"; });
   }
 }
 document.querySelectorAll(".review-btn-commit").forEach((btn) => {
   btn.addEventListener("click", runCommitImport);
+});
+
+document.getElementById("btn-review-keyword-conflicts").addEventListener("click", async () => {
+  const idx = reviewRows.findIndex((row) => row.keyword_resolution_needed);
+  if (idx >= 0) {
+    await reviewKeywordConflict(idx);
+  }
 });
 
 // ── Navigation ──
