@@ -318,7 +318,7 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=7"></script>
+<script src="/static/js/utils.js?v=9"></script>
 <script src="/static/js/api.js"></script>
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
 <script src="/static/js/keyword-conflict-modal.js?v=18"></script>
@@ -465,7 +465,7 @@ document.getElementById("btn-bulk-delete").addEventListener("click", async () =>
   const msg = totalTx > 0
     ? `Delete ${ids.length} categories (${names})?\n\nTheir ${totalTx} transaction(s) will become uncategorized.`
     : `Delete ${ids.length} categories (${names})?`;
-  if (!confirm(msg)) return;
+  if (!await confirmDialog({ title: `Delete ${ids.length} categor${ids.length === 1 ? "y" : "ies"}`, message: msg, confirmLabel: "Delete" })) return;
   try {
     await Promise.all(ids.map(id => API.deleteCategory(id)));
     selectedIds.clear();
@@ -698,7 +698,7 @@ async function deleteCat(id) {
   const msg = cat?.tx_count > 0
     ? `Delete "${cat.name}"? Its ${cat.tx_count} transaction(s) will become uncategorized.`
     : `Delete "${cat?.name}"?`;
-  if (!confirm(msg)) return;
+  if (!await confirmDialog({ title: `Delete "${cat?.name}"`, message: msg, confirmLabel: "Delete" })) return;
   try {
     await API.deleteCategory(id);
     await loadStats();

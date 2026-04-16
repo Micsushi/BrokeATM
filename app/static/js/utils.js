@@ -111,6 +111,50 @@ function escHtml(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+/**
+ * Custom confirm dialog. Returns Promise<boolean>.
+ * Usage: if (!await confirmDialog({ title, message, confirmLabel })) return;
+ */
+function confirmDialog({ title = "Confirm", message = "", confirmLabel = "Confirm", confirmClass = "btn-danger", cancelLabel = "Cancel" } = {}) {
+  return new Promise(resolve => {
+    let overlay = document.getElementById("__confirm-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "__confirm-overlay";
+      overlay.className = "modal-overlay";
+      overlay.style.display = "none";
+      overlay.innerHTML = `
+        <div class="modal" style="max-width:420px">
+          <h2 id="__confirm-title" style="margin-bottom:0.6rem"></h2>
+          <p id="__confirm-msg" style="color:var(--text-muted);font-size:0.9rem;margin:0;white-space:pre-wrap"></p>
+          <div class="modal-actions">
+            <button class="btn btn-secondary btn-sm" id="__confirm-cancel"></button>
+            <button class="btn btn-sm" id="__confirm-ok"></button>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener("click", e => { if (e.target === overlay) cleanup(false); });
+    }
+    document.getElementById("__confirm-title").textContent = title;
+    document.getElementById("__confirm-msg").textContent = message;
+    const okBtn = document.getElementById("__confirm-ok");
+    const cancelBtn = document.getElementById("__confirm-cancel");
+    okBtn.textContent = confirmLabel;
+    okBtn.className = `btn btn-sm ${confirmClass}`;
+    cancelBtn.textContent = cancelLabel;
+    overlay.style.display = "flex";
+
+    function cleanup(result) {
+      overlay.style.display = "none";
+      okBtn.onclick = null;
+      cancelBtn.onclick = null;
+      resolve(result);
+    }
+    okBtn.onclick = () => cleanup(true);
+    cancelBtn.onclick = () => cleanup(false);
+  });
+}
+
 function debounce(fn, ms = 300) {
   let t;
   return (...args) => {

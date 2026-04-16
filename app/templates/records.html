@@ -338,7 +338,7 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=7"></script>
+<script src="/static/js/utils.js?v=9"></script>
 <script src="/static/js/api.js?v=7"></script>
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
 <script src="/static/js/keyword-conflict-modal.js?v=18"></script>
@@ -621,7 +621,7 @@ document.getElementById("btn-deselect-all").addEventListener("click", () => {
 });
 
 document.getElementById("btn-bulk-delete").addEventListener("click", async () => {
-  if (!confirm(`Delete ${selectedIds.size} transaction(s)? This cannot be undone.`)) return;
+  if (!await confirmDialog({ title: "Delete transactions", message: `Delete ${selectedIds.size} transaction(s)? This cannot be undone.`, confirmLabel: "Delete" })) return;
   try {
     const res = await API.bulkDelete([...selectedIds]);
     selectedIds.clear();
@@ -745,7 +745,7 @@ document.getElementById("edit-save").addEventListener("click", async () => {
 
 // ── Delete single ──
 async function deleteTx(id) {
-  if (!confirm("Delete this transaction?")) return;
+  if (!await confirmDialog({ title: "Delete transaction", message: "Delete this transaction? This cannot be undone.", confirmLabel: "Delete" })) return;
   try {
     await API.deleteTransaction(id);
     selectedIds.delete(id);
@@ -813,7 +813,7 @@ document.getElementById("btn-prune-dup-extras").addEventListener("click", async 
   const msg =
     `Remove ${rep.total_extra_rows} duplicate copy(ies) in ${rep.total_groups} group(s)? ` +
     "The lowest id in each group is kept. This cannot be undone.";
-  if (!confirm(msg)) return;
+  if (!await confirmDialog({ title: "Remove duplicates", message: msg, confirmLabel: "Remove" })) return;
   try {
     const res = await API.pruneExactDuplicates(true);
     showAlert(document.getElementById("alerts"), `Removed ${res.deleted} duplicate row(s).`, "success");

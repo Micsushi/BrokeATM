@@ -26,25 +26,10 @@
       transition: border-color 0.15s;
     }
     .limit-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,130,255,0.15); }
-    .total-row td { border-top: 2px solid var(--border) !important; font-weight: 700; padding-top: 0.75rem; }
-    .total-budget-row {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1rem;
-    }
-    .total-budget-meta {
-      flex: 1;
-      min-width: 0;
-    }
-    .total-budget-field {
-      flex-shrink: 0;
-      text-align: right;
-    }
     .total-budget-input {
-      width: 110px; background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text); font-size: 0.9rem; font-weight: 700;
-      padding: 0.35rem 0.6rem; text-align: right;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); font-size: 0.84rem; font-weight: 700;
+      padding: 0.28rem 0.5rem; text-align: right;
       transition: border-color 0.15s;
     }
     .total-budget-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,130,255,0.15); }
@@ -55,10 +40,29 @@
     .save-status.saving { color: var(--text-muted); }
     .save-status.saved { color: #22c55e; }
     .save-status.error { color: var(--danger); }
-    @media (max-width: 700px) {
-      .total-budget-row { flex-direction: column; align-items: stretch; }
-      .total-budget-field { text-align: left; }
+
+    .budget-table tbody tr { position: relative; }
+    .budget-table tbody tr.selected td { background: rgba(99,102,241,0.07); }
+    .cat-name-cell { display: flex; align-items: center; gap: 0.35rem; }
+    .cat-name-cell .cat-dot { margin-right: 0; }
+    .budget-row-chk { cursor: pointer; accent-color: var(--accent); width: 14px; height: 14px; flex-shrink: 0; }
+    .budget-table th.chk-col, .budget-table td.chk-col { width: 28px; padding-right: 0; text-align: center; }
+    .add-cat-wrap { position: relative; display: inline-block; }
+    .cat-dropdown {
+      position: absolute; top: calc(100% + 4px); left: 0;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; min-width: 200px; max-height: 260px;
+      overflow-y: auto; z-index: 100;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
     }
+    .cat-dropdown.hidden { display: none; }
+    .cat-dropdown-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.875rem;
+      transition: background 0.1s;
+    }
+    .cat-dropdown-item:hover { background: rgba(255,255,255,0.06); }
+    .cat-dropdown-empty { padding: 0.75rem; font-size: 0.82rem; color: var(--text-muted); text-align: center; }
   </style>
 </head>
 <body>
@@ -84,15 +88,37 @@
 
   <div id="alerts"></div>
 
-  <!-- ── TOP: Category limits ───────────────────────────────────────── -->
-  <div class="card" style="margin-bottom:1.25rem">
-    <div class="picker-card-header" style="margin-bottom:0.75rem">
-      <span class="section-title">Category limits</span>
-    </div>
+  <!-- Unallocated / validation hint -->
+  <div id="budget-hint-bar" style="display:none;justify-content:flex-end;margin-bottom:0.4rem">
+    <div id="others-hint" class="alert alert-warning" style="margin:0;padding:0.35rem 0.85rem;font-size:0.82rem;border-radius:6px"></div>
+    <div id="validation-hint" class="alert alert-error" style="margin:0;padding:0.35rem 0.85rem;font-size:0.82rem;border-radius:6px;display:none"></div>
+  </div>
 
+  <!-- Bulk action bar (always visible) -->
+  <div class="bulk-bar" id="budget-bulk-bar">
+    <span class="bulk-count" id="budget-bulk-count">0 selected</span>
+    <button class="btn btn-ghost btn-sm" id="btn-budget-select-all">Select All</button>
+    <button class="btn btn-ghost btn-sm" id="btn-budget-deselect">Clear All</button>
+    <div class="bulk-divider"></div>
+    <div class="add-cat-wrap">
+      <button class="btn btn-ghost btn-sm" id="btn-add-cat">+ Add category</button>
+      <div class="cat-dropdown hidden" id="cat-dropdown"></div>
+    </div>
+    <button class="btn btn-danger btn-sm" id="btn-budget-bulk-delete" disabled>Delete selected</button>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0">
+      <span style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap">Total budget</span>
+      <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="—" style="width:110px" />
+      <div class="save-status" id="save-status" style="min-width:60px"></div>
+    </div>
+  </div>
+
+  <!-- ── Category limits table ─────────────────────────────────────── -->
+  <div class="card" style="margin-bottom:1.25rem">
     <table class="budget-table" id="budget-table">
       <thead>
         <tr>
+          <th class="chk-col"></th>
           <th>Category</th>
           <th class="right">6 mo avg</th>
           <th class="right">3 mo avg</th>
@@ -101,31 +127,14 @@
         </tr>
       </thead>
       <tbody id="budget-tbody">
-        <tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--text-muted)">Loading…</td></tr>
+        <tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--text-muted)">Loading…</td></tr>
       </tbody>
-      <tfoot>
-        <tr class="total-row">
-          <td colspan="5">
-            <div class="total-budget-row">
-              <div class="total-budget-meta">
-                <span style="font-size:0.85rem">Total budget</span>
-                <div class="save-status" id="save-status"></div>
-                <div class="validation-hint" id="validation-hint"></div>
-                <div class="others-hint" id="others-hint"></div>
-              </div>
-              <div class="total-budget-field">
-                <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="—" />
-              </div>
-            </div>
-          </td>
-        </tr>
-      </tfoot>
     </table>
   </div>
 
 </div>
 
-<script src="/static/js/utils.js?v=7"></script>
+<script src="/static/js/utils.js?v=9"></script>
 <script src="/static/js/api.js?v=7"></script>
 <script>
 let currentSettings = null;
@@ -175,46 +184,82 @@ async function doSave() {
 // ── Load settings (top panel) ─────────────────────────────────────────────────
 
 async function loadSettings() {
-  const data = await fetch(`/api/budget/settings`).then(r => r.json());
-  currentSettings = data;
-  renderBudgetTable(data);
-  updateTotalHint();
+  try {
+    const r = await fetch(`/api/budget/settings`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    currentSettings = data;
+    renderBudgetTable(data);
+    updateTotalHint();
+  } catch (e) {
+    const tbody = document.getElementById("budget-tbody");
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--danger)">Failed to load: ${e.message}</td></tr>`;
+  }
 }
 
 function fmtAvg(val) {
   return `<span style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--text-muted)">${fmtCurrency(val, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>`;
 }
 
-function renderBudgetTable(data) {
-  const tbody = document.getElementById("budget-tbody");
+// ── Bulk selection ────────────────────────────────────────────────────────────
 
-  tbody.innerHTML = data.categories.map(c => {
-    const dot = c.category_color
-      ? `<span class="cat-dot" style="background:${escHtml(c.category_color)}"></span>`
-      : `<span class="cat-dot" style="background:var(--border)"></span>`;
-    const limitVal = c.limit_amount != null ? c.limit_amount : "";
+let selectedCatIds = new Set();
+
+function updateBulkBar() {
+  const n = selectedCatIds.size;
+  document.getElementById("budget-bulk-count").textContent = `${n} selected`;
+  document.getElementById("btn-budget-bulk-delete").disabled = n === 0;
+}
+
+function toggleRowSelect(tr, checked) {
+  const id = tr.dataset.catId;
+  if (!id) return;
+  if (checked) { selectedCatIds.add(id); tr.classList.add("selected"); }
+  else { selectedCatIds.delete(id); tr.classList.remove("selected"); }
+  updateBulkBar();
+}
+
+function buildCatRow(catId, catName, catColor, avg6, avg3, avg1, limitVal) {
+  const dot = catColor
+    ? `<span class="cat-dot" style="background:${escHtml(catColor)}"></span>`
+    : `<span class="cat-dot" style="background:var(--border)"></span>`;
+  const tr = document.createElement("tr");
+  tr.dataset.catId = catId ?? "";
+  tr.innerHTML = `
+    <td class="chk-col"><input type="checkbox" class="budget-row-chk" /></td>
+    <td><div class="cat-name-cell">${dot}${escHtml(catName)}</div></td>
+    <td style="text-align:right">${fmtAvg(avg6)}</td>
+    <td style="text-align:right">${fmtAvg(avg3)}</td>
+    <td style="text-align:right">${fmtAvg(avg1)}</td>
+    <td style="text-align:right">
+      <input type="number" class="limit-input" data-cat-id="${catId ?? ""}"
+        min="0" step="1" placeholder="—" value="${limitVal}" />
+    </td>`;
+  wireRow(tr);
+  return tr;
+}
+
+function wireRow(tr) {
+  tr.querySelector(".limit-input").addEventListener("input", () => { updateTotalHint(); scheduleSave(); });
+  tr.querySelector(".budget-row-chk").addEventListener("change", e => toggleRowSelect(tr, e.target.checked));
+}
+
+function renderBudgetTable(data) {
+  selectedCatIds.clear();
+  const tbody = document.getElementById("budget-tbody");
+  tbody.innerHTML = "";
+
+  data.categories.forEach(c => {
     const avg6 = c.avg_6m ?? c.avg_monthly ?? 0;
     const avg3 = c.avg_3m ?? 0;
     const avg1 = c.avg_1m ?? 0;
-    return `
-      <tr data-cat-id="${c.category_id ?? ""}">
-        <td>${dot}${escHtml(c.category_name)}</td>
-        <td style="text-align:right">${fmtAvg(avg6)}</td>
-        <td style="text-align:right">${fmtAvg(avg3)}</td>
-        <td style="text-align:right">${fmtAvg(avg1)}</td>
-        <td style="text-align:right">
-          <input type="number" class="limit-input" data-cat-id="${c.category_id ?? ""}"
-            min="0" step="1" placeholder="—" value="${limitVal}" />
-        </td>
-      </tr>`;
-  }).join("");
+    const limitVal = c.limit_amount != null ? c.limit_amount : "";
+    tbody.appendChild(buildCatRow(c.category_id, c.category_name, c.category_color, avg6, avg3, avg1, limitVal));
+  });
 
   const totalEl = document.getElementById("total-budget");
   if (data.total != null) totalEl.value = data.total;
-
-  tbody.querySelectorAll(".limit-input").forEach(el =>
-    el.addEventListener("input", () => { updateTotalHint(); scheduleSave(); })
-  );
+  updateBulkBar();
 }
 
 function getCategoryLimits() {
@@ -236,26 +281,132 @@ function updateTotalHint() {
   const totalVal = parseFloat(totalEl.value);
   const hint = document.getElementById("validation-hint");
   const others = document.getElementById("others-hint");
+  const hintBar = document.getElementById("budget-hint-bar");
+
+  hint.style.display = "none";
+  others.style.display = "none";
+  hintBar.style.display = "none";
+  totalEl.classList.remove("invalid");
 
   if (!isNaN(totalVal)) {
     const diff = totalVal - catSum;
     if (diff < 0) {
       hint.textContent = `Total must be ≥ category sum (${fmtCurrency(catSum)})`;
+      hint.style.display = "";
+      hintBar.style.display = "flex";
       totalEl.classList.add("invalid");
-      others.textContent = "";
-    } else {
-      hint.textContent = "";
-      totalEl.classList.remove("invalid");
-      others.textContent = diff > 0
-        ? `${fmtCurrency(diff)} unallocated → "Others"`
-        : "No unallocated budget";
+    } else if (diff > 0) {
+      others.textContent = `${fmtCurrency(diff)} unallocated → "Others"`;
+      others.style.display = "";
+      hintBar.style.display = "flex";
     }
-  } else {
-    hint.textContent = "";
-    totalEl.classList.remove("invalid");
-    others.textContent = "";
   }
 }
+
+// ── Add category dropdown ─────────────────────────────────────────────────────
+
+let allCategories = [];
+
+async function loadAllCategories() {
+  if (allCategories.length === 0) {
+    allCategories = await fetch("/api/categories").then(r => r.json());
+  }
+}
+
+function getExistingCatIds() {
+  return new Set(
+    [...document.querySelectorAll("#budget-tbody tr[data-cat-id]")]
+      .map(tr => parseInt(tr.dataset.catId))
+      .filter(id => !isNaN(id))
+  );
+}
+
+async function openAddCatDropdown() {
+  const dropdown = document.getElementById("cat-dropdown");
+  if (!dropdown.classList.contains("hidden")) {
+    dropdown.classList.add("hidden");
+    return;
+  }
+  await loadAllCategories();
+  const existing = getExistingCatIds();
+  const missing = allCategories.filter(c => !existing.has(c.id));
+  if (missing.length === 0) {
+    dropdown.innerHTML = `<div class="cat-dropdown-empty">All categories added</div>`;
+  } else {
+    dropdown.innerHTML = missing.map(c => {
+      const dot = c.color
+        ? `<span class="cat-dot" style="background:${escHtml(c.color)}"></span>`
+        : `<span class="cat-dot" style="background:var(--border)"></span>`;
+      return `<div class="cat-dropdown-item" data-cat-id="${c.id}" data-cat-name="${escHtml(c.name)}" data-cat-color="${escHtml(c.color || '')}">
+        ${dot}${escHtml(c.name)}
+      </div>`;
+    }).join("");
+    dropdown.querySelectorAll(".cat-dropdown-item").forEach(el => {
+      el.addEventListener("click", () => {
+        addCategoryRow(parseInt(el.dataset.catId), el.dataset.catName, el.dataset.catColor || null);
+        dropdown.classList.add("hidden");
+      });
+    });
+  }
+  dropdown.classList.remove("hidden");
+}
+
+function addCategoryRow(catId, catName, catColor) {
+  const tbody = document.getElementById("budget-tbody");
+  // Look up avgs from already-loaded settings (categories with spending but no budget rule)
+  const existing = currentSettings?.categories?.find(c => c.category_id === catId);
+  const avg6 = existing?.avg_6m ?? 0;
+  const avg3 = existing?.avg_3m ?? 0;
+  const avg1 = existing?.avg_1m ?? 0;
+  const tr = buildCatRow(catId, catName, catColor, avg6, avg3, avg1, "");
+  tbody.appendChild(tr);
+  tr.querySelector(".limit-input").focus();
+}
+
+document.getElementById("btn-add-cat").addEventListener("click", (e) => {
+  e.stopPropagation();
+  openAddCatDropdown();
+});
+
+document.addEventListener("click", () => {
+  document.getElementById("cat-dropdown").classList.add("hidden");
+});
+
+document.getElementById("cat-dropdown").addEventListener("click", (e) => {
+  e.stopPropagation();
+});
+
+// ── Bulk-bar event listeners ──────────────────────────────────────────────────
+
+document.getElementById("btn-budget-select-all").addEventListener("click", () => {
+  document.querySelectorAll("#budget-tbody tr[data-cat-id]").forEach(tr => {
+    const chk = tr.querySelector(".budget-row-chk");
+    if (chk) { chk.checked = true; toggleRowSelect(tr, true); }
+  });
+});
+
+document.getElementById("btn-budget-deselect").addEventListener("click", () => {
+  document.querySelectorAll("#budget-tbody tr[data-cat-id]").forEach(tr => {
+    const chk = tr.querySelector(".budget-row-chk");
+    if (chk) { chk.checked = false; tr.classList.remove("selected"); }
+  });
+  selectedCatIds.clear();
+  updateBulkBar();
+});
+
+document.getElementById("btn-budget-bulk-delete").addEventListener("click", async () => {
+  const n = selectedCatIds.size;
+  if (!n) return;
+  if (!await confirmDialog({ title: `Remove from budget`, message: `Remove ${n} categor${n === 1 ? "y" : "ies"} from budget? Their limits will be cleared.`, confirmLabel: "Remove" })) return;
+  const toRemove = new Set(selectedCatIds);
+  document.querySelectorAll("#budget-tbody tr[data-cat-id]").forEach(tr => {
+    if (toRemove.has(tr.dataset.catId)) tr.remove();
+  });
+  selectedCatIds.clear();
+  updateTotalHint();
+  updateBulkBar();
+  scheduleSave();
+});
 
 // ── Event listeners ───────────────────────────────────────────────────────────
 
