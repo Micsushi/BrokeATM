@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import io
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -18,27 +17,21 @@ from app.services.parsers.base import (
     detect_unknown_categories,
     is_valid_row,
 )
+from app.services.parsers.ocr_parser import _pdf_to_images
+from app.services.parsers.pdfplumber_text import _END_AMOUNT_RE, _LINE_DATE_RE
 
 if TYPE_CHECKING:
     from app.services.keyword_matching import KeywordMatcher
 
-_DATE_PART = (
-    r"(?:\d{1,2}[/\-]\d{1,2}(?:[/\-]\d{2,4})?"   # 01/15, 01-15, 01/15/2024
-    r"|[A-Za-z]{3,}\s*\d{1,2}(?:[,\s]+\d{4})?"    # Jan 15, January 15 2024
-    r"|\d{1,2}[-\s][A-Za-z]{3}(?:\s+\d{4})?)"     # 15 Mar, 15-Jul
-)
-_LINE_DATE_RE = re.compile(
-    r"^(" + _DATE_PART + r")"
-    r"(?:\s+" + _DATE_PART + r")?"
-    r"\s+(.+)"
-)
 
-_END_AMOUNT_RE = re.compile(r"[\-\+]?\$?\s*([\d,]+\.\d{2})\s*(?:CR|DB|DR)?\s*$")
+def _check_tesseract() -> bool:
+    import shutil
+    return shutil.which("tesseract") is not None
 
 
-class PdfplumberTextParser(BaseParser):
-    parser_id = "pdfplumber_text"
-    parser_label = "Generic Text"
+class TesseractParser(BaseParser):
+    parser_id = "tesseract_parser"
+    parser_label = "OCR (Tesseract)"
 
     def can_handle(self, filename: str, content: bytes) -> bool:
         return filename.lower().endswith(".pdf")
@@ -59,7 +52,7 @@ class PdfplumberTextParser(BaseParser):
                 parser_label=self.parser_label,
                 confidence=0.0,
                 rows=[],
-                errors=[f"Text extraction failed: {exc}"],
+                errors=[f"Tesseract OCR failed: {exc}"],
             )
 
     def _parse_inner(
@@ -70,21 +63,30 @@ class PdfplumberTextParser(BaseParser):
         keyword_matcher: KeywordMatcher | None,
         known_categories: list[str],
     ) -> ParseResult:
-        import pdfplumber
+        import pytesseract
 
         rows: list[dict[str, Any]] = []
         errors: list[str] = []
         skipped = 0
         warnings: list[str] = [
-            "Regex-based: may not distinguish transaction date vs post date",
+            "OCR-based (Tesseract): accuracy depends on scan quality",
         ]
 
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
-            all_text = ""
-            for page in pdf.pages:
-                all_text += (page.extract_text() or "") + "\n"
-            fallback_year = infer_year_from_text(all_text)
+        images = _pdf_to_images(content)
+        if not images:
+            return ParseResult(
+                parser_id=self.parser_id,
+                parser_label=self.parser_label,
+                confidence=0.0,
+                rows=[],
+                errors=["Could not render PDF pages to images"],
+            )
 
+        all_text = ""
+        for img in images:
+            all_text += pytesseract.image_to_string(img, config="--psm 6") + "\n"
+
+        fallback_year = infer_year_from_text(all_text)
         lines = all_text.splitlines()
 
         for line_idx, line in enumerate(lines):
@@ -111,7 +113,7 @@ class PdfplumberTextParser(BaseParser):
                     merchant = rest
                 else:
                     skipped += 1
-                    errors.append(f"Line {line_idx + 1}: no amount found — '{line[:60]}'")
+                    errors.append(f"Line {line_idx + 1}: no amount — '{line[:60]}'")
                     continue
             else:
                 amount_str = am.group(1)
@@ -140,10 +142,10 @@ class PdfplumberTextParser(BaseParser):
             rows.append(row)
 
         if skipped > 0:
-            warnings.append(f"{skipped} row(s) skipped: ambiguous or unparseable lines")
+            warnings.append(f"{skipped} row(s) skipped: ambiguous lines after OCR")
 
         valid = sum(1 for r in rows if is_valid_row(r))
-        confidence = min(compute_confidence(valid, skipped), 0.75)
+        confidence = min(compute_confidence(valid, skipped), 0.65)
         unknown_cats = detect_unknown_categories(rows, known_categories)
 
         return ParseResult(

@@ -6,10 +6,13 @@ from app.services.parsers.base import BaseParser, ParseResult
 from app.services.parsers.camelot_lattice import CamelotLatticeParser
 from app.services.parsers.camelot_stream import CamelotStreamParser
 from app.services.parsers.csv_wrapper import CsvWrapperParser
+from app.services.parsers.ocr_parser import OcrParser
 from app.services.parsers.ofx_parser import OfxParser
 from app.services.parsers.pdfplumber_coords import PdfplumberCoordsParser
 from app.services.parsers.pdfplumber_table import PdfplumberTableParser
 from app.services.parsers.pdfplumber_text import PdfplumberTextParser
+from app.services.parsers.tabula_parser import TabulaParser
+from app.services.parsers.tesseract_parser import TesseractParser, _check_tesseract
 
 if TYPE_CHECKING:
     from app.services.keyword_matching import KeywordMatcher
@@ -19,7 +22,10 @@ ALL_PARSERS: list[BaseParser] = [
     CamelotLatticeParser(),
     PdfplumberTableParser(),
     CamelotStreamParser(),
+    TabulaParser(),
     PdfplumberTextParser(),
+    OcrParser(),
+    *([TesseractParser()] if _check_tesseract() else []),
     OfxParser(),
     CsvWrapperParser(),
 ]
@@ -35,7 +41,9 @@ def run_all(
     results: list[ParseResult] = []
     for parser in ALL_PARSERS:
         if parser.can_handle(filename, content):
-            result = parser.parse(content, filename, default_currency, keyword_matcher, known_categories)
+            result = parser.parse(
+                content, filename, default_currency, keyword_matcher, known_categories
+            )
             results.append(result)
         else:
             results.append(ParseResult(

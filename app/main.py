@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -20,6 +21,17 @@ from app.services.app_settings import ensure_app_settings
 from app.services.starter_categories import seed_starter_categories
 
 Base.metadata.create_all(bind=engine)
+
+
+def _prewarm_ocr() -> None:
+    try:
+        from app.services.parsers.ocr_parser import _get_reader
+        _get_reader()
+    except Exception:
+        pass
+
+
+threading.Thread(target=_prewarm_ocr, daemon=True).start()
 
 with SessionLocal() as _db:
     seed_starter_categories(_db)

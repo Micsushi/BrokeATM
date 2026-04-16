@@ -254,7 +254,7 @@ class LargeExpenseRow(BaseModel):
     merchant_name: str
     category: str | None
     amount: float
-    pct_of_total: float
+    pct_of_month: float
     currency: str
 
 

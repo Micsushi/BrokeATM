@@ -196,7 +196,7 @@
             <th>Merchant</th>
             <th>Category</th>
             <th class="text-right">Amount</th>
-            <th class="text-right">% of Period</th>
+            <th class="text-right">% of Month</th>
           </tr>
         </thead>
         <tbody id="large-expenses-tbody">
@@ -506,7 +506,7 @@ function renderLargeExpenses(resp, s) {
 
   const parts = [];
   if (s && s.enableAmount) parts.push(`> ${fmtCurrency(s.thresholdAmount)}`);
-  if (s && s.enablePct) parts.push(`> ${s.thresholdPct}% of period`);
+  if (s && s.enablePct) parts.push(`> ${s.thresholdPct}% of its month`);
   subtitle.textContent = `${total} transaction${total !== 1 ? "s" : ""}${parts.length ? " · " + parts.join(" or ") : ""}`;
 
   if (!rows.length) {
@@ -521,7 +521,7 @@ function renderLargeExpenses(resp, s) {
       <td style="font-weight:600">${escHtml(r.merchant_name)}</td>
       <td style="color:var(--text-muted)">${escHtml(r.category || "—")}</td>
       <td class="text-right text-danger" style="font-family:'JetBrains Mono',monospace;font-weight:700">${fmtCurrency(r.amount, r.currency)}</td>
-      <td class="text-right" style="color:var(--text-muted)">${r.pct_of_total}%</td>
+      <td class="text-right" style="color:var(--text-muted)">${r.pct_of_month}%</td>
     </tr>`).join("");
 
   paginationWrap.style.display = "flex";

@@ -175,7 +175,7 @@ def large_expenses(
     date_from: str | None = Query(None, description="YYYY-MM start (inclusive), omit for all time"),
     date_to: str | None = Query(None, description="YYYY-MM end (inclusive), omit for all time"),
     min_amount: float | None = Query(None, description="Fixed amount threshold (CAD)"),
-    min_pct: float | None = Query(None, description="% of all-time total expenses (0-100)"),
+    min_pct: float | None = Query(None, description="% of the transaction's own month total (0-100)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=500),
     db: Session = Depends(get_db),
@@ -199,12 +199,19 @@ def large_expenses(
             pass
 
     all_in_range = base_q.all()
-    range_total = sum(r.amount for r in all_in_range)
+
+    # build per-month totals so pct is relative to the transaction's own month
+    month_totals: dict[tuple[int, int], float] = {}
+    for r in all_in_range:
+        key = (r.transaction_date.year, r.transaction_date.month)
+        month_totals[key] = month_totals.get(key, 0.0) + r.amount
 
     matched = []
     for r in all_in_range:
         passes_amount = min_amount is not None and r.amount >= min_amount
-        pct = (r.amount / range_total * 100) if range_total else 0
+        key = (r.transaction_date.year, r.transaction_date.month)
+        month_total = month_totals.get(key, 0.0)
+        pct = (r.amount / month_total * 100) if month_total else 0
         passes_pct = min_pct is not None and pct >= min_pct
         if passes_amount or passes_pct:
             matched.append((r, round(pct, 1)))
@@ -222,7 +229,7 @@ def large_expenses(
                 merchant_name=r.merchant_name,
                 category=r.category.name if r.category else None,
                 amount=round(r.amount, 2),
-                pct_of_total=pct,
+                pct_of_month=pct,
                 currency=r.currency,
             )
             for r, pct in page_items

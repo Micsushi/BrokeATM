@@ -130,7 +130,7 @@
     <div class="setting-row">
       <div class="setting-label">
         <strong>Percentage threshold</strong>
-        <span>Flag any expense that is more than this % of total spending for the period.</span>
+        <span>Flag any expense that is more than this % of total spending for its own month.</span>
       </div>
       <div class="setting-control">
         <input type="checkbox" id="enable-pct" />
@@ -368,7 +368,7 @@ function updatePreview(s) {
   const box = document.getElementById("preview-box");
   const parts = [];
   if (s.enableAmount) parts.push(`amount ≥ <strong>${fmtCurrency(s.thresholdAmount, s.defaultCurrency, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}</strong>`);
-  if (s.enablePct) parts.push(`≥ <strong>${s.thresholdPct}%</strong> of period total`);
+  if (s.enablePct) parts.push(`≥ <strong>${s.thresholdPct}%</strong> of its month total`);
   box.innerHTML = parts.length
     ? `Flagging expenses where: ${parts.join(" <em>or</em> ")}.`
     : "No thresholds enabled — Large Expenses section will be hidden on the Dashboard.";

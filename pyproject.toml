@@ -19,6 +19,11 @@ dependencies = [
     "pdfplumber>=0.10.0",
     "ofxtools>=0.9.0",
     "camelot-py[cv]>=0.11.0",
+    "tabula-py>=2.9.0",
+    "pytesseract>=0.3.10",
+    "pdf2image>=1.17.0",
+    "pymupdf>=1.24.0",
+    "easyocr>=1.7.0",
 ]
 
 [tool.setuptools.packages.find]

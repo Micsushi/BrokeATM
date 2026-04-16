@@ -42,6 +42,7 @@ class CsvWrapperParser(BaseParser):
             for date_field in ("transaction_date", "posted_date"):
                 if hasattr(row.get(date_field), "isoformat"):
                     row[date_field] = row[date_field].isoformat()
+            row.setdefault("source_file", filename)
             rows.append(row)
 
         errors = result.get("errors", [])

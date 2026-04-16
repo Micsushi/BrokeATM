@@ -17,6 +17,8 @@ _DATE_FORMATS = (
     "%b %d %Y", "%b %d, %Y", "%B %d %Y", "%B %d, %Y",
     "%d %b %Y", "%d %B %Y",
     "%b %d", "%m/%d",
+    "%d %b",        # RBC chequing: "15 Mar"
+    "%d-%b",        # RBC visa: "10-Jul"
     "%b%d", "%b%d%Y",
 )
 
@@ -26,11 +28,13 @@ def try_parse_date(raw: str, fallback_year: int | None = None) -> date | None:
     raw = raw.strip().split("\n")[0].strip()
     if not raw:
         return None
+    effective_year = fallback_year or datetime.today().year
     for fmt in _DATE_FORMATS:
         try:
-            d = datetime.strptime(raw, fmt)
-            if d.year == 1900 and fallback_year:
-                d = d.replace(year=fallback_year)
+            if "%Y" not in fmt and "%y" not in fmt:
+                d = datetime.strptime(f"{raw} {effective_year}", f"{fmt} %Y")
+            else:
+                d = datetime.strptime(raw, fmt)
             return d.date()
         except ValueError:
             continue

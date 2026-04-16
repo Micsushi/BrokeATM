@@ -38,20 +38,32 @@ class BankProfile:
 
 BANK_PROFILES: list[BankProfile] = [
     BankProfile(
-        name="TD Chequing",
-        detect_patterns=["TD Canada Trust", "TD Bank", "Personal Chequing"],
-        date_x=(30, 90),
-        desc_x=(90, 400),
-        debit_x=(400, 470),
-        credit_x=(470, 540),
-        balance_x=(540, 620),
-    ),
-    BankProfile(
         name="TD Visa",
+        # must come before TD Chequing — generic "td.com" pattern would match both
         detect_patterns=["TD Visa", "TD® Visa", "TD Credit Card", "TD CASH BACK", "TD Cash Back"],
         date_x=(30, 92),
         desc_x=(136, 316),
         amount_x=(316, 360),
+    ),
+    BankProfile(
+        name="TD Chequing",
+        # statement footer: "ACCOUNTISSUEDBY:THETORONTO-DOMINIONBANK" / "www.td.com"
+        detect_patterns=["TD Canada Trust", "TD Bank", "Personal Chequing", "TORONTO-DOMINION", "td.com"],
+        # date is rightmost column (x~416), desc is leftmost (x~69)
+        date_x=(408, 470),
+        desc_x=(60, 225),
+        debit_x=(225, 335),
+        credit_x=(335, 410),
+        balance_x=(470, 565),
+    ),
+    BankProfile(
+        name="CIBC Visa",
+        # must come before CIBC Chequing — "CIBC" alone would match chequing profile first
+        detect_patterns=["CIBC Visa", "CIBC Credit Card", "CIBC Dividend"],
+        # transactions on page 2: trans date x=37-50, post date x=79-92 (excluded), desc x=119+, amount x=516
+        date_x=(30, 72),
+        desc_x=(115, 495),
+        amount_x=(495, 560),
     ),
     BankProfile(
         name="CIBC Chequing",
@@ -63,28 +75,31 @@ BANK_PROFILES: list[BankProfile] = [
         balance_x=(530, 610),
     ),
     BankProfile(
-        name="CIBC Visa",
-        detect_patterns=["CIBC Visa", "CIBC Credit Card", "CIBC Dividend"],
-        date_x=(28, 90),
-        desc_x=(90, 380),
-        amount_x=(380, 520),
-    ),
-    BankProfile(
         name="EQ Bank",
         detect_patterns=["EQ Bank", "Equitable Bank", "EQ Personal", "eqbank"],
-        date_x=(20, 95),
-        desc_x=(95, 390),
-        amount_x=(390, 530),
-        needs_year_inference=False,
+        # date x=42-55 ("Jan 9"), desc x=113+, withdrawals x=361, deposits x=448, balance x=522
+        date_x=(35, 105),
+        desc_x=(105, 350),
+        debit_x=(350, 440),
+        credit_x=(440, 515),
+        balance_x=(515, 570),
     ),
     BankProfile(
-        name="RBC",
-        detect_patterns=["Royal Bank", "RBC Royal Bank", "RBC Direct"],
-        date_x=(28, 90),
-        desc_x=(90, 390),
-        debit_x=(390, 465),
-        credit_x=(465, 540),
-        balance_x=(540, 620),
+        name="RBC Visa",
+        # must come before RBC Chequing — "Royal Bank" matches both
+        detect_patterns=["RBC Visa", "RBC Rewards", "RBC Avion", "Visa Platinum", "RBC Credit Card"],
+        date_x=(55, 105),
+        desc_x=(105, 295),
+        amount_x=(295, 390),
+    ),
+    BankProfile(
+        name="RBC Chequing",
+        detect_patterns=["Royal Bank", "RBC Royal Bank", "RBC Direct", "Day-to-Day Banking", "RBC Chequing"],
+        date_x=(28, 72),
+        desc_x=(72, 310),
+        debit_x=(310, 405),
+        credit_x=(405, 520),
+        balance_x=(520, 600),
     ),
     BankProfile(
         name="BMO",
