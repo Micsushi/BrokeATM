@@ -16,6 +16,9 @@ dependencies = [
     "aiofiles>=23.2.1",
     "pydantic>=2.7.0",
     "pydantic-settings>=2.3.0",
+    "pdfplumber>=0.10.0",
+    "ofxtools>=0.9.0",
+    "camelot-py[cv]>=0.11.0",
 ]
 
 [tool.setuptools.packages.find]

@@ -4,7 +4,9 @@
       "Bash(.venv/Scripts/python.exe -c \"from app.main import app; print\\('ok'\\)\")",
       "Bash(.venv/Scripts/python.exe -c ':*)",
       "Bash(.venv/Scripts/python.exe -m alembic revision --autogenerate -m \"add budget_rules table\")",
-      "Bash(python -c \"from app.main import app; print\\([r.path for r in app.routes]\\)\")"
+      "Bash(python -c \"from app.main import app; print\\([r.path for r in app.routes]\\)\")",
+      "Bash(cat requirements.txt)",
+      "Bash(cat pyproject.toml)"
     ]
   }
 }

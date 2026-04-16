@@ -7,14 +7,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.schemas import CommitRequest, CommitResponse, ParseResponse
+from app.core.schemas import CommitRequest, CommitResponse, ParseResponse, ParserResult
 from app.models.models import Category
 from app.services.app_settings import get_default_currency
 from app.services.csv_parser import parse_csv
 from app.services.import_service import check_duplicates, commit_import
 from app.services.keyword_matching import KeywordMatcher
+from app.services.parsers.registry import run_all
 
 router = APIRouter(prefix="/api/import", tags=["import"])
+
+_PDF_OFX_EXTS = {".pdf", ".ofx", ".qfx"}
 
 
 @router.post("/parse", response_model=ParseResponse)
@@ -28,6 +31,24 @@ async def parse_upload(file: UploadFile = File(...), db: Session = Depends(get_d
         default_currency=get_default_currency(db),
         keyword_matcher=keyword_matcher,
     )
+
+
+@router.post("/parse-all", response_model=list[ParserResult])
+async def parse_all_upload(file: UploadFile = File(...), db: Session = Depends(get_db)) -> Any:
+    fname = (file.filename or "").lower()
+    ext = "." + fname.rsplit(".", 1)[-1] if "." in fname else ""
+    if ext not in _PDF_OFX_EXTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Accepted: .pdf, .ofx, .qfx",
+        )
+    content = await file.read()
+    cats = db.query(Category).all()
+    keyword_matcher = KeywordMatcher.from_categories(cats)
+    known_categories = [c.name for c in cats]
+    currency = get_default_currency(db)
+    results = run_all(content, file.filename or "", currency, keyword_matcher, known_categories)
+    return results
 
 
 @router.post("/check-duplicates")

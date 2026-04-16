@@ -691,19 +691,51 @@ function isPdfOrOfx(f) {
 
 async function handlePdfOrOfxFile(file) {
   isPdfMode = true;
-  parserResults = MOCK_PARSER_RESULTS.map(r => ({
-    ...r,
-    rows: r.rows.map(row => ({ ...row, source_file: file.name })),
-  }));
+  importFilename = file.name;
+
+  const fd = new FormData();
+  fd.append("file", file);
+
+  let results;
+  try {
+    const resp = await fetch("/api/import/parse-all", { method: "POST", body: fd });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || resp.statusText);
+    }
+    results = await resp.json();
+  } catch (e) {
+    showAlert(document.getElementById("alerts"), `Parse failed: ${e.message}`, "error");
+    return;
+  }
+
+  parserResults = results;
+
+  if (!parserResults.length) {
+    showAlert(document.getElementById("alerts"), "No parsers returned results.", "error");
+    return;
+  }
+
   const best = parserResults.reduce((a, b) => b.confidence > a.confidence ? b : a);
   selectedParserId = best.parser_id;
-  importFilename = file.name;
+
+  // Detect month/year from first valid row date
+  let detected_month = null, detected_year = null;
+  for (const r of best.rows) {
+    const d = r.transaction_date ? new Date(r.transaction_date) : null;
+    if (d && !isNaN(d)) {
+      detected_month = d.getMonth() + 1;
+      detected_year = d.getFullYear();
+      break;
+    }
+  }
+
   parsedData = {
     format: "pdf",
     rows: best.rows,
     errors: [],
-    detected_month: 1,
-    detected_year: 2025,
+    detected_month,
+    detected_year,
     source_files: [file.name],
     perFilePeriod: {},
   };

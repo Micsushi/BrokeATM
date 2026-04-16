@@ -16,8 +16,13 @@ data/
 *.log
 *.err
 
-# Uploaded CSVs / local test files
+# Uploaded / local test files
 *.csv
+*.pdf
+*.ofx
+*.qfx
+*.xlsx
+*.xls
 uploads/
 
 # Env

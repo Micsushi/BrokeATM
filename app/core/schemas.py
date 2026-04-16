@@ -48,6 +48,17 @@ class ParseResponse(BaseModel):
     col_map: dict[str, str] = Field(default_factory=dict)
 
 
+class ParserResult(BaseModel):
+    parser_id: str
+    parser_label: str
+    confidence: float
+    rows: list[ParsedRow]
+    skipped_rows: int = 0
+    warnings: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    unknown_pdf_categories: list[str] = Field(default_factory=list)
+
+
 class CommitRow(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
