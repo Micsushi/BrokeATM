@@ -26,7 +26,16 @@ MCC_TO_CATEGORY: dict[str, str] = {
     "continuity/subscription": "subscriptions",
 }
 
-PAYMENT_KEYWORDS = ["payment thank you", "payment - thank you", "remboursement"]
+PAYMENT_KEYWORDS = [
+    "payment thank you", "payment - thank you", "remboursement",
+    "e-transfer", "e transfer", "etransfer",
+    "interac e-transfer", "interac transfer",
+    "wire transfer", "wire xfer",
+    "internal transfer", "account transfer",
+    "ach transfer", "eft transfer",
+    "internet transfer", "online transfer",
+    "hh005tfr", "tfr-to", "tfr-from",
+]
 CASHBACK_KEYWORDS = ["cash back", "cash back / remises", "rebate"]
 
 # Starter categories now live in app/data/starter_categories.json.

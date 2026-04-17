@@ -36,6 +36,11 @@ class TestBankSpecificParser:
         assert len(result.rows) >= 5
         assert_valid_rows(result.rows, min_rows=5)
 
+    def test_cibc_visa_uses_continuation_pages(self):
+        result = self.parser.parse(pdf_bytes("cibc_visa_1"), "cibc_visa.pdf", "CAD", None, [])
+        assert len(result.rows) >= 30
+        assert_valid_rows(result.rows, min_rows=30)
+
     def test_rbc_visa(self):
         result = self.parser.parse(pdf_bytes("rbc_visa"), "rbc_visa.pdf", "CAD", None, [])
         assert result.confidence >= 0.85

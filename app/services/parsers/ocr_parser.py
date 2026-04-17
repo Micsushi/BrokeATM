@@ -191,8 +191,14 @@ class OcrParser(BaseParser):
                     errors.append(f"Line {line_idx + 1}: no amount — '{line[:60]}'")
                     continue
             else:
-                amount_str = am.group(1)
-                merchant = rest[: am.start()].strip()
+                pre = rest[: am.start()].rstrip()
+                inner_am = _END_AMOUNT_RE.search(pre)
+                if inner_am:
+                    amount_str = inner_am.group(1)
+                    merchant = pre[: inner_am.start()].strip()
+                else:
+                    amount_str = am.group(1)
+                    merchant = pre.strip()
 
             if not merchant:
                 skipped += 1
@@ -211,6 +217,11 @@ class OcrParser(BaseParser):
                 continue
 
             if re.search(r"\bCR\b", line, re.IGNORECASE):
+                amount_raw = -abs(amount_raw)
+            elif re.search(
+                r"\b(credit\s*memo|direct\s*deposit|refund|reversal)\b",
+                merchant, re.IGNORECASE,
+            ):
                 amount_raw = -abs(amount_raw)
 
             row = build_row(

@@ -1,7 +1,15 @@
+import logging
 import threading
 from pathlib import Path
 
 from fastapi import FastAPI
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 

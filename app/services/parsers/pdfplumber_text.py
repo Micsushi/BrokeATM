@@ -35,6 +35,13 @@ _LINE_DATE_RE = re.compile(
 
 _END_AMOUNT_RE = re.compile(r"[\-\+]?\$?\s*([\d,]+\.\d{2})\s*(?:CR|DB|DR)?\s*$")
 
+# Descriptions that indicate a credit/deposit (amount should be negative in expense view)
+_CREDIT_DESC_RE = re.compile(
+    r"\b(credit\s*memo|direct\s*deposit|e[\-\s]?deposit"
+    r"|payroll\s*deposit|refund|reversal|interest\s*paid|dividend\s*paid)\b",
+    re.IGNORECASE,
+)
+
 
 class PdfplumberTextParser(BaseParser):
     parser_id = "pdfplumber_text"
@@ -114,8 +121,17 @@ class PdfplumberTextParser(BaseParser):
                     errors.append(f"Line {line_idx + 1}: no amount found — '{line[:60]}'")
                     continue
             else:
-                amount_str = am.group(1)
-                merchant = rest[: am.start()].strip()
+                # Check if there's a second (earlier) amount before the last one.
+                # Debit/Credit/Balance format ends with: ... txn_amount  balance
+                # In that case the last number is the running balance — use the one before it.
+                pre = rest[: am.start()].rstrip()
+                inner_am = _END_AMOUNT_RE.search(pre)
+                if inner_am:
+                    amount_str = inner_am.group(1)
+                    merchant = pre[: inner_am.start()].strip()
+                else:
+                    amount_str = am.group(1)
+                    merchant = pre.strip()
 
             if not merchant:
                 skipped += 1
@@ -134,6 +150,8 @@ class PdfplumberTextParser(BaseParser):
                 continue
 
             if re.search(r"\bCR\b", line, re.IGNORECASE):
+                amount_raw = -abs(amount_raw)
+            elif _CREDIT_DESC_RE.search(merchant):
                 amount_raw = -abs(amount_raw)
 
             row = build_row(txn_date, merchant, amount_raw, default_currency, filename, keyword_matcher)

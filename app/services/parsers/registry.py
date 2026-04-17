@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 from app.services.parsers.base import BaseParser, ParseResult
@@ -16,6 +18,8 @@ from app.services.parsers.tesseract_parser import TesseractParser, _check_tesser
 
 if TYPE_CHECKING:
     from app.services.keyword_matching import KeywordMatcher
+
+log = logging.getLogger(__name__)
 
 ALL_PARSERS: list[BaseParser] = [
     PdfplumberCoordsParser(),
@@ -38,14 +42,11 @@ def run_all(
     keyword_matcher: KeywordMatcher | None,
     known_categories: list[str],
 ) -> list[dict[str, Any]]:
+    log.info("run_all: start  file=%r  size=%d bytes", filename, len(content))
+    total_start = time.perf_counter()
     results: list[ParseResult] = []
     for parser in ALL_PARSERS:
-        if parser.can_handle(filename, content):
-            result = parser.parse(
-                content, filename, default_currency, keyword_matcher, known_categories
-            )
-            results.append(result)
-        else:
+        if not parser.can_handle(filename, content):
             results.append(ParseResult(
                 parser_id=parser.parser_id,
                 parser_label=parser.parser_label,
@@ -53,6 +54,48 @@ def run_all(
                 rows=[],
                 warnings=["Not applicable for this file type."],
             ))
+            continue
+
+        t0 = time.perf_counter()
+        try:
+            result = parser.parse(
+                content, filename, default_currency, keyword_matcher, known_categories
+            )
+        except Exception as exc:
+            elapsed = time.perf_counter() - t0
+            log.error(
+                "run_all: UNHANDLED EXCEPTION  parser=%s  file=%r  elapsed=%.2fs  error=%s",
+                parser.parser_id, filename, elapsed, exc, exc_info=True,
+            )
+            result = ParseResult(
+                parser_id=parser.parser_id,
+                parser_label=parser.parser_label,
+                confidence=0.0,
+                rows=[],
+                errors=[f"Unhandled exception: {exc}"],
+            )
+        else:
+            elapsed = time.perf_counter() - t0
+            row_count = len(result.rows)
+            status = "OK" if row_count > 0 else "ZERO_ROWS"
+            if result.errors:
+                log.warning(
+                    "run_all: %s  parser=%s  file=%r  rows=%d  elapsed=%.2fs  errors=%s",
+                    status, parser.parser_id, filename, row_count, elapsed, result.errors,
+                )
+            else:
+                log.info(
+                    "run_all: %s  parser=%s  file=%r  rows=%d  elapsed=%.2fs",
+                    status, parser.parser_id, filename, row_count, elapsed,
+                )
+        results.append(result)
+
+    total_elapsed = time.perf_counter() - total_start
+    max_rows = max((len(r.rows) for r in results), default=0)
+    log.info(
+        "run_all: done  file=%r  max_rows=%d  total_elapsed=%.2fs",
+        filename, max_rows, total_elapsed,
+    )
     return [_result_to_dict(r) for r in results]
 
 

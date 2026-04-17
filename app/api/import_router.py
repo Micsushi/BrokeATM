@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import functools
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -47,7 +49,11 @@ async def parse_all_upload(file: UploadFile = File(...), db: Session = Depends(g
     keyword_matcher = KeywordMatcher.from_categories(cats)
     known_categories = [c.name for c in cats]
     currency = get_default_currency(db)
-    results = run_all(content, file.filename or "", currency, keyword_matcher, known_categories)
+    loop = asyncio.get_event_loop()
+    results = await loop.run_in_executor(
+        None,
+        functools.partial(run_all, content, file.filename or "", currency, keyword_matcher, known_categories),
+    )
     return results
 
 
