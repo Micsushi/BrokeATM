@@ -24,6 +24,7 @@ def save_budget(payload: BudgetSave, db: Session = Depends(get_db)):
             db,
             total=payload.total,
             rules=[r.model_dump() for r in payload.rules],
+            hidden_category_keys=payload.hidden_category_keys,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -727,10 +727,7 @@ function renderStepIndicators(visibleStep) {
     const stepEl = document.querySelector(`.step[data-step="${step}"]`)
     if (!stepEl) return
     stepEl.classList.remove("active", "done")
-    if (step === visibleStep) {
-      stepEl.classList.add("active")
-      if (visibleStep === 5) stepEl.classList.add("done")
-    }
+    if (step === visibleStep) stepEl.classList.add("active")
     else if (step < visibleStep) stepEl.classList.add("done")
   })
 }
@@ -777,50 +774,33 @@ function stageToolbarMeta() {
       }
     }
     if (doc.isPdfMode) {
-      const result = getParserResultForDoc(doc)
       return {
-        title: `Review parser output for ${doc.filename}`,
-        detail: result
-          ? `${formatParserSummary(result)} · ${result.parser_label}`
-          : "Compare the parser results, then move the whole batch forward.",
+        title: "Parser review",
+        detail: doc.filename,
       }
     }
-    const rows = ((doc.parsedData && doc.parsedData.rows) || [])
     return {
-      title: `Preview ${doc.filename}`,
-      detail: `${rows.length} row${rows.length !== 1 ? "s" : ""} parsed. CSV files do not need a parser choice.`,
+      title: "CSV preview",
+      detail: doc.filename,
     }
   }
 
   if (currentStep === 3) {
     const readyDocs = getReadyDocs()
-    const summary = document.getElementById("parse-summary")
     return {
-      title: `Confirm file periods for ${readyDocs.length} ready file${readyDocs.length !== 1 ? "s" : ""}`,
-      detail: (summary && summary.textContent) || "Month and year are saved per file in this batch.",
+      title: "Confirm file periods",
+      detail: readyDocs.length === 1
+        ? readyDocs[0].filename
+        : `${readyDocs.length} ready file${readyDocs.length !== 1 ? "s" : ""} in this batch`,
     }
   }
 
   if (currentStep === 4) {
-    const duplicateCount = reviewRows.filter((row) => row.duplicate).length
-    const duplicateExcluded = reviewRows.filter((row) => row.duplicate && row.exclude).length
-    const duplicateIncluded = reviewRows.filter((row) => row.duplicate && !row.exclude).length
-    const duplicateInUpload = reviewRows.filter((row) => row.duplicate && row.duplicate_in_import).length
-    const duplicateInDbOnly = reviewRows.filter((row) => row.duplicate && row.duplicate_in_database && !row.duplicate_in_import).length
-    const paymentCount = reviewRows.filter((row) => row.is_payment).length
-    const keywordCount = reviewRows.filter((row) => row.keyword_resolution_needed).length
-    const parts = []
-    if (duplicateCount) {
-      let dupText = `${duplicateExcluded} duplicates off`
-      if (duplicateIncluded) dupText += `, ${duplicateIncluded} kept`
-      if (duplicateInUpload || duplicateInDbOnly) dupText += ` (${duplicateInUpload} upload, ${duplicateInDbOnly} database)`
-      parts.push(dupText)
-    }
-    if (paymentCount) parts.push(`${paymentCount} payments`)
-    if (keywordCount) parts.push(`${keywordCount} conflicts`)
     return {
-      title: `${reviewRows.length} rows from ${importFilename || "this file"}`,
-      detail: parts.join(" · ") || "Review the rows below, then import the ones you want to keep.",
+      title: "Review rows",
+      detail: importFilename
+        ? `${importFilename} · ${reviewRows.length} row${reviewRows.length !== 1 ? "s" : ""}`
+        : `${reviewRows.length} row${reviewRows.length !== 1 ? "s" : ""}`,
     }
   }
 
@@ -838,18 +818,18 @@ function renderStageToolbar() {
   if (!toolbar || !titleEl || !detailEl || !backBtn || !selectAllBtn || !deselectAllBtn || !selectedCountEl) return
 
   const visible = currentStep >= 2 && currentStep <= 4 && (!!getActiveDoc() || !!importDocs.length)
+  const reviewControlsVisible = visible && currentStep === 4
   toolbar.classList.toggle("hidden", !visible)
+  selectAllBtn.classList.toggle("hidden", !reviewControlsVisible)
+  deselectAllBtn.classList.toggle("hidden", !reviewControlsVisible)
+  selectedCountEl.classList.toggle("hidden", !reviewControlsVisible)
   if (!visible) return
 
   const meta = stageToolbarMeta()
   titleEl.textContent = meta.title
   detailEl.textContent = meta.detail
+  detailEl.classList.toggle("hidden", !meta.detail)
   backBtn.dataset.step = String(previousStepFor(currentStep))
-
-  const reviewControlsVisible = currentStep === 4
-  selectAllBtn.classList.toggle("hidden", !reviewControlsVisible)
-  deselectAllBtn.classList.toggle("hidden", !reviewControlsVisible)
-  selectedCountEl.classList.toggle("hidden", !reviewControlsVisible)
 }
 
 function applyButtonState(button, state) {
@@ -874,7 +854,7 @@ function queueStatusText(doc) {
   if (doc.status === "processing") return "Processing"
   if (doc.status === "queued") return "Queued"
   if (doc.status === "error") return "Needs attention"
-  if (currentStep === 2) return doc.isPdfMode ? "Choose parser" : "CSV ready"
+  if (currentStep === 2) return "Ready"
   if (currentStep === 3) return "Confirm period"
   if (currentStep === 4) return doc.reviewReady ? "Ready to import" : "Needs review"
   return "Ready"
@@ -920,7 +900,7 @@ function renderImportQueue() {
       <span class="import-doc-name" title="${escHtml(doc.filename)}">${escHtml(doc.filename)}</span>
       <span class="import-doc-meta">
         <span class="import-doc-status ${statusClass}">${escHtml(statusText)}</span>
-        ${rowCount ? `<span>${rowCount} row${rowCount !== 1 ? "s" : ""}</span>` : ""}
+        ${rowCount ? `<span class="import-doc-count">${rowCount} row${rowCount !== 1 ? "s" : ""}</span>` : ""}
       </span>
     `
     openBtn.addEventListener("click", () => {
@@ -1009,28 +989,6 @@ function renderProcessingPanel() {
   if (removeBtn) removeBtn.addEventListener("click", () => removeImportDoc(doc.id))
 }
 
-function updateParseSummary() {
-  const summary = document.getElementById("parse-summary")
-  const doc = getActiveDoc()
-  if (!summary || !doc) return
-
-  if (doc.isPdfMode) {
-    const result = getParserResultForDoc(doc)
-    summary.textContent = result
-      ? `${formatParserSummary(result)} from ${doc.filename} · parser: ${result.parser_label}`
-      : `No rows found from ${doc.filename}`
-    return
-  }
-
-  const rows = doc.reviewRows.length ? doc.reviewRows : (((doc.parsedData && doc.parsedData.rows) || []))
-  const payments = rows.filter((row) => row.is_payment).length
-  const warnings = (((doc.parsedData && doc.parsedData.errors) || [])).length
-  const parts = [`${rows.length} row${rows.length !== 1 ? "s" : ""} found from ${doc.filename}`]
-  if (payments) parts.push(`${payments} payment entr${payments === 1 ? "y" : "ies"}`)
-  if (warnings) parts.push(`${warnings} parse warning${warnings === 1 ? "" : "s"}`)
-  summary.textContent = parts.join(" · ")
-}
-
 function renderStepPanels() {
   let visibleStep = currentStep
   if (visibleStep !== 5 && !getActiveDoc()) visibleStep = 1
@@ -1062,7 +1020,6 @@ function renderStepPanels() {
 
   if (visibleStep === 3) {
     renderFilePeriodPickers()
-    updateParseSummary()
   }
   if (visibleStep === 4) {
     renderReviewTable()
@@ -1554,6 +1511,25 @@ function renderReviewUnknownCatsBanner() {
   banner.classList.remove("hidden")
 }
 
+function reviewCategoryLabel(row) {
+  return row.category_name || row.suggested_category || "Choose category"
+}
+
+function reviewCategoryButtonHtml(row, idx, tabIndex) {
+  return `
+    <button
+      type="button"
+      class="review-inp category-picker-trigger cat-pick-btn"
+      data-idx="${idx}"
+      tabindex="${tabIndex}"
+      title="Choose category"
+    >
+      <span class="category-picker-trigger-label">${escHtml(reviewCategoryLabel(row))}</span>
+      <span class="category-picker-trigger-caret" aria-hidden="true">▾</span>
+    </button>
+  `
+}
+
 function renderReviewTable(previewMode = false) {
   const tbodyId = previewMode ? "parser-preview-tbody" : "review-tbody"
   const tbody = document.getElementById(tbodyId)
@@ -1630,11 +1606,6 @@ function renderReviewTable(previewMode = false) {
       `<option value="${type}" ${row.transaction_type === type ? "selected" : ""}>${type.charAt(0).toUpperCase() + type.slice(1)}</option>`
     ).join("")
 
-    const suggestedCategory = row.category_name || row.suggested_category || ""
-    const categoryOptions = `<option value="">-- none --</option>` + categories.map((category) =>
-      `<option value="${escHtml(category.name)}" ${category.name === suggestedCategory ? "selected" : ""}>${escHtml(category.name)}</option>`
-    ).join("")
-
     const tabIndex = {
       chk: tabIdx++,
       date: tabIdx++,
@@ -1687,7 +1658,7 @@ function renderReviewTable(previewMode = false) {
         <select class="review-inp type-sel${missingType ? " required-missing" : ""}" data-idx="${i}" tabindex="${tabIndex.type}">${typeOptions}</select>
       </td>
       <td>
-        <select class="review-inp cat-sel" data-idx="${i}" tabindex="${tabIndex.cat}">${categoryOptions}</select>
+        ${reviewCategoryButtonHtml(row, i, tabIndex.cat)}
       </td>
       <td>
         <input type="text" class="review-inp notes-inp" data-idx="${i}"
@@ -1841,7 +1812,6 @@ function refreshParserPanel() {
   if (!isPdfMode) {
     reviewRows = (((parsedData && parsedData.rows) || [])).map((row) => ({ ...row, source_file: importFilename, exclude: !!row.exclude }))
     refreshKeywordStateForRows(reviewRows)
-    updateParseSummary()
     renderParserWarnings()
     renderParserPreviewTable()
     renderUnknownCatsBannerStep2()
@@ -1851,7 +1821,6 @@ function refreshParserPanel() {
   if (result) {
     reviewRows = result.rows.map((row) => ({ ...row, source_file: importFilename, exclude: !!row.exclude }))
     refreshKeywordStateForRows(reviewRows)
-    updateParseSummary()
   }
   renderParserWarnings()
   renderParserPreviewTable()
@@ -2013,10 +1982,9 @@ function attachReviewListeners() {
       markDraftDirty()
     })
   })
-  document.querySelectorAll(".cat-sel").forEach((select) => {
-    select.addEventListener("change", () => {
-      reviewRows[+select.dataset.idx].category_name = select.value
-      markDraftDirty()
+  document.querySelectorAll(".cat-pick-btn").forEach((button) => {
+    button.addEventListener("click", () => {
+      void openImportReviewCategoryPicker(+button.dataset.idx)
     })
   })
   document.querySelectorAll(".kw-review-btn").forEach((button) => {
@@ -2028,6 +1996,31 @@ function attachReviewListeners() {
       markDraftDirty()
     })
   })
+}
+
+async function openImportReviewCategoryPicker(idx) {
+  const row = reviewRows[idx]
+  if (!row) return
+  const picked = await openCategoryPickerModal({
+    title: "Set category",
+    subtitle: `Search categories for row ${idx + 1}.`,
+    searchPlaceholder: "Search categories...",
+    selectedValue: row.category_name || row.suggested_category || "",
+    actionLabel: "Use",
+    items: categories.map((category) => ({
+      id: category.id,
+      value: category.name,
+      name: category.name,
+      color: category.color || "",
+    })),
+    emptyMessage: "No categories available yet.",
+    noResultsMessage: (query) => `No categories match "${query}".`,
+  })
+  if (!picked) return
+  row.category_name = picked.name
+  const label = document.querySelector(`.cat-pick-btn[data-idx="${idx}"] .category-picker-trigger-label`)
+  if (label) label.textContent = reviewCategoryLabel(row)
+  markDraftDirty()
 }
 
 async function reviewKeywordConflict(idx) {
@@ -2188,12 +2181,8 @@ function syncReviewMasterCheckbox() {
 }
 
 function updateSelectedCount() {
-  const duplicateCount = reviewRows.filter((row) => row.duplicate).length
-  const duplicatesOff = reviewRows.filter((row) => row.duplicate && row.exclude).length
   const selected = reviewRows.filter((row) => !row.exclude).length
-  const text = duplicateCount > 0
-    ? `${selected} of ${reviewRows.length} selected · ${duplicatesOff} duplicates off`
-    : `${selected} of ${reviewRows.length} selected`
+  const text = `${selected} of ${reviewRows.length} selected`
   document.querySelectorAll(".review-selected-count").forEach((el) => {
     el.textContent = text
   })

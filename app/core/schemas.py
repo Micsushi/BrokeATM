@@ -272,11 +272,13 @@ class BudgetCategoryRule(BaseModel):
 
 class BudgetSave(BaseModel):
     total: float | None = None
-    rules: list[BudgetCategoryRule] = []
+    rules: list[BudgetCategoryRule] = Field(default_factory=list)
+    hidden_category_keys: list[str] = Field(default_factory=list)
 
 
 class BudgetCategoryAvg(BaseModel):
     category_id: int | None
+    category_key: str
     category_name: str
     category_color: str | None = None
     avg_monthly: float
@@ -290,6 +292,7 @@ class BudgetSettingsOut(BaseModel):
     total: float | None
     avg_months: int
     categories: list[BudgetCategoryAvg]
+    hidden_category_keys: list[str] = Field(default_factory=list)
 
 
 class BudgetMonthItem(BaseModel):

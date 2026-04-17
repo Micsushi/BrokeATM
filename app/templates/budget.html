@@ -6,20 +6,45 @@
   <title>Budget | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=16" />
+  <link rel="stylesheet" href="/static/css/main.css?v=18" />
   <style>
     /* Category budget table */
+    .budget-page {
+      --budget-panel-pad: 1.35rem;
+      --budget-cell-pad-x: 1rem;
+      --budget-metric-col-width: 14%;
+      --budget-limit-col-width: clamp(220px, 30%, 340px);
+      --budget-limit-input-width: calc(var(--budget-limit-col-width) - (var(--budget-cell-pad-x) * 2));
+      --budget-column-divider: rgba(255,255,255,0.06);
+    }
+    .budget-page-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .budget-header-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.85rem 1.15rem;
+      flex-wrap: wrap;
+    }
+    .budget-header-meta p {
+      margin: 0;
+      flex: 1 1 340px;
+    }
     .budget-page .bulk-bar {
       gap: 0.75rem;
-      padding: 0.72rem 0.9rem;
+      padding: 0.82rem var(--budget-panel-pad);
       margin-bottom: 0.85rem;
     }
     .budget-page .bulk-count { font-size: var(--font-size-body); }
     .budget-hint-bar {
+      align-items: center;
       justify-content: flex-end;
       gap: 0.5rem;
       flex-wrap: wrap;
-      margin-bottom: 0.65rem;
+      margin-bottom: 0;
     }
     .budget-hint-chip {
       margin: 0;
@@ -27,24 +52,68 @@
       font-size: var(--font-size-caption);
       border-radius: 8px;
     }
-    .budget-table { width: 100%; border-collapse: collapse; }
+    .budget-table-card {
+      margin-bottom: 1.05rem;
+      padding: 1.05rem var(--budget-panel-pad) 0.95rem;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .budget-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      table-layout: fixed;
+    }
+    .budget-table col.chk-col { width: 42px; }
+    .budget-table col.metric-col { width: var(--budget-metric-col-width); }
+    .budget-table col.limit-col { width: var(--budget-limit-col-width); }
     .budget-table th {
       font-size: var(--font-size-table-head); font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.06em; color: var(--text-muted);
-      padding: 0 0.75rem 0.7rem; text-align: left;
+      padding: 0.45rem var(--budget-cell-pad-x) 0.9rem;
+      text-align: left;
+      vertical-align: bottom;
+      position: relative;
+      border-bottom: 1px solid var(--border);
     }
-    .budget-table th.right { text-align: right; }
     .budget-table td {
-      padding: 0.62rem 0.75rem;
+      padding: 0.82rem var(--budget-cell-pad-x);
       vertical-align: middle;
       border-top: 1px solid rgba(255,255,255,0.04);
       font-size: var(--font-size-table-cell);
+      position: relative;
     }
     .budget-table tr:first-child td { border-top: none; }
+    .budget-table th + th::before,
+    .budget-table td + td::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.7rem;
+      bottom: 0.7rem;
+      width: 1px;
+      background: var(--budget-column-divider);
+      pointer-events: none;
+    }
+    .budget-table th.num-col,
+    .budget-table td.num-col,
+    .budget-table th.limit-col,
+    .budget-table td.limit-col {
+      text-align: right;
+    }
+    .budget-table th.limit-col,
+    .budget-table td.limit-col {
+      background: linear-gradient(180deg, rgba(124,130,255,0.08), rgba(124,130,255,0.02));
+    }
     .cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.4rem; flex-shrink: 0; }
     .budget-avg { font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-body-sm); color: var(--text-muted); }
     .limit-input {
-      width: 112px; background: var(--surface2); border: 1px solid var(--border);
+      display: block;
+      width: var(--budget-limit-input-width);
+      max-width: 100%;
+      min-width: 0;
+      margin-left: auto;
+      background: var(--surface2); border: 1px solid var(--border);
       border-radius: 8px; color: var(--text); font-size: var(--control-font-sm);
       min-height: var(--control-height-sm);
       padding: var(--control-pad-sm-y) var(--control-pad-sm-x); text-align: right;
@@ -65,42 +134,117 @@
     .save-status {
       font-size: var(--font-size-caption);
       color: var(--text-muted);
-      min-height: 1.1em;
-      min-width: 70px;
+      min-height: 0;
+      min-width: 0;
       transition: color 0.3s;
-      display: inline-flex;
+      display: none;
       align-items: center;
+      justify-content: flex-end;
+      text-align: right;
+      white-space: nowrap;
+      flex: 0 0 auto;
     }
+    .save-status:not(:empty) { display: inline-flex; }
     .save-status.saving { color: var(--text-muted); }
     .save-status.saved { color: #22c55e; }
     .save-status.error { color: var(--danger); }
 
     .budget-table tbody tr { position: relative; }
     .budget-table tbody tr.selected td { background: rgba(99,102,241,0.07); }
-    .cat-name-cell { display: flex; align-items: center; gap: 0.35rem; font-size: var(--font-size-body); font-weight: 600; }
+    .cat-name-cell { display: flex; align-items: center; gap: 0.35rem; min-width: 0; font-size: var(--font-size-body); font-weight: 600; }
     .cat-name-cell .cat-dot { margin-right: 0; }
-    .budget-row-chk { cursor: pointer; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
-    .budget-table th.chk-col, .budget-table td.chk-col { width: 28px; padding-right: 0; text-align: center; }
-    .add-cat-wrap { position: relative; display: inline-block; }
+    .budget-chk-wrap { display: flex; align-items: center; justify-content: center; min-height: 100%; }
+    .budget-row-chk {
+      cursor: pointer;
+      accent-color: var(--accent);
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      display: block;
+      margin: 0 auto;
+    }
+    .budget-table th.chk-col,
+    .budget-table td.chk-col {
+      width: 42px;
+      padding-left: 0;
+      padding-right: 0.8rem;
+      text-align: center;
+    }
+    .add-cat-wrap { display: inline-flex; }
+    .add-cat-btn {
+      min-width: 42px;
+      padding-inline: 0;
+      justify-content: center;
+      font-size: 1.35rem;
+      line-height: 1;
+      font-weight: 700;
+    }
     .budget-spacer { flex: 1; }
-    .budget-total-wrap { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; flex-wrap: wrap; }
-    .budget-total-label { font-size: var(--font-size-caption); color: var(--text-muted); white-space: nowrap; }
-    .budget-table-card { margin-bottom: 1.05rem; }
-    .cat-dropdown {
-      position: absolute; top: calc(100% + 4px); left: 0;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; min-width: 200px; max-height: 260px;
-      overflow-y: auto; z-index: 100;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    .budget-total-shell {
+      flex: 0 0 auto;
+      width: auto;
+      margin-left: auto;
+      padding-left: 1rem;
+      padding-right: var(--budget-cell-pad-x);
+      border-left: 1px solid var(--budget-column-divider);
     }
-    .cat-dropdown.hidden { display: none; }
-    .cat-dropdown-item {
-      display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.6rem 0.85rem; cursor: pointer; font-size: var(--font-size-body-sm);
-      transition: background 0.1s;
+    .budget-total-wrap {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      justify-content: flex-end;
+      width: auto;
     }
-    .cat-dropdown-item:hover { background: rgba(255,255,255,0.06); }
-    .cat-dropdown-empty { padding: 0.85rem; font-size: var(--font-size-caption); color: var(--text-muted); text-align: center; }
+    .budget-total-label {
+      font-size: var(--font-size-table-head);
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
+    .budget-total-field {
+      display: flex;
+      flex: 0 0 auto;
+      width: var(--budget-limit-input-width);
+      min-width: var(--budget-limit-input-width);
+    }
+    .total-budget-input {
+      width: 100%;
+      min-width: 0;
+    }
+
+    @media (max-width: 900px) {
+      .budget-total-shell {
+        flex-basis: 100%;
+        width: 100%;
+        padding-left: 0;
+        padding-right: 0;
+        padding-top: 0.7rem;
+        border-left: none;
+        border-top: 1px solid var(--budget-column-divider);
+      }
+    }
+
+    @media (max-width: 640px) {
+      .budget-table {
+        min-width: 760px;
+      }
+      .budget-hint-bar {
+        width: 100%;
+        justify-content: flex-start;
+      }
+      .budget-total-wrap {
+        flex-wrap: wrap;
+        width: 100%;
+      }
+      .budget-total-field {
+        flex: 1 1 100%;
+        width: 100%;
+        min-width: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -117,20 +261,18 @@
 </nav>
 
 <div class="page budget-page">
-  <div class="page-header">
-    <div>
-      <h1>Budget</h1>
+  <div class="page-header budget-page-header">
+    <h1>Budget</h1>
+    <div class="budget-header-meta">
       <p>Set spending limits per category and track your progress</p>
+      <div id="budget-hint-bar" class="budget-hint-bar" style="display:none">
+        <div id="others-hint" class="alert alert-warning budget-hint-chip"></div>
+        <div id="validation-hint" class="alert alert-error budget-hint-chip" style="display:none"></div>
+      </div>
     </div>
   </div>
 
   <div id="alerts"></div>
-
-  <!-- Unallocated / validation hint -->
-  <div id="budget-hint-bar" class="budget-hint-bar" style="display:none">
-    <div id="others-hint" class="alert alert-warning budget-hint-chip"></div>
-    <div id="validation-hint" class="alert alert-error budget-hint-chip" style="display:none"></div>
-  </div>
 
   <!-- Bulk action bar (always visible) -->
   <div class="bulk-bar" id="budget-bulk-bar">
@@ -139,29 +281,40 @@
     <button class="btn btn-ghost btn-sm" id="btn-budget-deselect">Clear All</button>
     <div class="bulk-divider"></div>
     <div class="add-cat-wrap">
-      <button class="btn btn-ghost btn-sm" id="btn-add-cat">+ Add category</button>
-      <div class="cat-dropdown hidden" id="cat-dropdown"></div>
+      <button class="btn btn-ghost btn-sm add-cat-btn" id="btn-add-cat" aria-label="Add category" title="Add category">+</button>
     </div>
     <button class="btn btn-danger btn-sm" id="btn-budget-bulk-delete" disabled>Delete selected</button>
     <div class="budget-spacer"></div>
-    <div class="budget-total-wrap">
-      <span class="budget-total-label">Total budget</span>
-      <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="—" />
-      <div class="save-status" id="save-status"></div>
+    <div class="budget-total-shell">
+      <div class="budget-total-wrap">
+        <span class="budget-total-label">Total budget</span>
+        <div class="save-status" id="save-status"></div>
+        <div class="budget-total-field">
+          <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="—" />
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- ── Category limits table ─────────────────────────────────────── -->
   <div class="card budget-table-card">
     <table class="budget-table" id="budget-table">
+      <colgroup>
+        <col class="chk-col" />
+        <col class="category-col" />
+        <col class="metric-col" />
+        <col class="metric-col" />
+        <col class="metric-col" />
+        <col class="limit-col" />
+      </colgroup>
       <thead>
         <tr>
           <th class="chk-col"></th>
-          <th>Category</th>
-          <th class="right">6 mo avg</th>
-          <th class="right">3 mo avg</th>
-          <th class="right">Last mo</th>
-          <th class="right">Limit</th>
+          <th class="category-col">Category</th>
+          <th class="num-col">6 mo avg</th>
+          <th class="num-col">3 mo avg</th>
+          <th class="num-col">Last mo</th>
+          <th class="limit-col">Limit</th>
         </tr>
       </thead>
       <tbody id="budget-tbody">
@@ -174,9 +327,11 @@
 
 <script src="/static/js/utils.js?v=9"></script>
 <script src="/static/js/api.js?v=8"></script>
+<script src="/static/js/category-picker-modal.js?v=1"></script>
 <script>
 let currentSettings = null;
 let saveTimer = null;
+let hiddenCategoryKeys = new Set();
 
 // ── Auto-save (debounced 800ms) ────────────────────────────────────────────────
 
@@ -207,6 +362,7 @@ async function doSave() {
       body: JSON.stringify({
         total: isNaN(totalVal) ? null : totalVal,
         rules: limits,
+        hidden_category_keys: getHiddenCategoryKeys(),
       }),
     });
     if (!r.ok) throw new Error(await r.text());
@@ -239,21 +395,38 @@ function fmtAvg(val) {
   return `<span class="budget-avg">${fmtCurrency(val, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>`;
 }
 
+function budgetCategoryKey(catId) {
+  return catId == null || catId === "" ? "uncategorized" : `cat:${catId}`;
+}
+
+function getVisibleCategoryKeys() {
+  return new Set(
+    [...document.querySelectorAll("#budget-tbody tr[data-cat-key]")]
+      .map(tr => tr.dataset.catKey)
+      .filter(Boolean)
+  );
+}
+
+function getHiddenCategoryKeys() {
+  const visible = getVisibleCategoryKeys();
+  return [...hiddenCategoryKeys].filter(key => key && !visible.has(key));
+}
+
 // ── Bulk selection ────────────────────────────────────────────────────────────
 
-let selectedCatIds = new Set();
+let selectedCatKeys = new Set();
 
 function updateBulkBar() {
-  const n = selectedCatIds.size;
+  const n = selectedCatKeys.size;
   document.getElementById("budget-bulk-count").textContent = `${n} selected`;
   document.getElementById("btn-budget-bulk-delete").disabled = n === 0;
 }
 
 function toggleRowSelect(tr, checked) {
-  const id = tr.dataset.catId;
-  if (!id) return;
-  if (checked) { selectedCatIds.add(id); tr.classList.add("selected"); }
-  else { selectedCatIds.delete(id); tr.classList.remove("selected"); }
+  const key = tr.dataset.catKey;
+  if (!key) return;
+  if (checked) { selectedCatKeys.add(key); tr.classList.add("selected"); }
+  else { selectedCatKeys.delete(key); tr.classList.remove("selected"); }
   updateBulkBar();
 }
 
@@ -262,14 +435,16 @@ function buildCatRow(catId, catName, catColor, avg6, avg3, avg1, limitVal) {
     ? `<span class="cat-dot" style="background:${escHtml(catColor)}"></span>`
     : `<span class="cat-dot" style="background:var(--border)"></span>`;
   const tr = document.createElement("tr");
+  const catKey = budgetCategoryKey(catId);
   tr.dataset.catId = catId ?? "";
+  tr.dataset.catKey = catKey;
   tr.innerHTML = `
-    <td class="chk-col"><input type="checkbox" class="budget-row-chk" /></td>
-    <td><div class="cat-name-cell">${dot}${escHtml(catName)}</div></td>
-    <td style="text-align:right">${fmtAvg(avg6)}</td>
-    <td style="text-align:right">${fmtAvg(avg3)}</td>
-    <td style="text-align:right">${fmtAvg(avg1)}</td>
-    <td style="text-align:right">
+    <td class="chk-col"><div class="budget-chk-wrap"><input type="checkbox" class="budget-row-chk" /></div></td>
+    <td class="category-col"><div class="cat-name-cell">${dot}${escHtml(catName)}</div></td>
+    <td class="num-col">${fmtAvg(avg6)}</td>
+    <td class="num-col">${fmtAvg(avg3)}</td>
+    <td class="num-col">${fmtAvg(avg1)}</td>
+    <td class="limit-col">
       <input type="number" class="limit-input" data-cat-id="${catId ?? ""}"
         min="0" step="1" placeholder="—" value="${limitVal}" />
     </td>`;
@@ -283,11 +458,14 @@ function wireRow(tr) {
 }
 
 function renderBudgetTable(data) {
-  selectedCatIds.clear();
+  selectedCatKeys.clear();
+  hiddenCategoryKeys = new Set(data.hidden_category_keys || []);
   const tbody = document.getElementById("budget-tbody");
   tbody.innerHTML = "";
 
-  data.categories.forEach(c => {
+  data.categories
+    .filter(c => !hiddenCategoryKeys.has(c.category_key || budgetCategoryKey(c.category_id)))
+    .forEach(c => {
     const avg6 = c.avg_6m ?? c.avg_monthly ?? 0;
     const avg3 = c.avg_3m ?? 0;
     const avg1 = c.avg_1m ?? 0;
@@ -296,7 +474,7 @@ function renderBudgetTable(data) {
   });
 
   const totalEl = document.getElementById("total-budget");
-  if (data.total != null) totalEl.value = data.total;
+  totalEl.value = data.total != null ? data.total : "";
   updateBulkBar();
 }
 
@@ -341,7 +519,7 @@ function updateTotalHint() {
   }
 }
 
-// ── Add category dropdown ─────────────────────────────────────────────────────
+// ── Add category picker ───────────────────────────────────────────────────────
 
 let allCategories = [];
 
@@ -359,59 +537,97 @@ function getExistingCatIds() {
   );
 }
 
-async function openAddCatDropdown() {
-  const dropdown = document.getElementById("cat-dropdown");
-  if (!dropdown.classList.contains("hidden")) {
-    dropdown.classList.add("hidden");
-    return;
-  }
+function getCurrentCategoryMetaMap() {
+  return new Map(
+    (currentSettings?.categories || []).map(cat => [
+      cat.category_key || budgetCategoryKey(cat.category_id),
+      cat,
+    ])
+  );
+}
+
+async function getAvailableBudgetCategories() {
   await loadAllCategories();
   const existing = getExistingCatIds();
-  const missing = allCategories.filter(c => !existing.has(c.id));
-  if (missing.length === 0) {
-    dropdown.innerHTML = `<div class="cat-dropdown-empty">All categories added</div>`;
-  } else {
-    dropdown.innerHTML = missing.map(c => {
-      const dot = c.color
-        ? `<span class="cat-dot" style="background:${escHtml(c.color)}"></span>`
-        : `<span class="cat-dot" style="background:var(--border)"></span>`;
-      return `<div class="cat-dropdown-item" data-cat-id="${c.id}" data-cat-name="${escHtml(c.name)}" data-cat-color="${escHtml(c.color || '')}">
-        ${dot}${escHtml(c.name)}
-      </div>`;
-    }).join("");
-    dropdown.querySelectorAll(".cat-dropdown-item").forEach(el => {
-      el.addEventListener("click", () => {
-        addCategoryRow(parseInt(el.dataset.catId), el.dataset.catName, el.dataset.catColor || null);
-        dropdown.classList.add("hidden");
-      });
+  const existingKeys = getVisibleCategoryKeys();
+  const metaMap = getCurrentCategoryMetaMap();
+  const missing = allCategories
+    .filter(c => !existing.has(c.id))
+    .map(c => {
+      const category_key = budgetCategoryKey(c.id);
+      const meta = metaMap.get(category_key);
+      return {
+        ...c,
+        category_key,
+        avg_6m: meta?.avg_6m ?? meta?.avg_monthly ?? 0,
+      };
+    });
+  const uncategorizedMeta = currentSettings?.categories?.find(c => c.category_id == null);
+  if (uncategorizedMeta && !existingKeys.has("uncategorized")) {
+    missing.push({
+      id: "",
+      name: uncategorizedMeta.category_name || "Uncategorized",
+      color: uncategorizedMeta.category_color || "",
+      category_key: "uncategorized",
+      avg_6m: uncategorizedMeta.avg_6m ?? uncategorizedMeta.avg_monthly ?? 0,
     });
   }
-  dropdown.classList.remove("hidden");
+  return missing.sort((a, b) => {
+    const avgDiff = (b.avg_6m || 0) - (a.avg_6m || 0);
+    if (avgDiff !== 0) return avgDiff;
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  });
+}
+
+async function openCategoryPicker() {
+  const items = (await getAvailableBudgetCategories()).map((item) => ({
+    id: item.category_key === "uncategorized" ? null : item.id,
+    value: item.category_key,
+    key: item.category_key,
+    name: item.name,
+    color: item.color || "",
+    description: Number(item.avg_6m || 0) > 0
+      ? `6 mo avg ${fmtCurrency(item.avg_6m, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+      : "No recent spending",
+    actionText: "Add",
+  }));
+  return openCategoryPickerModal({
+    title: "Add category",
+    subtitle: "Search categories and add them back into this budget table.",
+    searchPlaceholder: "Search categories...",
+    items,
+    actionLabel: "Add",
+    emptyMessage: "All categories are already in this budget.",
+    noResultsMessage: (query) => `No categories match "${query}".`,
+  });
 }
 
 function addCategoryRow(catId, catName, catColor) {
   const tbody = document.getElementById("budget-tbody");
   // Look up avgs from already-loaded settings (categories with spending but no budget rule)
-  const existing = currentSettings?.categories?.find(c => c.category_id === catId);
+  const existing = currentSettings?.categories?.find(c => (
+    (catId == null && c.category_id == null) || c.category_id === catId
+  ));
   const avg6 = existing?.avg_6m ?? 0;
   const avg3 = existing?.avg_3m ?? 0;
   const avg1 = existing?.avg_1m ?? 0;
+  hiddenCategoryKeys.delete(budgetCategoryKey(catId));
   const tr = buildCatRow(catId, catName, catColor, avg6, avg3, avg1, "");
   tbody.appendChild(tr);
+  updateTotalHint();
+  scheduleSave();
   tr.querySelector(".limit-input").focus();
 }
 
-document.getElementById("btn-add-cat").addEventListener("click", (e) => {
+document.getElementById("btn-add-cat").addEventListener("click", async (e) => {
   e.stopPropagation();
-  openAddCatDropdown();
-});
-
-document.addEventListener("click", () => {
-  document.getElementById("cat-dropdown").classList.add("hidden");
-});
-
-document.getElementById("cat-dropdown").addEventListener("click", (e) => {
-  e.stopPropagation();
+  try {
+    const picked = await openCategoryPicker();
+    if (!picked) return;
+    addCategoryRow(picked.id, picked.name, picked.color || null);
+  } catch (err) {
+    showAlert(document.getElementById("alerts"), err?.message || "Could not load categories.", "error");
+  }
 });
 
 // ── Bulk-bar event listeners ──────────────────────────────────────────────────
@@ -428,19 +644,20 @@ document.getElementById("btn-budget-deselect").addEventListener("click", () => {
     const chk = tr.querySelector(".budget-row-chk");
     if (chk) { chk.checked = false; tr.classList.remove("selected"); }
   });
-  selectedCatIds.clear();
+  selectedCatKeys.clear();
   updateBulkBar();
 });
 
 document.getElementById("btn-budget-bulk-delete").addEventListener("click", async () => {
-  const n = selectedCatIds.size;
+  const n = selectedCatKeys.size;
   if (!n) return;
   if (!await confirmDialog({ title: `Remove from budget`, message: `Remove ${n} categor${n === 1 ? "y" : "ies"} from budget? Their limits will be cleared.`, confirmLabel: "Remove" })) return;
-  const toRemove = new Set(selectedCatIds);
-  document.querySelectorAll("#budget-tbody tr[data-cat-id]").forEach(tr => {
-    if (toRemove.has(tr.dataset.catId)) tr.remove();
+  const toRemove = new Set(selectedCatKeys);
+  toRemove.forEach(key => hiddenCategoryKeys.add(key));
+  document.querySelectorAll("#budget-tbody tr[data-cat-key]").forEach(tr => {
+    if (toRemove.has(tr.dataset.catKey)) tr.remove();
   });
-  selectedCatIds.clear();
+  selectedCatKeys.clear();
   updateTotalHint();
   updateBulkBar();
   scheduleSave();

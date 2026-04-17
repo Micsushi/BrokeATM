@@ -9,7 +9,7 @@
   <title>Import | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=16" />
+  <link rel="stylesheet" href="/static/css/main.css?v=18" />
   <style>
     /* Review table inline inputs */
     #review-table .review-inp,
@@ -111,6 +111,12 @@
       flex-direction: column;
       gap: 0.65rem;
     }
+    .review-selection-summary {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 0.45rem;
+      padding-right: 0.2rem;
+    }
     .import-stage-toolbar-main {
       display: flex;
       align-items: center;
@@ -134,6 +140,7 @@
       font-size: var(--font-size-body-sm);
       line-height: 1.45;
       color: var(--text-muted);
+      overflow-wrap: anywhere;
     }
     .import-stage-toolbar-secondary {
       display: flex;
@@ -313,10 +320,15 @@
       display: flex;
       align-items: center;
       flex-wrap: wrap;
+      justify-content: space-between;
       gap: 0.4rem;
       margin-top: 0.35rem;
       font-size: var(--font-size-caption);
       color: var(--text-muted);
+    }
+    .import-doc-count {
+      white-space: nowrap;
+      margin-left: auto;
     }
     .import-doc-status {
       display: inline-flex;
@@ -403,6 +415,10 @@
       margin-top: 0.4rem;
     }
     @media (max-width: 720px) {
+      .review-selection-summary {
+        justify-content: flex-start;
+        padding-right: 0;
+      }
       .import-doc-tab {
         min-width: 100%;
         max-width: none;
@@ -435,7 +451,6 @@
       font-size: var(--font-size-caption);
       line-height: 1.45;
     }
-    .parse-summary { font-size: var(--font-size-body-sm); }
     .review-keyword-title {
       display: block;
       font-size: var(--font-size-body);
@@ -558,6 +573,8 @@
     <div id="import-doc-tabs" class="import-queue-tabs"></div>
   </div>
 
+  <div class="review-selection-summary hidden review-selected-count text-muted" id="review-selected-count"></div>
+
   <div id="import-stage-toolbar" class="card card-tight mb-2 import-stage-toolbar hidden">
     <div class="import-stage-toolbar-main">
       <button type="button" class="btn btn-secondary" id="btn-stage-back">← Back</button>
@@ -566,9 +583,8 @@
         <div id="import-stage-detail" class="import-stage-toolbar-detail"></div>
       </div>
       <div id="import-stage-secondary" class="import-stage-toolbar-secondary">
-        <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-select-all">Select All</button>
-        <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-deselect-all">Clear All</button>
-        <span class="review-selected-count text-muted hidden" id="review-selected-count"></span>
+        <button type="button" class="btn btn-ghost hidden" id="btn-select-all">Select All</button>
+        <button type="button" class="btn btn-ghost hidden" id="btn-deselect-all">Clear All</button>
       </div>
       <button type="button" class="btn btn-primary import-stage-toolbar-primary" id="btn-stage-primary"></button>
     </div>
@@ -639,10 +655,6 @@
       Month and year are saved on the <strong>import batch</strong>. Row dates still come from the file.
     </p>
     <div id="file-periods" class="mt-2"></div>
-    <div id="parse-summary" class="mt-2 text-muted parse-summary"></div>
-    <p class="mt-2 text-muted step-note">
-      Duplicates are checked against your database and <strong>earlier rows in this upload</strong>.
-    </p>
   </div>
 
   <!-- Step 4: Review Rows -->
@@ -697,11 +709,12 @@
 
 <script src="/static/js/utils.js?v=7"></script>
 <script src="/static/js/api.js?v=8"></script>
+<script src="/static/js/category-picker-modal.js?v=1"></script>
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
 <script src="/static/js/keyword-conflict-modal.js?v=22"></script>
 <script src="/static/js/category-create-modal.js?v=1"></script>
 <script src="/static/js/add-tx-modal.js?v=4"></script>
-<script src="/static/js/import-page.js?v=11"></script>
+<script src="/static/js/import-page.js?v=13"></script>
 
 <div class="app-toast toast-wide" id="import-toast"></div>
 </body>

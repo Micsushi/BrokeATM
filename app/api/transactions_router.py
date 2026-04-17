@@ -26,6 +26,7 @@ from app.models.models import Category, Transaction
 from app.services.transaction_duplicates import find_exact_duplicate_groups, prune_exact_duplicates
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
+NO_MONTHS_SENTINEL = "__none__"
 
 
 def _enrich(tx: Transaction, *, exact_duplicate: bool = False) -> TransactionOut:
@@ -37,6 +38,8 @@ def _enrich(tx: Transaction, *, exact_duplicate: bool = False) -> TransactionOut
 
 def _apply_month_filter(q: Any, months: str | None, year: int | None, month: int | None) -> Any:
     if months:
+        if months == NO_MONTHS_SENTINEL:
+            return q.filter(False)
         pairs = []
         for part in months.split(","):
             try:

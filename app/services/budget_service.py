@@ -4,7 +4,27 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.utils import add_months
-from app.models.models import BudgetRule, Category, Transaction
+from app.models.models import BudgetHiddenCategory, BudgetRule, Category, Transaction
+
+
+UNCATEGORIZED_BUDGET_KEY = "uncategorized"
+
+
+def budget_category_key(category_id: int | None) -> str:
+    if category_id is None:
+        return UNCATEGORIZED_BUDGET_KEY
+    return f"cat:{category_id}"
+
+
+def _category_id_from_budget_key(category_key: str) -> int | None:
+    if category_key == UNCATEGORIZED_BUDGET_KEY:
+        return None
+    if category_key.startswith("cat:"):
+        try:
+            return int(category_key.split(":", 1)[1])
+        except ValueError:
+            return None
+    return None
 
 
 def _ym(d: date) -> str:
@@ -13,22 +33,44 @@ def _ym(d: date) -> str:
 
 def get_budget_rules(db: Session) -> dict:
     rules = db.query(BudgetRule).all()
+    hidden_keys = sorted(
+        row.category_key
+        for row in db.query(BudgetHiddenCategory).all()
+    )
     return {
         "total": next((r.limit_amount for r in rules if r.is_total), None),
         "rules": [
             {"category_id": r.category_id, "limit_amount": r.limit_amount}
             for r in rules if not r.is_total
         ],
+        "hidden_category_keys": hidden_keys,
     }
 
 
-def save_budget_rules(db: Session, total: float | None, rules: list[dict]) -> None:
+def save_budget_rules(
+    db: Session,
+    total: float | None,
+    rules: list[dict],
+    hidden_category_keys: list[str] | None = None,
+) -> None:
     cat_sum = sum(r["limit_amount"] for r in rules)
     if total is not None and total < cat_sum:
         raise ValueError(
             f"Total budget ({total:.2f}) must be ≥ sum of category budgets ({cat_sum:.2f})"
         )
+
+    visible_keys = {
+        budget_category_key(rule["category_id"])
+        for rule in rules
+    }
+    hidden_keys = {
+        key
+        for key in (hidden_category_keys or [])
+        if key and key not in visible_keys
+    }
+
     db.query(BudgetRule).delete()
+    db.query(BudgetHiddenCategory).delete()
     if total is not None:
         db.add(BudgetRule(category_id=None, limit_amount=total, is_total=True))
     for rule in rules:
@@ -36,6 +78,11 @@ def save_budget_rules(db: Session, total: float | None, rules: list[dict]) -> No
             category_id=rule["category_id"],
             limit_amount=rule["limit_amount"],
             is_total=False,
+        ))
+    for category_key in sorted(hidden_keys):
+        db.add(BudgetHiddenCategory(
+            category_key=category_key,
+            category_id=_category_id_from_budget_key(category_key),
         ))
     db.commit()
 
@@ -70,6 +117,10 @@ def get_settings_with_averages(db: Session, avg_months: int = 6) -> dict:
     rules = db.query(BudgetRule).all()
     total_budget = next((r.limit_amount for r in rules if r.is_total), None)
     cat_limits = {r.category_id: r.limit_amount for r in rules if not r.is_total}
+    hidden_keys = {
+        row.category_key
+        for row in db.query(BudgetHiddenCategory).all()
+    }
 
     # Accumulate per-category totals for each window
     cat_meta: dict[int | None, dict] = {}
@@ -96,6 +147,7 @@ def get_settings_with_averages(db: Session, avg_months: int = 6) -> dict:
     for cat_id, m in cat_meta.items():
         categories.append({
             "category_id": cat_id,
+            "category_key": budget_category_key(cat_id),
             "category_name": m["name"],
             "category_color": m["color"],
             "avg_6m": round(m["t6"] / 6, 2),
@@ -106,7 +158,12 @@ def get_settings_with_averages(db: Session, avg_months: int = 6) -> dict:
         })
 
     categories.sort(key=lambda c: c["avg_6m"], reverse=True)
-    return {"total": total_budget, "avg_months": 6, "categories": categories}
+    return {
+        "total": total_budget,
+        "avg_months": 6,
+        "categories": categories,
+        "hidden_category_keys": sorted(hidden_keys),
+    }
 
 
 def _month_range(from_ym: str, to_ym: str) -> list[dict]:

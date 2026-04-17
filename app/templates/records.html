@@ -6,7 +6,7 @@
   <title>Records | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=16" />
+  <link rel="stylesheet" href="/static/css/main.css?v=18" />
   <script src="/static/js/month-picker.js?v=2"></script>
   <script src="/static/js/month-filter.js?v=6"></script>
   <style>
@@ -40,8 +40,11 @@
     .filter-group { display:flex; flex-direction:column; gap:0.22rem; min-width:128px; }
     .filter-group.wide { min-width:240px; flex:1 1 280px; }
     .filter-group.amount-filter { min-width:150px; }
-    .filter-action-group { min-width:132px; }
-    .filter-spacer-label { visibility: hidden; }
+    .filter-action-group {
+      min-width:132px;
+      justify-content:flex-end;
+    }
+    .filter-action-group .filter-spacer-label { display:none; }
     .records-date-section {
       margin-bottom:0.7rem;
       padding-bottom:0.7rem;
@@ -52,6 +55,7 @@
       flex-wrap:wrap;
       gap:0.6rem 0.75rem;
       align-items:flex-end;
+      margin-top:0.28rem;
     }
     .amount-cell { font-family:'JetBrains Mono',monospace; }
     .actions-cell { white-space:nowrap; }
@@ -66,10 +70,16 @@
     .records-page .filters .btn,
     .records-page .bulk-bar select,
     .records-page .bulk-bar .btn,
+    .records-page .bulk-bar .category-picker-trigger,
     .records-page #page-size-sel {
       min-height: var(--records-control-height);
       font-size: var(--records-control-font);
       padding: var(--records-control-pad-y) var(--records-control-pad-x);
+    }
+    #edit-category-trigger {
+      min-height: 38px;
+      font-size: 0.91rem;
+      padding: 0.3rem 0.85rem;
     }
     .records-page input[type="checkbox"] {
       width: 18px;
@@ -162,7 +172,16 @@
     tr.selected td { background: rgba(99,102,241,0.07) !important; }
 
     /* Checkbox column */
-    th.chk-col, td.chk-col { width: 36px; padding-left: 0.75rem; }
+    th.chk-col, td.chk-col {
+      width: 36px;
+      padding-left: 0.75rem;
+      text-align: center;
+      vertical-align: middle;
+    }
+    .records-page td.chk-col .row-chk {
+      display: block;
+      margin: 0 auto;
+    }
     td.cell-inline { cursor: pointer; vertical-align: middle; }
     td.cell-inline:hover:not(.cell-inline-editing) { background: rgba(99,102,241,0.07); }
     td.cell-inline-editing { padding: 0.14rem 0.28rem !important; }
@@ -388,10 +407,11 @@
     <button class="btn btn-ghost btn-sm" id="btn-select-all-page">Select page</button>
     <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Deselect all</button>
     <div class="bulk-divider"></div>
-    <label class="bulk-label" for="bulk-cat-sel">Set category:</label>
-    <select class="bulk-select" id="bulk-cat-sel" disabled>
-      <option value="">pick...</option>
-    </select>
+    <label class="bulk-label" for="bulk-cat-trigger">Set category:</label>
+    <button type="button" class="bulk-select category-picker-trigger" id="bulk-cat-trigger" disabled>
+      <span class="category-picker-trigger-label" id="bulk-cat-trigger-label">Pick...</span>
+      <span class="category-picker-trigger-caret" aria-hidden="true">▾</span>
+    </button>
     <button class="btn btn-secondary btn-sm" id="btn-bulk-cat" disabled>Apply</button>
     <div class="bulk-divider"></div>
     <label class="bulk-label" for="bulk-type-sel">Set type:</label>
@@ -479,7 +499,11 @@
         <div>
           <label>Category</label>
           <div style="display:flex;gap:0.5rem;align-items:stretch">
-            <select id="edit-category" style="flex:1"></select>
+            <input type="hidden" id="edit-category" value="" />
+            <button type="button" class="category-picker-trigger" id="edit-category-trigger" style="flex:1">
+              <span class="category-picker-trigger-label" id="edit-category-trigger-label">No category</span>
+              <span class="category-picker-trigger-caret" aria-hidden="true">▾</span>
+            </button>
             <button type="button" class="btn btn-secondary btn-field-action" id="edit-new-category">+ Category</button>
           </div>
         </div>
@@ -502,6 +526,7 @@
 
 <script src="/static/js/utils.js?v=9"></script>
 <script src="/static/js/api.js?v=8"></script>
+<script src="/static/js/category-picker-modal.js?v=1"></script>
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
 <script src="/static/js/keyword-conflict-modal.js?v=22"></script>
 <script src="/static/js/category-create-modal.js?v=1"></script>
@@ -528,6 +553,7 @@ let sortBy = "date";
 let sortDir = "asc";
 let categories = [];
 let accounts = [];
+let bulkCategoryChoice = undefined;
 let recordsAvailableMonths = [];
 let recordsDateSelected = new Set();
 let recordsDateFilter = null;
@@ -535,6 +561,7 @@ let editingId = null;
 let selectedIds = new Set();
 let lastTableItems = [];
 let inlineEditBlurTimer = null;
+const NO_RECORD_MONTHS = "__none__";
 
 // ── Column visibility (from Settings) ────────────────────────────────────────
 // Columns that can be toggled: date_added, category, type, notes, account, currency
@@ -576,6 +603,8 @@ async function init() {
     API.getAvailableMonths(),
   ]);
   populateFilterDropdowns();
+  setEditCategoryValue(null);
+  setBulkCategoryChoice(undefined);
   initRecordsDateFilter();
   syncSortHeaders();
   syncDupToggleUi();
@@ -620,25 +649,74 @@ function populateFilterDropdowns() {
     categories.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
   document.getElementById("f-category").innerHTML = catOpts;
 
-  const editCatOpts = `<option value="">none</option>` +
-    categories.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
-  document.getElementById("edit-category").innerHTML = editCatOpts;
-
   const editAccOpts = `<option value="">none</option>` +
     accounts.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join("");
   document.getElementById("edit-account-sel").innerHTML = editAccOpts;
+}
 
-  const bulkCatOpts = `<option value="">pick...</option>` +
-    categories.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
-  document.getElementById("bulk-cat-sel").innerHTML = bulkCatOpts;
+function parseCategoryIdInput(value) {
+  if (value == null || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function categoryNameById(categoryId) {
+  if (categoryId == null) return "No category";
+  return categories.find((category) => category.id === categoryId)?.name || "Unknown category";
+}
+
+function setEditCategoryValue(categoryId) {
+  const value = categoryId == null ? "" : String(categoryId);
+  document.getElementById("edit-category").value = value;
+  document.getElementById("edit-category-trigger-label").textContent = categoryNameById(categoryId);
+}
+
+function setBulkCategoryChoice(categoryId) {
+  bulkCategoryChoice = categoryId;
+  document.getElementById("bulk-cat-trigger-label").textContent =
+    categoryId === undefined ? "Pick..." : categoryNameById(categoryId);
+  updateBulkBar();
+}
+
+async function openRecordCategoryPicker({
+  title = "Select category",
+  subtitle = "",
+  selectedId,
+  noneLabel = "No category",
+  noneDescription = "",
+  actionLabel = "Select",
+  anchorEl = null,
+} = {}) {
+  return openCategoryPickerModal({
+    title,
+    subtitle,
+    searchPlaceholder: "Search categories...",
+    selectedValue: selectedId,
+    actionLabel,
+    noneOption: {
+      label: noneLabel,
+      description: noneDescription,
+      actionText: actionLabel,
+    },
+    items: categories.map((category) => ({
+      id: category.id,
+      value: category.id,
+      name: category.name,
+      color: category.color || "",
+    })),
+    emptyMessage: "No categories available yet.",
+    noResultsMessage: (query) => `No categories match "${query}".`,
+    mode: anchorEl ? "popover" : "modal",
+    anchorEl,
+  });
 }
 
 async function refreshCategories(selectedEditId = null) {
   categories = await API.getCategories();
   populateFilterDropdowns();
-  if (selectedEditId != null) {
-    document.getElementById("edit-category").value = String(selectedEditId);
-  }
+  if (selectedEditId !== null) setEditCategoryValue(selectedEditId);
+  else setEditCategoryValue(parseCategoryIdInput(document.getElementById("edit-category").value));
+  if (bulkCategoryChoice !== undefined) setBulkCategoryChoice(bulkCategoryChoice);
 }
 
 function syncSortHeaders() {
@@ -658,7 +736,7 @@ function syncSortHeaders() {
 function getFilterParams() {
   return {
     search: document.getElementById("f-search").value,
-    months: recordsDateSelected.size ? [...recordsDateSelected].sort().join(",") : "",
+    months: recordsDateSelected.size ? [...recordsDateSelected].sort().join(",") : NO_RECORD_MONTHS,
     transaction_type: document.getElementById("f-type").value,
     category_id: document.getElementById("f-category").value,
     min_amount: document.getElementById("f-amount-min").value,
@@ -781,19 +859,33 @@ function renderTable(data) {
 function updateBulkBar() {
   const n = selectedIds.size;
   const hasSelection = n > 0;
-  const bulkCatSel = document.getElementById("bulk-cat-sel");
+  const bulkCatTrigger = document.getElementById("bulk-cat-trigger");
   const bulkTypeSel = document.getElementById("bulk-type-sel");
   document.getElementById("bulk-count").textContent = n === 0 ? "0 selected" : `${n} selected`;
   document.getElementById("btn-bulk-delete").disabled = !hasSelection;
-  bulkCatSel.disabled = !hasSelection;
+  bulkCatTrigger.disabled = !hasSelection;
   bulkTypeSel.disabled = !hasSelection;
-  document.getElementById("btn-bulk-cat").disabled = !hasSelection || !bulkCatSel.value;
+  document.getElementById("btn-bulk-cat").disabled = !hasSelection || bulkCategoryChoice === undefined;
   document.getElementById("btn-bulk-type").disabled = !hasSelection || !bulkTypeSel.value;
 }
 
-document.getElementById("bulk-cat-sel").addEventListener("change", updateBulkBar);
 document.getElementById("bulk-type-sel").addEventListener("change", updateBulkBar);
 updateBulkBar();
+
+document.getElementById("bulk-cat-trigger").addEventListener("click", async (event) => {
+  if (!selectedIds.size) return;
+  const picked = await openRecordCategoryPicker({
+    title: "Set category",
+    subtitle: `Search categories for ${selectedIds.size} selected transaction${selectedIds.size === 1 ? "" : "s"}.`,
+    selectedId: bulkCategoryChoice === undefined ? undefined : bulkCategoryChoice,
+    noneLabel: "No category",
+    noneDescription: "Clear the category on the selected transactions.",
+    actionLabel: "Use",
+    anchorEl: event.currentTarget,
+  });
+  if (!picked) return;
+  setBulkCategoryChoice(picked.value === null ? null : picked.id);
+});
 
 document.getElementById("btn-select-all-page").addEventListener("click", () => {
   document.querySelectorAll(".row-chk").forEach(chk => {
@@ -827,9 +919,11 @@ document.getElementById("btn-bulk-delete").addEventListener("click", async () =>
 });
 
 document.getElementById("btn-bulk-cat").addEventListener("click", async () => {
-  const catId = document.getElementById("bulk-cat-sel").value;
   try {
-    const res = await API.bulkUpdate([...selectedIds], { category_id: +catId });
+    const res = await API.bulkUpdate([...selectedIds], {
+      category_id: bulkCategoryChoice == null ? null : +bulkCategoryChoice,
+    });
+    setBulkCategoryChoice(undefined);
     showAlert(document.getElementById("alerts"), `Updated ${res.updated} transaction(s).`, "success");
     loadRecords();
   } catch (e) {
@@ -882,7 +976,7 @@ function openEdit(id) {
     document.getElementById("edit-merchant").value = tx.merchant_name;
     document.getElementById("edit-amount").value = tx.amount;
     document.getElementById("edit-type").value = tx.transaction_type;
-    document.getElementById("edit-category").value = tx.category_id || "";
+    setEditCategoryValue(tx.category_id ?? null);
     document.getElementById("edit-account-sel").value = tx.account_id || "";
     document.getElementById("edit-notes").value = tx.notes || "";
     document.getElementById("edit-modal").classList.remove("hidden");
@@ -904,6 +998,20 @@ document.getElementById("edit-new-category").addEventListener("click", async () 
   if (created) {
     await refreshCategories(created.id);
   }
+});
+
+document.getElementById("edit-category-trigger").addEventListener("click", async (event) => {
+  const picked = await openRecordCategoryPicker({
+    title: "Set category",
+    subtitle: "Search categories for this transaction.",
+    selectedId: parseCategoryIdInput(document.getElementById("edit-category").value),
+    noneLabel: "No category",
+    noneDescription: "Clear the category on this transaction.",
+    actionLabel: "Use",
+    anchorEl: event.currentTarget,
+  });
+  if (!picked) return;
+  setEditCategoryValue(picked.value === null ? null : picked.id);
 });
 
 document.getElementById("edit-save").addEventListener("click", async () => {
@@ -1036,15 +1144,6 @@ function abortInlineCellEdit(restore) {
   delete open._inlineKeydown;
 }
 
-function categorySelectHtml(selectedId) {
-  let h = `<option value="">none</option>`;
-  for (const c of categories) {
-    const sel = c.id === selectedId ? " selected" : "";
-    h += `<option value="${c.id}"${sel}>${escHtml(c.name)}</option>`;
-  }
-  return h;
-}
-
 function accountSelectHtml(selectedId) {
   let h = `<option value="">none</option>`;
   for (const a of accounts) {
@@ -1146,8 +1245,27 @@ function scheduleInlineCommit(td, txId, field, control) {
   }, 100);
 }
 
+async function openInlineCategoryPicker(td, tx) {
+  const picked = await openRecordCategoryPicker({
+    title: "Set category",
+    subtitle: `Search categories for "${tx.merchant_name || "this transaction"}".`,
+    selectedId: tx.category_id ?? null,
+    noneLabel: "No category",
+    noneDescription: "Clear the category on this transaction.",
+    actionLabel: "Use",
+    anchorEl: td,
+  });
+  if (!picked) return;
+  const control = { value: picked.value === null ? "" : String(picked.id) };
+  await commitInlineCell(td, tx.id, "category", control);
+}
+
 function startCellInlineEdit(td, tx, field) {
   abortInlineCellEdit(true);
+  if (field === "category") {
+    void openInlineCategoryPicker(td, tx);
+    return;
+  }
   td._restoreHTML = td.innerHTML;
   td.classList.add("cell-inline-editing");
   td.removeAttribute("title");
@@ -1162,10 +1280,6 @@ function startCellInlineEdit(td, tx, field) {
     control.type = "text";
     control.value = tx.merchant_name || "";
     control.addEventListener("blur", () => scheduleInlineCommit(td, tx.id, field, control));
-  } else if (field === "category") {
-    control = document.createElement("select");
-    control.innerHTML = categorySelectHtml(tx.category_id);
-    control.addEventListener("change", () => commitInlineCell(td, tx.id, field, control));
   } else if (field === "account") {
     control = document.createElement("select");
     control.innerHTML = accountSelectHtml(tx.account_id);

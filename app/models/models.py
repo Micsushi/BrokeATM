@@ -110,6 +110,19 @@ class BudgetRule(Base):
     )
 
 
+class BudgetHiddenCategory(Base):
+    __tablename__ = "budget_hidden_categories"
+
+    category_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    category_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class RecurringRule(Base):
     __tablename__ = "recurring_rules"
 

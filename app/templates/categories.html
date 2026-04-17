@@ -70,13 +70,17 @@
     }
     .add-form {
       display: grid;
-      grid-template-columns: 1fr 1fr auto auto;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
       gap: 0.9rem;
-      align-items: end;
+      align-items: start;
     }
     .add-form .form-group { display: flex; flex-direction: column; gap: 0.22rem; }
-    .add-color-group { min-width: var(--btn-height-sm); }
-    .add-action-group { justify-content: flex-end; }
+    .add-color-group { min-width: var(--btn-height-sm); align-self: start; }
+    .add-action-group {
+      justify-content: flex-start;
+      align-self: start;
+      min-width: 112px;
+    }
     .keyword-note {
       font-weight: 400;
       color: var(--text-muted);
@@ -192,16 +196,30 @@
     .conflict-shadow-title { font-weight: 600; color: var(--tone-warning-text); margin-bottom: 0.2rem; font-size: var(--font-size-body-sm); }
     .conflict-shadow ul { margin: 0.25rem 0 0 1rem; }
     .conflict-shadow li { font-size: var(--font-size-caption); }
-    .categories-topbar { gap: 0.75rem; flex-wrap: wrap; }
+    .categories-topbar { gap: 0.75rem; flex-wrap: wrap; align-items: flex-start; }
     .categories-count { font-size: var(--font-size-body-sm); }
-    .categories-toolbar-controls { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
-    .categories-search { width: 220px; }
+    .categories-toolbar-controls {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      gap: 0.5rem;
+      flex-wrap: nowrap;
+    }
+    .categories-sort {
+      width: 170px;
+      flex: 0 0 170px;
+    }
+    .categories-search {
+      width: 280px;
+      flex: 0 0 280px;
+    }
     .cat-grid-empty { grid-column: 1 / -1; }
     .modal-copy { font-size: var(--font-size-body-sm); }
     .bulk-merge-sources { margin-bottom: 0.75rem; font-size: var(--font-size-caption); color: var(--text-muted); }
     .bulk-merge-form { display: grid; grid-template-columns: 1fr auto; gap: 0.75rem; align-items: end; }
     .add-submit {
       width: 100%;
+      min-width: 112px;
       min-height: var(--btn-height-sm);
       padding: var(--btn-pad-sm-y) var(--btn-pad-sm-x);
       font-size: var(--btn-font-sm);
@@ -216,7 +234,16 @@
       .cat-grid,
       .add-form,
       .bulk-merge-form { grid-template-columns: 1fr; }
-      .categories-search { width: 100%; }
+      .categories-toolbar-controls {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+      }
+      .categories-sort,
+      .categories-search {
+        width: 100%;
+        flex: 1 1 100%;
+      }
     }
   </style>
 </head>
@@ -275,7 +302,7 @@
   <div class="flex items-center justify-between mb-1 categories-topbar">
     <span id="cat-count" class="text-muted categories-count"></span>
     <div class="categories-toolbar-controls">
-      <select id="sort-cats">
+      <select id="sort-cats" class="categories-sort">
         <option value="alpha">A to Z</option>
         <option value="created">Newest first</option>
       </select>
@@ -289,8 +316,8 @@
     <button class="btn btn-ghost btn-sm" id="btn-select-all">Select All</button>
     <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Clear All</button>
     <div class="bulk-divider"></div>
-    <button class="btn btn-ghost btn-sm bulk-merge-btn" id="btn-bulk-merge" style="display:none">Merge</button>
-    <button class="btn btn-danger btn-sm" id="btn-bulk-delete" style="display:none">Delete selected</button>
+    <button class="btn btn-ghost btn-sm bulk-merge-btn" id="btn-bulk-merge" disabled title="Select at least 2 categories to merge">Merge</button>
+    <button class="btn btn-danger btn-sm" id="btn-bulk-delete" disabled title="Select at least 1 category to delete">Delete selected</button>
   </div>
 
   <!-- Category grid -->
@@ -419,8 +446,11 @@ function clearFormIssues(el) {
 async function loadStats(keepNew = false) {
   const res = await fetch("/api/categories/stats");
   allStats = await res.json();
+  const validIds = new Set(allStats.map((c) => c.id));
+  selectedIds = new Set([...selectedIds].filter((id) => validIds.has(id)));
   if (!keepNew) newlyAddedId = null;
   renderGrid(allStats);
+  updateBulkBar();
   document.getElementById("cat-count").textContent = `${allStats.length} categories`;
 }
 
@@ -507,9 +537,13 @@ function toggleSelect(id) {
 
 function updateBulkBar() {
   const n = selectedIds.size;
+  const deleteBtn = document.getElementById("btn-bulk-delete");
+  const mergeBtn = document.getElementById("btn-bulk-merge");
   document.getElementById("bulk-count").textContent = n === 0 ? "0 selected" : `${n} selected`;
-  document.getElementById("btn-bulk-delete").style.display = n >= 1 ? "" : "none";
-  document.getElementById("btn-bulk-merge").style.display = n >= 2 ? "" : "none";
+  deleteBtn.disabled = n < 1;
+  deleteBtn.title = n < 1 ? "Select at least 1 category to delete" : "";
+  mergeBtn.disabled = n < 2;
+  mergeBtn.title = n < 2 ? "Select at least 2 categories to merge" : "";
 }
 
 document.getElementById("btn-deselect-all").addEventListener("click", () => {
