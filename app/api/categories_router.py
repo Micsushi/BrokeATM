@@ -96,20 +96,26 @@ def update_category(cat_id: int, payload: CategoryUpdate, db: Session = Depends(
             raise HTTPException(status_code=409, detail="Category already exists")
     if "keywords" in updates:
         updates["keywords"] = keywords_to_csv((updates["keywords"] or "").split(","))
-        exact_conflicts = find_exact_keyword_conflicts(
-            db.query(Category).all(),
-            (updates["keywords"] or "").split(","),
-            exclude_category_id=cat_id,
-        )
-        if exact_conflicts:
-            conflict = exact_conflicts[0]
-            raise HTTPException(
-                status_code=409,
-                detail=(
-                    f'Keyword "{conflict["keyword"]}" already exists on '
-                    f'"{conflict["category_name"]}".'
-                ),
+        current_kws = set(filter(None, (cat.keywords or "").split(",")))
+        current_kws = {k.strip() for k in current_kws}
+        new_kws = set(filter(None, (updates["keywords"] or "").split(",")))
+        new_kws = {k.strip() for k in new_kws}
+        added_kws = new_kws - current_kws
+        if added_kws:
+            exact_conflicts = find_exact_keyword_conflicts(
+                db.query(Category).all(),
+                list(added_kws),
+                exclude_category_id=cat_id,
             )
+            if exact_conflicts:
+                conflict = exact_conflicts[0]
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f'Keyword "{conflict["keyword"]}" already exists on '
+                        f'"{conflict["category_name"]}".'
+                    ),
+                )
     for field, value in updates.items():
         setattr(cat, field, value)
     db.commit()

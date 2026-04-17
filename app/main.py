@@ -67,36 +67,43 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
+_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+
+
+def _html(name: str) -> FileResponse:
+    return FileResponse(str(TEMPLATES_DIR / name), headers=_NO_CACHE)
+
+
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(str(TEMPLATES_DIR / "dashboard.html"))
+    return _html("dashboard.html")
 
 
 @app.get("/import")
 def import_page() -> FileResponse:
-    return FileResponse(str(TEMPLATES_DIR / "index.html"))
+    return _html("index.html")
 
 
 @app.get("/records")
 def records() -> FileResponse:
-    return FileResponse(str(TEMPLATES_DIR / "records.html"))
+    return _html("records.html")
 
 
 @app.get("/dashboard")
 def dashboard() -> FileResponse:
-    return FileResponse(str(TEMPLATES_DIR / "dashboard.html"))
+    return _html("dashboard.html")
 
 
 @app.get("/categories")
 def categories_page() -> FileResponse:
-    return FileResponse(str(TEMPLATES_DIR / "categories.html"))
+    return _html("categories.html")
 
 
 @app.get("/settings")
 def settings_page() -> FileResponse:
-    return FileResponse(str(TEMPLATES_DIR / "settings.html"))
+    return _html("settings.html")
 
 
 @app.get("/budget")
 def budget_page() -> FileResponse:
-    return FileResponse(str(TEMPLATES_DIR / "budget.html"))
+    return _html("budget.html")

@@ -26,6 +26,10 @@ def _normalize_card_masked(value: Any) -> str:
     return str(value).strip()
 
 
+def _normalize_text_for_fingerprint(value: Any, *, limit: int = 200) -> str:
+    return " ".join(str(value or "").strip().lower().split())[:limit]
+
+
 def _digits_only(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
 
@@ -120,6 +124,47 @@ def _normalize_merchant_for_fingerprint(name: str) -> str:
     return " ".join((name or "").strip().lower().split())[:200]
 
 
+def _row_exact_duplicate_fingerprint(row: dict[str, Any]) -> tuple[Any, ...] | None:
+    tx_d = _row_statement_date(row)
+    if tx_d is None:
+        return None
+    return (
+        tx_d.isoformat(),
+        _normalize_merchant_for_fingerprint(row.get("merchant_name") or ""),
+        _normalize_text_for_fingerprint(row.get("merchant_city")),
+        _normalize_text_for_fingerprint(row.get("merchant_state")),
+        _normalize_text_for_fingerprint(row.get("merchant_country")),
+        _normalize_text_for_fingerprint(row.get("mcc_description"), limit=300),
+        round(float(row.get("amount") or 0.0), 4),
+        _normalize_text_for_fingerprint(row.get("currency") or "CAD", limit=8),
+        _normalize_text_for_fingerprint(row.get("transaction_type") or "expense", limit=20),
+    )
+
+
+def _transaction_exact_duplicate_fingerprint(tx: Transaction) -> tuple[Any, ...] | None:
+    tx_d = tx.transaction_date or tx.posted_date
+    if tx_d is None:
+        return None
+    return (
+        tx_d.isoformat(),
+        _normalize_merchant_for_fingerprint(tx.merchant_name or ""),
+        _normalize_text_for_fingerprint(tx.merchant_city),
+        _normalize_text_for_fingerprint(tx.merchant_state),
+        _normalize_text_for_fingerprint(tx.merchant_country),
+        _normalize_text_for_fingerprint(tx.mcc_description, limit=300),
+        round(float(tx.amount or 0.0), 4),
+        _normalize_text_for_fingerprint(tx.currency or "CAD", limit=8),
+        _normalize_text_for_fingerprint(tx.transaction_type or "expense", limit=20),
+    )
+
+
+def _upload_exact_duplicate_key(row: dict[str, Any], account_token: str | int | None) -> tuple[Any, ...] | None:
+    exact_fp = _row_exact_duplicate_fingerprint(row)
+    if exact_fp is None:
+        return None
+    return (_normalize_text_for_fingerprint(account_token, limit=40), *exact_fp)
+
+
 def _find_interest_account_date_amount_duplicate(
     db: Session,
     account: Account,
@@ -150,12 +195,13 @@ def _find_existing_transaction_duplicate(
     ref: str | None,
     tx_d: date | None,
     amount: float,
+    currency: str,
+    transaction_type: str,
     merchant_fp: str,
     interest_like: bool,
+    exact_fp: tuple[Any, ...] | None = None,
 ) -> Transaction | None:
-    if account is None:
-        return None
-    if ref:
+    if ref and account is not None:
         q = (
             db.query(Transaction)
             .filter_by(reference_number=ref, account_id=account.id)
@@ -173,7 +219,7 @@ def _find_existing_transaction_duplicate(
             return None
         # No transaction_date or posted_date: do not match by ref alone (avoids wrong-row matches).
         return None
-    if interest_like and tx_d is not None and merchant_fp:
+    if interest_like and account is not None and tx_d is not None and merchant_fp:
         amt = float(amount)
         candidates = (
             db.query(Transaction)
@@ -190,6 +236,21 @@ def _find_existing_transaction_duplicate(
             if _normalize_merchant_for_fingerprint(tx.merchant_name or "") == merchant_fp:
                 return tx
         return _find_interest_account_date_amount_duplicate(db, account, tx_d, amount)
+    if exact_fp is not None and tx_d is not None:
+        candidates_q = (
+            db.query(Transaction)
+            .filter(
+                or_(Transaction.transaction_date == tx_d, Transaction.posted_date == tx_d),
+                func.abs(Transaction.amount - float(amount)) < 0.0001,
+                Transaction.currency == currency,
+                Transaction.transaction_type == transaction_type,
+            )
+        )
+        if account is not None:
+            candidates_q = candidates_q.filter(Transaction.account_id == account.id)
+        for tx in candidates_q.limit(50).all():
+            if _transaction_exact_duplicate_fingerprint(tx) == exact_fp:
+                return tx
     return None
 
 
@@ -227,6 +288,7 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
     results: list[dict[str, Any]] = []
     seen_ref_line: set[tuple[str, str, str]] = set()
     seen_interest_fp: set[tuple[str, str, str, float, str]] = set()
+    seen_exact_line: set[tuple[Any, ...]] = set()
     default_card = _default_card_masked_for_rows(rows)
     for row in rows:
         ref = _normalize_reference_number(row.get("reference_number"))
@@ -234,8 +296,12 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
         tx_d = _row_statement_date(row)
         dkey = tx_d.isoformat() if tx_d else ""
         amount = float(row.get("amount") or 0.0)
+        currency = str(row.get("currency") or "CAD").upper()
+        transaction_type = str(row.get("transaction_type") or "expense").lower()
         merch_fp = _normalize_merchant_for_fingerprint(row.get("merchant_name") or "")
         interest_like = _interest_like_row(row)
+        exact_fp = _row_exact_duplicate_fingerprint(row)
+        upload_exact_key = _upload_exact_duplicate_key(row, card)
         account = _find_account_by_card_mask(db, card) if card else None
 
         is_dup = False
@@ -253,8 +319,11 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
                     ref=ref,
                     tx_d=tx_d,
                     amount=amount,
+                    currency=currency,
+                    transaction_type=transaction_type,
                     merchant_fp=merch_fp,
                     interest_like=interest_like,
+                    exact_fp=exact_fp,
                 )
                 if existing is not None:
                     is_dup = True
@@ -272,13 +341,37 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
                     ref=None,
                     tx_d=tx_d,
                     amount=amount,
+                    currency=currency,
+                    transaction_type=transaction_type,
                     merchant_fp=merch_fp,
                     interest_like=True,
+                    exact_fp=exact_fp,
                 )
                 if existing is not None:
                     is_dup = True
                     dup_in_db = True
                 seen_interest_fp.add(fp_key)
+        elif upload_exact_key is not None:
+            if upload_exact_key in seen_exact_line:
+                is_dup = True
+                dup_in_import = True
+            else:
+                existing = _find_existing_transaction_duplicate(
+                    db,
+                    account=account,
+                    ref=None,
+                    tx_d=tx_d,
+                    amount=amount,
+                    currency=currency,
+                    transaction_type=transaction_type,
+                    merchant_fp=merch_fp,
+                    interest_like=False,
+                    exact_fp=exact_fp,
+                )
+                if existing is not None:
+                    is_dup = True
+                    dup_in_db = True
+                seen_exact_line.add(upload_exact_key)
 
         # duplicate flag is advisory; UI defaults to unchecked so user decides
         exclude = bool(row.get("exclude"))
@@ -336,6 +429,7 @@ def commit_import(
     keyword_matcher = _keyword_matcher(db)
     seen_ref_line: set[tuple[str, int, str]] = set()
     seen_interest_fp: set[tuple[int, str, float, str]] = set()
+    seen_exact_line: set[tuple[Any, ...]] = set()
     default_card = _default_card_masked_for_rows(rows)
 
     for row in rows:
@@ -347,12 +441,17 @@ def commit_import(
         card = _effective_card_for_row(row, default_card)
         cardholder = row.get("cardholder", "")
         account = get_or_create_account(db, card, cardholder)
+        duplicate_account = account if card else None
         ref = _normalize_reference_number(row.get("reference_number"))
         tx_d = _row_statement_date(row)
         dkey = tx_d.isoformat() if tx_d else ""
         amount = float(row.get("amount") or 0.0)
+        currency = str(row.get("currency") or "CAD").upper()
+        transaction_type = str(row.get("transaction_type") or "expense").lower()
         merch_fp = _normalize_merchant_for_fingerprint(row.get("merchant_name") or "")
         interest_like = _interest_like_row(row)
+        exact_fp = _row_exact_duplicate_fingerprint(row)
+        upload_exact_key = _upload_exact_duplicate_key(row, account.id if card else "")
 
         if ref:
             key = (ref, account.id, dkey)
@@ -361,12 +460,15 @@ def commit_import(
                 continue
             existing = _find_existing_transaction_duplicate(
                 db,
-                account=account,
+                account=duplicate_account,
                 ref=ref,
                 tx_d=tx_d,
                 amount=amount,
+                currency=currency,
+                transaction_type=transaction_type,
                 merchant_fp=merch_fp,
                 interest_like=interest_like,
+                exact_fp=exact_fp,
             )
             if existing is not None:
                 skipped_by[gk] += 1
@@ -379,17 +481,40 @@ def commit_import(
                 continue
             existing = _find_existing_transaction_duplicate(
                 db,
-                account=account,
+                account=duplicate_account,
                 ref=None,
                 tx_d=tx_d,
                 amount=amount,
+                currency=currency,
+                transaction_type=transaction_type,
                 merchant_fp=merch_fp,
                 interest_like=True,
+                exact_fp=exact_fp,
             )
             if existing is not None:
                 skipped_by[gk] += 1
                 continue
             seen_interest_fp.add(ikey)
+        elif upload_exact_key is not None:
+            if upload_exact_key in seen_exact_line:
+                skipped_by[gk] += 1
+                continue
+            existing = _find_existing_transaction_duplicate(
+                db,
+                account=duplicate_account,
+                ref=None,
+                tx_d=tx_d,
+                amount=amount,
+                currency=currency,
+                transaction_type=transaction_type,
+                merchant_fp=merch_fp,
+                interest_like=False,
+                exact_fp=exact_fp,
+            )
+            if existing is not None:
+                skipped_by[gk] += 1
+                continue
+            seen_exact_line.add(upload_exact_key)
 
         raw_cat = row.get("category_name") or row.get("suggested_category")
         if not raw_cat or raw_cat == "uncategorized":
@@ -398,6 +523,10 @@ def commit_import(
 
         category = get_or_create_category(db, raw_cat)
         bid = batch_id_by_key[gk]
+
+        tx_type = row.get("transaction_type", "expense")
+        if raw_cat and raw_cat.strip().lower() == "transfer":
+            tx_type = "transfer"
 
         tx = Transaction(
             transaction_date=row["transaction_date"],
@@ -410,7 +539,7 @@ def commit_import(
             mcc_description=row.get("mcc_description") or None,
             amount=row["amount"],
             currency=row.get("currency", "CAD"),
-            transaction_type=row.get("transaction_type", "expense"),
+            transaction_type=tx_type,
             account_id=account.id,
             category_id=category.id,
             notes=row.get("notes") or None,

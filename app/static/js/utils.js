@@ -126,7 +126,7 @@ function confirmDialog({ title = "Confirm", message = "", confirmLabel = "Confir
       overlay.innerHTML = `
         <div class="modal" style="max-width:420px">
           <h2 id="__confirm-title" style="margin-bottom:0.6rem"></h2>
-          <p id="__confirm-msg" style="color:var(--text-muted);font-size:0.9rem;margin:0;white-space:pre-wrap"></p>
+          <p id="__confirm-msg" class="modal-copy" style="margin:0;white-space:pre-wrap"></p>
           <div class="modal-actions">
             <button class="btn btn-secondary btn-sm" id="__confirm-cancel"></button>
             <button class="btn btn-sm" id="__confirm-ok"></button>

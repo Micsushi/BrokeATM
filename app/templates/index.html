@@ -3,20 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Import | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=9" />
+  <link rel="stylesheet" href="/static/css/main.css?v=16" />
   <style>
     /* Review table inline inputs */
     #review-table .review-inp,
     #parser-preview-table .review-inp {
       width: 100%;
-      padding: 0.3rem 0.45rem;
-      font-size: 0.82rem;
+      min-height: var(--control-height-sm);
+      padding: var(--control-pad-sm-y) var(--control-pad-sm-x);
+      font-size: var(--control-font-sm);
       background: var(--surface2);
       border: 1px solid transparent;
-      border-radius: 4px;
+      border-radius: 8px;
       color: var(--text);
       box-sizing: border-box;
     }
@@ -62,8 +66,8 @@
       color: var(--tone-danger-text);
       max-width: 72rem;
     }
-    #review-table td { padding: 0.3rem 0.5rem; vertical-align: middle; }
-    #review-table th { padding: 0.5rem; }
+    #review-table td { padding: 0.55rem 0.65rem; vertical-align: middle; }
+    #review-table th { padding: 0.7rem 0.65rem; }
     .review-actions-bar {
       display: flex;
       align-items: center;
@@ -85,7 +89,7 @@
       box-shadow: 0 1px 0 var(--border);
     }
     .review-keyword-banner {
-      padding: 1.1rem 1.35rem;
+      padding: 0.95rem 1.15rem;
       border-radius: var(--radius);
       border: 1px solid var(--tone-warning-border);
       border-left: 6px solid var(--warning);
@@ -102,9 +106,48 @@
       color: var(--tone-warning-text);
       max-width: 60rem;
     }
+    .import-stage-toolbar {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+    .import-stage-toolbar-main {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem 1rem;
+      flex-wrap: wrap;
+    }
+    .import-stage-toolbar-meta {
+      flex: 1 1 18rem;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+    .import-stage-toolbar-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.2;
+    }
+    .import-stage-toolbar-detail {
+      font-size: var(--font-size-body-sm);
+      line-height: 1.45;
+      color: var(--text-muted);
+    }
+    .import-stage-toolbar-secondary {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-left: auto;
+    }
+    .import-stage-toolbar-primary {
+      white-space: nowrap;
+    }
 
     /* ── Parser selection ──────────────────────────────────────────── */
-    .parser-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+    .parser-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.85rem; }
     .parser-tab {
       display: flex; flex-direction: column; gap: 0.4rem;
       padding: 0.65rem 1rem;
@@ -167,7 +210,7 @@
     }
     .parser-meta-danger { color: #fca5a5; font-weight: 600; }
     .parser-warning-banner {
-      padding: 1rem 1.35rem;
+      padding: 0.9rem 1.15rem;
       border-radius: var(--radius);
       border: 1px solid var(--tone-warning-border);
       border-left: 6px solid var(--warning);
@@ -183,7 +226,7 @@
 
     /* ── Unknown PDF categories banner ────────────────────────────── */
     .unknown-cats-banner {
-      padding: 1.1rem 1.35rem;
+      padding: 0.95rem 1.15rem;
       border-radius: var(--radius);
       border: 1px solid var(--tone-warning-border);
       border-left: 6px solid var(--warning);
@@ -202,7 +245,7 @@
     .import-queue-card {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.85rem;
     }
     .import-queue-header {
       display: flex;
@@ -236,7 +279,7 @@
     .import-doc-open {
       flex: 1;
       min-width: 0;
-      padding: 0.8rem 0.95rem;
+      padding: 0.56rem 0.8rem;
       background: transparent;
       border: 0;
       color: inherit;
@@ -245,7 +288,7 @@
     }
     .import-doc-remove {
       align-self: stretch;
-      width: 2.65rem;
+      width: 2.4rem;
       border: 0;
       border-left: 1px solid var(--border);
       background: transparent;
@@ -259,7 +302,7 @@
     }
     .import-doc-name {
       display: block;
-      font-size: 0.9rem;
+      font-size: var(--font-size-body);
       font-weight: 600;
       color: var(--text);
       white-space: nowrap;
@@ -272,7 +315,7 @@
       flex-wrap: wrap;
       gap: 0.4rem;
       margin-top: 0.35rem;
-      font-size: 0.78rem;
+      font-size: var(--font-size-caption);
       color: var(--text-muted);
     }
     .import-doc-status {
@@ -364,6 +407,15 @@
         min-width: 100%;
         max-width: none;
       }
+      .import-stage-toolbar-main {
+        align-items: stretch;
+      }
+      .import-stage-toolbar-secondary {
+        margin-left: 0;
+      }
+      .import-stage-toolbar-primary {
+        width: 100%;
+      }
       .import-processing-panel {
         padding: 1.7rem 1.1rem;
       }
@@ -371,6 +423,100 @@
         font-size: 1.1rem;
       }
     }
+    .import-queue-title { display: block; font-size: var(--font-size-body); }
+    .import-queue-summary { font-size: var(--font-size-caption); margin-top: 0.2rem; }
+    .review-selected-count { font-size: var(--font-size-body-sm); }
+    .upload-help { font-size: var(--font-size-caption); }
+    .manual-entry-title { font-weight: 700; font-size: var(--font-size-body); }
+    .manual-entry-copy { font-size: var(--font-size-caption); margin-top: 0.2rem; }
+    .parser-step-title { font-size: 1rem; font-weight: 600; }
+    .parser-step-copy,
+    .step-note {
+      font-size: var(--font-size-caption);
+      line-height: 1.45;
+    }
+    .parse-summary { font-size: var(--font-size-body-sm); }
+    .review-keyword-title {
+      display: block;
+      font-size: var(--font-size-body);
+      color: var(--text);
+      margin-bottom: 0.25rem;
+    }
+    .done-card {
+      text-align: center;
+      padding: 3rem;
+    }
+    .done-title { font-size: 1.3rem; font-weight: 700; }
+    .done-actions { justify-content: center; }
+    .toast-wide { max-width: 360px; line-height: 1.4; }
+    .file-period-header {
+      display: grid;
+      grid-template-columns: 1fr 10rem 6rem;
+      gap: 0.75rem;
+      padding: 0 0 0.4rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 0.6rem;
+    }
+    .file-period-header-label {
+      font-size: var(--font-size-table-head);
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .file-period-row {
+      display: grid;
+      grid-template-columns: 1fr 10rem 6rem;
+      gap: 0.75rem;
+      align-items: center;
+      margin-bottom: 0.45rem;
+      min-width: 0;
+    }
+    .file-period-file {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 600;
+      font-size: var(--font-size-body);
+    }
+    .file-period-control {
+      width: 100%;
+      min-height: var(--control-height-sm);
+      padding: var(--control-pad-sm-y) var(--control-pad-sm-x);
+      border-radius: 8px;
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      font-size: var(--control-font-sm);
+    }
+    .unknown-cats-copy { font-size: var(--font-size-caption); line-height: 1.5; }
+    .unknown-cat-choice {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.32rem 0;
+      cursor: pointer;
+    }
+    .unknown-cat-choice input {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--accent);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .dup-badge-hint { font-size: 0.72rem; margin-left: 0.2rem; }
+    .dup-import-hint { font-size: 0.72rem; margin-left: 0.25rem; }
+    .kw-review-btn { margin-left: 0.3rem; }
+    .source-file-cell {
+      font-size: var(--font-size-caption);
+      max-width: 100px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .row-index-cell { font-size: var(--font-size-caption); }
+    .preview-category-cell { font-size: var(--font-size-body-sm); }
+    .review-amount-inp { width: 96px; }
   </style>
 </head>
 <body>
@@ -386,7 +532,7 @@
   </div>
 </nav>
 
-<div class="page">
+<div class="page import-page">
   <div class="page-header">
     <h1>Import Transactions</h1>
     <p>Upload CSV, PDF, or OFX/QFX bank statements. Duplicates are checked across this upload and your database.</p>
@@ -405,15 +551,27 @@
   <div id="import-queue-card" class="card mb-2 import-queue-card hidden">
     <div class="import-queue-header">
       <div>
-        <strong style="display:block;font-size:1rem">Import queue</strong>
-        <div id="import-queue-summary" class="text-muted" style="font-size:0.84rem;margin-top:0.2rem"></div>
-      </div>
-      <div class="flex gap-1 flex-wrap">
-        <button class="btn btn-ghost btn-sm" id="btn-add-more-files">Add more files</button>
-        <button class="btn btn-primary btn-sm hidden" id="btn-import-all-files">Import All Ready Files</button>
+        <strong class="import-queue-title">Import queue</strong>
+        <div id="import-queue-summary" class="text-muted import-queue-summary"></div>
       </div>
     </div>
     <div id="import-doc-tabs" class="import-queue-tabs"></div>
+  </div>
+
+  <div id="import-stage-toolbar" class="card card-tight mb-2 import-stage-toolbar hidden">
+    <div class="import-stage-toolbar-main">
+      <button type="button" class="btn btn-secondary" id="btn-stage-back">← Back</button>
+      <div class="import-stage-toolbar-meta">
+        <strong id="import-stage-title" class="import-stage-toolbar-title"></strong>
+        <div id="import-stage-detail" class="import-stage-toolbar-detail"></div>
+      </div>
+      <div id="import-stage-secondary" class="import-stage-toolbar-secondary">
+        <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-select-all">Select All</button>
+        <button type="button" class="btn btn-ghost btn-sm hidden" id="btn-deselect-all">Clear All</button>
+        <span class="review-selected-count text-muted hidden" id="review-selected-count"></span>
+      </div>
+      <button type="button" class="btn btn-primary import-stage-toolbar-primary" id="btn-stage-primary"></button>
+    </div>
   </div>
 
   <!-- Step 1: Upload -->
@@ -422,17 +580,17 @@
       <div class="drop-zone" id="drop-zone">
         <div class="drop-icon">📂</div>
         <p><strong>Drop files here</strong> or click to browse</p>
-        <p class="mt-1" style="font-size:0.8rem">CSV · PDF · OFX · QFX &nbsp;·&nbsp; Drop one file or a whole batch. Files are processed one by one.</p>
-        <input type="file" id="file-input" accept=".csv,.pdf,.ofx,.qfx" multiple style="display:none" />
+        <p class="mt-1 upload-help">CSV · PDF · OFX · QFX &nbsp;·&nbsp; Drop one file or a whole batch. Files are processed one by one.</p>
+        <input type="file" id="file-input" accept=".csv,.pdf,.ofx,.qfx" multiple class="hidden" />
       </div>
     </div>
 
     <div class="card card-split">
       <div>
-        <div style="font-weight:600;font-size:0.95rem">Add one entry manually</div>
-        <div class="text-muted" style="font-size:0.82rem;margin-top:0.2rem">Add an expense, income, or refund without a CSV.</div>
+        <div class="manual-entry-title">Add one entry manually</div>
+        <div class="text-muted manual-entry-copy">Add an expense, income, or refund without a CSV.</div>
       </div>
-      <button class="btn btn-primary" id="btn-add-entry-import" style="font-size:0.95rem;padding:0.55rem 1.4rem;white-space:nowrap">+ Add Entry</button>
+      <button class="btn btn-primary" id="btn-add-entry-import">+ Add Entry</button>
     </div>
   </div>
 
@@ -443,8 +601,8 @@
     </div>
     <div id="parser-step-content">
       <div class="card mb-2">
-        <h2 id="parser-step-title" style="font-size:1rem;font-weight:600">Choose a parsing method</h2>
-        <p id="parser-step-copy" class="text-muted" style="font-size:0.82rem;margin-top:0.2rem;line-height:1.45">
+        <h2 id="parser-step-title" class="parser-step-title">Choose a parsing method</h2>
+        <p id="parser-step-copy" class="text-muted parser-step-copy" style="margin-top:0.2rem">
           Start with the option that found the most rows, then compare skipped rows, warnings, and the preview before continuing.
         </p>
         <div class="parser-tabs" id="parser-tabs"></div>
@@ -471,33 +629,20 @@
         </div>
       </div>
 
-      <div class="card card-tight">
-        <div class="review-actions-bar">
-          <button class="btn btn-secondary" onclick="goStep(1)">← Back</button>
-          <div class="flex gap-1 items-center">
-            <span id="parser-preview-label" class="text-muted" style="font-size:0.85rem"></span>
-            <button class="btn btn-primary" id="btn-use-parser">Use selected parser for all files →</button>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
   <!-- Step 3: Confirm period per file -->
   <div id="step-3" class="card hidden">
-    <h2 style="font-size:1rem;font-weight:600;margin-bottom:0.5rem">Confirm file periods</h2>
-    <p class="text-muted mb-2" style="font-size:0.82rem;line-height:1.45">
+    <h2 class="parser-step-title" style="margin-bottom:0.5rem">Confirm file periods</h2>
+    <p class="text-muted mb-2 step-note">
       Month and year are saved on the <strong>import batch</strong>. Row dates still come from the file.
     </p>
     <div id="file-periods" class="mt-2"></div>
-    <div id="parse-summary" class="mt-2 text-muted" style="font-size:0.85rem"></div>
-    <p class="mt-2 text-muted" style="font-size:0.82rem;line-height:1.45">
+    <div id="parse-summary" class="mt-2 text-muted parse-summary"></div>
+    <p class="mt-2 text-muted step-note">
       Duplicates are checked against your database and <strong>earlier rows in this upload</strong>.
     </p>
-    <div class="flex gap-1 mt-3">
-      <button class="btn btn-secondary" id="btn-back-to-parser">← Back</button>
-      <button class="btn btn-primary" id="btn-check-dups">Check duplicates for all files →</button>
-    </div>
   </div>
 
   <!-- Step 4: Review Rows -->
@@ -509,36 +654,11 @@
     </div>
     <div id="review-keyword-banner" class="review-keyword-banner mb-2 hidden">
       <div>
-        <strong style="display:block;font-size:1rem;color:var(--text);margin-bottom:0.25rem">Cross-category matches</strong>
+        <strong class="review-keyword-title">Cross-category matches</strong>
         <div id="review-keyword-banner-text" class="review-keyword-body"></div>
       </div>
       <button type="button" class="btn btn-secondary btn-sm" id="btn-review-keyword-conflicts">Review Conflict</button>
     </div>
-    <div class="card mb-2">
-      <div class="flex items-center justify-between">
-        <div>
-          <strong id="review-summary"></strong>
-          <span class="text-muted ml-1" style="font-size:0.8rem" id="dup-warning"></span>
-        </div>
-        <div class="flex gap-1 flex-wrap">
-          <button class="btn btn-ghost btn-sm" id="btn-recheck-dups">Recheck Duplicates</button>
-          <button class="btn btn-ghost btn-sm" id="btn-exclude-payments">Skip Payments</button>
-          <button class="btn btn-ghost btn-sm" id="btn-select-all">Select All</button>
-          <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Clear All</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="card card-tight mb-2">
-      <div class="review-actions-bar">
-        <button type="button" class="btn btn-secondary" onclick="goStep(3)">← Back</button>
-        <div class="flex gap-1 items-center">
-          <span class="review-selected-count text-muted" style="font-size:0.85rem"></span>
-          <button type="button" class="btn btn-primary review-btn-commit-all">Import all reviewed files</button>
-        </div>
-      </div>
-    </div>
-
     <div class="card card-flush mb-2">
       <div class="review-table-scroll">
         <table id="review-table">
@@ -560,24 +680,14 @@
         </table>
       </div>
     </div>
-
-    <div class="card card-tight">
-      <div class="review-actions-bar">
-        <button type="button" class="btn btn-secondary" onclick="goStep(3)">← Back</button>
-        <div class="flex gap-1 items-center">
-          <span class="review-selected-count text-muted" style="font-size:0.85rem"></span>
-          <button type="button" class="btn btn-primary review-btn-commit-all">Import all reviewed files</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- Step 5: Done -->
-  <div id="step-5" class="card hidden" style="text-align:center;padding:3rem">
+  <div id="step-5" class="card hidden done-card">
     <div style="font-size:3rem;margin-bottom:1rem">✅</div>
-    <h2 style="font-size:1.3rem;font-weight:700" id="done-title">Import complete</h2>
+    <h2 class="done-title" id="done-title">Import complete</h2>
     <p class="text-muted mt-1" id="done-summary"></p>
-    <div class="flex gap-2 mt-3" style="justify-content:center">
+    <div class="flex gap-2 mt-3 done-actions">
       <a href="/records" class="btn btn-secondary">View Records</a>
       <a href="/dashboard" class="btn btn-primary">Dashboard</a>
       <button class="btn btn-ghost" onclick="resetImport()">Import More</button>
@@ -586,13 +696,13 @@
 </div>
 
 <script src="/static/js/utils.js?v=7"></script>
-<script src="/static/js/api.js?v=7"></script>
+<script src="/static/js/api.js?v=8"></script>
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
-<script src="/static/js/keyword-conflict-modal.js?v=18"></script>
+<script src="/static/js/keyword-conflict-modal.js?v=22"></script>
 <script src="/static/js/category-create-modal.js?v=1"></script>
 <script src="/static/js/add-tx-modal.js?v=4"></script>
-<script src="/static/js/import-page.js?v=4"></script>
+<script src="/static/js/import-page.js?v=11"></script>
 
-<div class="app-toast" id="import-toast" style="max-width:360px;line-height:1.4"></div>
+<div class="app-toast toast-wide" id="import-toast"></div>
 </body>
 </html>

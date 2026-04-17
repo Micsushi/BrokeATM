@@ -6,32 +6,44 @@
   <title>Settings | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=9" />
+  <link rel="stylesheet" href="/static/css/main.css?v=16" />
   <style>
     .settings-section { margin-bottom: 2rem; }
     .settings-section h2 {
-      font-size: 1rem; font-weight: 700; color: var(--text);
+      font-size: 1.02rem; font-weight: 700; color: var(--text);
       margin-bottom: 1rem; padding-bottom: 0.5rem;
       border-bottom: 1px solid var(--border);
     }
+    .settings-page .page-header .btn {
+      min-height: var(--btn-height);
+      font-size: var(--btn-font);
+    }
+    .settings-copy {
+      font-size: var(--font-size-body-sm);
+      color: var(--text-muted);
+      margin-bottom: 1.1rem;
+      line-height: 1.55;
+    }
     .setting-row {
       display: flex; align-items: center; justify-content: space-between;
-      gap: 1.5rem; padding: 0.85rem 0;
+      gap: 1.5rem; padding: 1rem 0;
       border-bottom: 1px solid rgba(255,255,255,0.04);
     }
     .setting-row:last-child { border-bottom: none; }
     .setting-label { flex: 1; }
-    .setting-label strong { display: block; font-size: 0.92rem; color: var(--text); margin-bottom: 0.2rem; }
-    .setting-label span { font-size: 0.8rem; color: var(--text-muted); line-height: 1.4; }
+    .setting-label strong { display: block; font-size: 0.98rem; color: var(--text); margin-bottom: 0.2rem; }
+    .setting-label span { font-size: var(--font-size-body-sm); color: var(--text-muted); line-height: 1.5; }
     .setting-control { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+    .currency-select { min-width: 140px; }
     .setting-control input[type="number"] {
       width: 110px;
       background: var(--surface2);
       border: 1px solid var(--border);
       border-radius: 8px;
       color: var(--text);
-      font-size: 0.9rem;
-      padding: 0.45rem 0.75rem;
+      font-size: var(--control-font-sm);
+      min-height: var(--control-height-sm);
+      padding: var(--control-pad-sm-y) var(--control-pad-sm-x);
     }
     .setting-control input[type="number"]:focus {
       outline: none; border-color: var(--accent);
@@ -40,11 +52,11 @@
     .setting-control input[type="checkbox"] {
       width: 18px; height: 18px; cursor: pointer; accent-color: var(--accent);
     }
-    .setting-unit { font-size: 0.82rem; color: var(--text-muted); }
+    .setting-unit { font-size: var(--font-size-caption); color: var(--text-muted); }
     .preview-box {
       background: var(--surface2); border: 1px solid var(--border);
       border-radius: var(--radius); padding: 1rem 1.25rem;
-      font-size: 0.83rem; color: var(--text-muted); line-height: 1.6;
+      font-size: var(--font-size-body-sm); color: var(--text-muted); line-height: 1.6;
       margin-top: 0.75rem;
     }
     .preview-box strong { color: var(--accent-hover); }
@@ -58,7 +70,7 @@
     .col-toggle {
       display: flex; align-items: center; gap: 0.6rem;
       background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; padding: 0.55rem 0.9rem;
+      border-radius: 8px; padding: 0.65rem 0.95rem;
       cursor: pointer; transition: border-color 0.15s;
       user-select: none;
     }
@@ -66,9 +78,65 @@
     .col-toggle input[type="checkbox"] {
       width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; flex-shrink: 0;
     }
-    .col-toggle label { font-size: 0.88rem; color: var(--text); cursor: pointer; font-weight: 500; }
+    .col-toggle label { font-size: var(--font-size-body-sm); color: var(--text); cursor: pointer; font-weight: 500; }
     .col-toggle.required { opacity: 0.5; }
     .col-toggle.required label { color: var(--text-muted); }
+    .autosort-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      min-height: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .autosort-row {
+      display: flex;
+      gap: 0.6rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .autosort-input {
+      flex: 1;
+      min-width: 200px;
+    }
+    .autosort-empty {
+      font-size: var(--font-size-caption);
+      color: var(--text-muted);
+    }
+    .autosort-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.24rem 0.55rem 0.24rem 0.68rem;
+      border-radius: 99px;
+      background: rgba(124,130,255,0.18);
+      border: 1px solid rgba(124,130,255,0.35);
+      font-size: var(--font-size-caption);
+      color: var(--accent-hover);
+      font-weight: 600;
+    }
+    .autosort-chip-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      line-height: 1;
+      padding: 0 0.1rem;
+    }
+    .danger-card { border-color: rgba(239,68,68,0.35); }
+    .danger-title { color: var(--danger); border-bottom-color: rgba(239,68,68,0.25); }
+    .modal-copy { color: var(--text-muted); font-size: var(--font-size-body); margin: 0.75rem 0 1.25rem; }
+
+    @media (max-width: 760px) {
+      .setting-row {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .setting-control {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+    }
   </style>
 </head>
 <body>
@@ -84,13 +152,13 @@
   </div>
 </nav>
 
-<div class="page">
+<div class="page settings-page">
   <div class="page-header page-header-split">
     <div>
       <h1>Settings</h1>
       <p>All changes save automatically</p>
     </div>
-    <button class="btn btn-secondary btn-sm" id="btn-reset">Reset to defaults</button>
+    <button class="btn btn-secondary" id="btn-reset">Reset to defaults</button>
   </div>
 
   <!-- Large Expense Detection -->
@@ -102,7 +170,7 @@
         <span>Changes the currency code used across the app, including existing transactions, recurring rules, totals, charts, and labels.</span>
       </div>
       <div class="setting-control">
-        <select id="default-currency" style="min-width:140px"></select>
+        <select class="currency-select" id="default-currency"></select>
       </div>
     </div>
   </div>
@@ -110,7 +178,7 @@
   <!-- Large Expense Detection -->
   <div class="card settings-section">
     <h2>Large Expense Detection</h2>
-    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:1.25rem">
+    <p class="settings-copy">
       Transactions shown in the <strong style="color:var(--text)">Large Expenses</strong> section on the Dashboard.
       A transaction is flagged if it meets <em>either</em> enabled condition.
     </p>
@@ -145,7 +213,7 @@
   <!-- Records Columns -->
   <div class="card settings-section">
     <h2>Records: Visible Columns</h2>
-    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:1rem">
+    <p class="settings-copy" style="margin-bottom:1rem">
       Choose which columns to show in the Records table. Changes apply immediately on next visit.
       <em>Date</em>, <em>Merchant</em>, <em>Amount</em> and <em>Actions</em> are always shown.
     </p>
@@ -182,23 +250,21 @@
   <!-- Import: Auto-Sort Categories -->
   <div class="card settings-section">
     <h2>Import: Auto-Sort Categories</h2>
-    <p style="font-size:0.83rem;color:var(--text-muted);margin-bottom:1.25rem">
+    <p class="settings-copy">
       When a PDF or OFX import contains a category name in this list, it will automatically use keyword matching
       against your existing categories instead of prompting you to create a new one.
       Add category names exactly as they appear in your bank statements.
     </p>
-    <div id="autosort-list" style="display:flex;flex-wrap:wrap;gap:0.4rem;min-height:1.5rem;margin-bottom:1rem"></div>
-    <div style="display:flex;gap:0.6rem;align-items:center;flex-wrap:wrap">
-      <input type="text" id="autosort-input" placeholder="Category name from bank statement"
-             style="flex:1;min-width:200px;background:var(--surface2);border:1px solid var(--border);
-                    border-radius:8px;color:var(--text);font-size:0.9rem;padding:0.45rem 0.75rem" />
+    <div id="autosort-list" class="autosort-list"></div>
+    <div class="autosort-row">
+      <input class="autosort-input" type="text" id="autosort-input" placeholder="Category name from bank statement" />
       <button class="btn btn-ghost btn-sm" id="btn-autosort-add">Add</button>
     </div>
   </div>
 
   <!-- Danger Zone -->
-  <div class="card settings-section" style="border-color:rgba(239,68,68,0.35)">
-    <h2 style="color:var(--danger);border-bottom-color:rgba(239,68,68,0.25)">Danger Zone</h2>
+  <div class="card settings-section danger-card">
+    <h2 class="danger-title">Danger Zone</h2>
     <div class="setting-row">
       <div class="setting-label">
         <strong>Clear all transaction records</strong>
@@ -224,7 +290,7 @@
 <div class="modal-overlay hidden" id="clear-modal">
   <div class="modal" style="max-width:420px">
     <h2 style="color:var(--danger)" id="clear-title">Delete all records?</h2>
-    <p style="color:var(--text-muted);font-size:0.9rem;margin:0.75rem 0 1.25rem" id="clear-body"></p>
+    <p class="modal-copy" id="clear-body"></p>
     <div id="clear-alerts"></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" id="clear-cancel">Cancel</button>
@@ -236,7 +302,7 @@
 <div class="app-toast" id="saved-toast">Saved</div>
 
 <script src="/static/js/utils.js?v=7"></script>
-<script src="/static/js/api.js?v=7"></script>
+<script src="/static/js/api.js?v=8"></script>
 <script>
 // ── Column definitions (id matches what records.html expects) ─────────────────
 const ALL_COLUMNS = [
@@ -429,16 +495,13 @@ function buildAutoSortList(s) {
   if (!list) return;
   const cats = Array.isArray(s.autoSortCategories) ? s.autoSortCategories : [];
   if (!cats.length) {
-    list.innerHTML = `<span style="font-size:0.82rem;color:var(--text-muted)">No categories added yet.</span>`;
+    list.innerHTML = `<span class="autosort-empty">No categories added yet.</span>`;
     return;
   }
   list.innerHTML = cats.map((c, i) => `
-    <span style="display:inline-flex;align-items:center;gap:0.35rem;padding:0.2rem 0.5rem 0.2rem 0.65rem;
-                 border-radius:99px;background:rgba(124,130,255,0.18);border:1px solid rgba(124,130,255,0.35);
-                 font-size:0.8rem;color:var(--accent-hover);font-weight:500">
+    <span class="autosort-chip">
       ${c.replace(/</g,"&lt;")}
-      <button onclick="removeAutoSortCat(${i})" style="background:none;border:none;cursor:pointer;
-              color:var(--text-muted);font-size:0.85rem;line-height:1;padding:0 0.1rem"
+      <button class="autosort-chip-remove" onclick="removeAutoSortCat(${i})"
               title="Remove">×</button>
     </span>`).join("");
 }

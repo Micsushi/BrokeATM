@@ -8,8 +8,8 @@
     style.id = STYLE_ID;
     style.textContent = `
       #${MODAL_ID} .modal {
-        width: min(96vw, 1040px);
-        max-width: 1040px;
+        width: min(96vw, 680px);
+        max-width: 680px;
         max-height: min(92vh, 920px);
         display: grid;
         grid-template-rows: auto auto minmax(0, 1fr) auto;
@@ -37,8 +37,8 @@
         display: none;
       }
       #${MODAL_ID} .kcm-nav-btn {
-        min-width: 40px;
-        min-height: 40px;
+        min-width: 36px;
+        min-height: 36px;
         padding: 0;
         border-radius: 10px;
         font-size: 1rem;
@@ -258,11 +258,15 @@
       #${MODAL_ID} .kcm-category-label {
         display: block;
         margin-bottom: 0.45rem;
-        font-size: 0.84rem;
+        font-size: 0.95rem;
         font-weight: 700;
         color: var(--text);
         text-transform: none;
         letter-spacing: normal;
+      }
+      #${MODAL_ID} #kcm-category-select {
+        font-size: 1rem;
+        padding: 0.55rem 0.75rem;
       }
       #${MODAL_ID} .kcm-actions {
         display: grid;
@@ -274,7 +278,8 @@
         background: linear-gradient(180deg, rgba(19, 22, 42, 0), rgba(19, 22, 42, 0.92) 40%);
       }
       #${MODAL_ID} .kcm-actions .btn {
-        min-height: 48px;
+        min-height: 40px;
+        padding: 0.28rem 0.8rem;
         border-radius: 12px;
         font-size: 0.96rem;
         font-weight: 700;
@@ -303,13 +308,46 @@
         background: rgba(124, 130, 255, 0.15);
       }
       #${MODAL_ID} .kcm-btn-action {
-        background: linear-gradient(180deg, #c27a1a, #a55b10);
-        color: #fff7ea;
-        border: 1px solid rgba(251, 191, 36, 0.45);
+        background: linear-gradient(180deg, #dc2626, #b91c1c);
+        color: #fff;
+        border: 1px solid rgba(239, 68, 68, 0.5);
       }
       #${MODAL_ID} .kcm-btn-action:hover {
-        background: linear-gradient(180deg, #d18a24, #b96815);
-        border-color: rgba(252, 211, 77, 0.6);
+        background: linear-gradient(180deg, #ef4444, #dc2626);
+        border-color: rgba(239, 68, 68, 0.7);
+      }
+      #${MODAL_ID} .kcm-conflict-list {
+        display: grid;
+        gap: 0.5rem;
+      }
+      #${MODAL_ID} .kcm-conflict-row {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.7rem 0.9rem;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: color-mix(in srgb, var(--surface2) 92%, white 2%);
+        cursor: pointer;
+        flex-wrap: wrap;
+      }
+      #${MODAL_ID} .kcm-conflict-row.is-checked {
+        border-color: rgba(239, 68, 68, 0.3);
+        background: rgba(239, 68, 68, 0.06);
+      }
+      #${MODAL_ID} .kcm-conflict-keywords {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+        flex: 1;
+        flex-wrap: wrap;
+      }
+      #${MODAL_ID} .kcm-conflict-row input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-left: auto;
+        flex-shrink: 0;
+        accent-color: #ef4444;
       }
       #${MODAL_ID} .kcm-btn-primary {
         background: color-mix(in srgb, var(--accent) 78%, white 22%);
@@ -636,24 +674,28 @@
     normalizedMerchant,
     matches,
     selectedCategory,
-    rowIsDuplicate,
-    rowExcluded,
     navigation,
+    onApplyRemovals,
   }) {
     injectModal();
     const modal = document.getElementById(MODAL_ID);
     const body = document.getElementById("kcm-body");
     const uniqueCategories = [...new Set((matches || []).map((item) => item.categoryName))].sort();
     const currentCategory = selectedCategory || uniqueCategories[0] || "";
-    const bestLength = matches?.length ? matches[0].length : 0;
     const removalCandidates = CategoryKeywordTools.uniqueBy(
       (matches || []).map((item) => ({
         categoryId: item.categoryId,
         categoryName: item.categoryName,
         keyword: item.keyword,
+        length: item.length || 0,
       })),
       (item) => `${item.categoryId}|${item.keyword}`
     );
+    const bestLength = removalCandidates.reduce((max, r) => Math.max(max, r.length), 0);
+    const strongestIdx = (() => {
+      const inCat = removalCandidates.findIndex((r) => r.categoryName === currentCategory && r.length === bestLength);
+      return inCat >= 0 ? inCat : removalCandidates.findIndex((r) => r.length === bestLength);
+    })();
     let allowRemoveAll = false;
     document.getElementById("kcm-title").textContent = title || "Keyword matches";
     setNav({
@@ -677,49 +719,59 @@
     clearAlerts();
 
     body.innerHTML = `
-      <div class="kcm-merchant-layout">
-        <div class="kcm-merchant-main">
-          <div class="kcm-entry-card">
-            <div class="kcm-entry-label">Entry</div>
-            <div class="kcm-entry-text">${escHtml(merchantName || "Untitled entry")}</div>
-            <div class="kcm-entry-normalized">Match text: <code>${escHtml(normalizedMerchant || "") || "—"}</code></div>
-          </div>
-          <div class="kcm-section">
-            <div class="kcm-section-title">Multiple keyword matches</div>
-            <div class="kcm-match-grid">
-              ${(matches || []).map((item) => `
-                <div class="kcm-match-card">
-                  <div class="kcm-match-line">
-                    <span class="kcm-token kcm-token-keyword">${escHtml(item.keyword)}</span>
-                    <span class="kcm-arrow">→</span>
-                    <span class="kcm-token kcm-token-category">${escHtml(item.categoryName)}</span>
-                    ${item.length === bestLength ? `<span class="badge">strongest</span>` : ""}
-                  </div>
-                </div>
-              `).join("")}
-            </div>
-          </div>
+      <div class="kcm-entry-card">
+        <div class="kcm-entry-label">Entry</div>
+        <div class="kcm-entry-text">${escHtml(merchantName || "Untitled entry")}</div>
+        <div class="kcm-entry-normalized"><em>Normalized match text:</em> <code>${escHtml(normalizedMerchant || "") || "—"}</code></div>
+      </div>
+      <div class="kcm-section">
+        <label class="kcm-category-label" for="kcm-category-select">Category for this row</label>
+        <select id="kcm-category-select" class="review-inp" style="width:100%">
+          ${uniqueCategories.map((name) => `
+            <option value="${escHtml(name)}"${name === currentCategory ? " selected" : ""}>${escHtml(name)}</option>
+          `).join("")}
+        </select>
+      </div>
+      <div class="kcm-section">
+        <div class="kcm-section-title">Keyword matches — check to remove</div>
+        <div class="kcm-conflict-list">
+          ${removalCandidates.map((item, i) => {
+            const willRemove = item.categoryName !== currentCategory;
+            return `
+              <label class="kcm-conflict-row${willRemove ? " is-checked" : ""}">
+                <span class="kcm-conflict-keywords">
+                  <span class="kcm-token kcm-token-keyword">${escHtml(item.keyword)}</span>
+                  <span class="kcm-arrow">→</span>
+                  <span class="kcm-token kcm-token-category">${escHtml(item.categoryName)}</span>
+                  ${i === strongestIdx ? `<span class="badge">strongest</span>` : ""}
+                </span>
+                <input type="checkbox"
+                  data-removal-key="${escHtml(item.categoryId + "|" + item.keyword)}"
+                  data-category-id="${escHtml(String(item.categoryId))}"
+                  data-category-name="${escHtml(item.categoryName)}"
+                  data-keyword="${escHtml(item.keyword)}"
+                  ${willRemove ? "checked" : ""} />
+              </label>
+            `;
+          }).join("")}
         </div>
-        <div class="kcm-merchant-side">
-          <div class="kcm-section">
-            <label class="kcm-category-label">Category for this row</label>
-            <select id="kcm-category-select" class="review-inp" style="width:100%">
-              ${uniqueCategories.map((name) => `
-                <option value="${escHtml(name)}"${name === currentCategory ? " selected" : ""}>${escHtml(name)}</option>
-              `).join("")}
-            </select>
-          </div>
-          <div class="kcm-section">
-            <div class="kcm-section-title">Remove keywords</div>
-            ${renderRemovalChecklist(removalCandidates, "No removable keywords were found for this merchant.")}
-            <div class="kcm-inline-note">
-              Saves immediately.
-            </div>
-          </div>
-        </div>
+        <div class="kcm-inline-note">Checked keywords will be removed from their category. Saves immediately.</div>
       </div>
     `;
-    bindRemovalChecklist(() => {
+
+    document.querySelectorAll("#kcm-body .kcm-conflict-row input[type='checkbox']").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        cb.closest(".kcm-conflict-row")?.classList.toggle("is-checked", cb.checked);
+        allowRemoveAll = false;
+      });
+    });
+
+    document.getElementById("kcm-category-select")?.addEventListener("change", (e) => {
+      const newCat = e.target.value;
+      document.querySelectorAll("#kcm-body input[data-removal-key]").forEach((cb) => {
+        cb.checked = cb.dataset.categoryName !== newCat;
+        cb.closest(".kcm-conflict-row")?.classList.toggle("is-checked", cb.checked);
+      });
       allowRemoveAll = false;
     });
 
@@ -736,7 +788,7 @@
       {
         label: "Apply removals",
         className: "btn kcm-btn-action",
-        onClick: () => {
+        onClick: async () => {
           const removals = selectedRemovalItems();
           if (!removals.length) {
             showAlert(document.getElementById("kcm-alerts"), "Pick at least one keyword to remove.", "error");
@@ -751,21 +803,44 @@
             allowRemoveAll = true;
             return;
           }
-          closeCurrent({
-            action: "remove",
-            removals,
-            selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
-          });
+          const selCat = document.getElementById("kcm-category-select")?.value || currentCategory;
+          let updatedState = null;
+          if (typeof onApplyRemovals === "function") {
+            try {
+              updatedState = await onApplyRemovals({ removals, selectedCategory: selCat });
+            } catch (err) {
+              showAlert(document.getElementById("kcm-alerts"), err?.message || "Could not remove keywords.", "error");
+              return;
+            }
+          }
+          closeCurrent({ action: "remove", removals, selectedCategory: selCat, updatedState });
         },
       },
       {
         label: "Use for this row",
         className: "btn kcm-btn-primary",
-        onClick: () => closeCurrent({
-          action: "done",
-          removals: [],
-          selectedCategory: document.getElementById("kcm-category-select")?.value || currentCategory,
-        }),
+        onClick: () => {
+          const selCat = document.getElementById("kcm-category-select")?.value || currentCategory;
+          const body = document.getElementById("kcm-body");
+          if (body) {
+            body.style.transition = "opacity 0.18s ease";
+            body.style.opacity = "0.35";
+          }
+          const actionBar = document.getElementById("kcm-actions");
+          if (actionBar) {
+            actionBar.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+          }
+          const titleEl = document.getElementById("kcm-title");
+          if (titleEl) {
+            titleEl.textContent = `✓ Set to ${selCat}`;
+            titleEl.style.color = "#22c55e";
+          }
+          setTimeout(() => {
+            if (body) { body.style.transition = ""; body.style.opacity = ""; }
+            if (titleEl) { titleEl.style.color = ""; }
+            closeCurrent({ action: "done", removals: [], selectedCategory: selCat });
+          }, 480);
+        },
       },
     ]);
 

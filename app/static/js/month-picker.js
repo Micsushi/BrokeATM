@@ -31,6 +31,7 @@ class MonthPicker {
     this.onChange = onChange;
     this._months = [];
     this._active = mode === 'multi' ? new Set() : 0;
+    this._bindWheelScroll();
   }
 
   /** Rebuild chips. initial: idx (single) or Set<ym> (multi). */
@@ -87,5 +88,22 @@ class MonthPicker {
       this._sync();
       this.onChange(i, ym);
     }
+  }
+
+  _bindWheelScroll() {
+    if (!this.el) return;
+    this.el.addEventListener('wheel', (event) => {
+      if (event.ctrlKey || this.el.scrollWidth <= this.el.clientWidth) return;
+
+      const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+      if (!delta) return;
+
+      const maxScrollLeft = this.el.scrollWidth - this.el.clientWidth;
+      const nextScrollLeft = Math.max(0, Math.min(maxScrollLeft, this.el.scrollLeft + delta));
+      if (nextScrollLeft === this.el.scrollLeft) return;
+
+      event.preventDefault();
+      this.el.scrollLeft = nextScrollLeft;
+    }, { passive: false });
   }
 }

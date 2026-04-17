@@ -727,7 +727,10 @@ function renderStepIndicators(visibleStep) {
     const stepEl = document.querySelector(`.step[data-step="${step}"]`)
     if (!stepEl) return
     stepEl.classList.remove("active", "done")
-    if (step === visibleStep) stepEl.classList.add("active")
+    if (step === visibleStep) {
+      stepEl.classList.add("active")
+      if (visibleStep === 5) stepEl.classList.add("done")
+    }
     else if (step < visibleStep) stepEl.classList.add("done")
   })
 }
@@ -737,18 +740,116 @@ function renderDoneState() {
   document.getElementById("done-summary").textContent = (doneSummary && doneSummary.summary) || ""
 }
 
-function renderQueuePrimaryButton() {
-  const headerBtn = document.getElementById("btn-import-all-files")
-  if (!headerBtn) return
-  const state = queuePrimaryActionState()
-  const show = currentStep >= 3 && currentStep <= 4 && !!importDocs.length
-  headerBtn.classList.toggle("hidden", !show)
-  if (!show) return
-  headerBtn.textContent = state.label
-  headerBtn.dataset.defaultLabel = state.label
-  headerBtn.disabled = !!state.disabled
-  if (state.reason) headerBtn.title = state.reason
-  else headerBtn.removeAttribute("title")
+function previousStepFor(step) {
+  if (step <= 2) return 1
+  if (step === 3) return 2
+  if (step === 4) return 3
+  return 1
+}
+
+function stageToolbarMeta() {
+  const doc = getActiveDoc()
+  if (currentStep === 2) {
+    if (!doc) {
+      return {
+        title: "Choose a parsing method",
+        detail: "Pick a file in the queue to review its parsed rows.",
+      }
+    }
+    if (doc.status === "processing") {
+      const position = importDocs.findIndex((item) => item.id === doc.id) + 1
+      return {
+        title: `Processing ${doc.filename}`,
+        detail: `File ${position} of ${importDocs.length}. You can go back to uploads while this finishes.`,
+      }
+    }
+    if (doc.status === "queued") {
+      const position = importDocs.findIndex((item) => item.id === doc.id) + 1
+      return {
+        title: `${doc.filename} is queued`,
+        detail: `File ${position} of ${importDocs.length}. It will move into preview as soon as parsing finishes.`,
+      }
+    }
+    if (doc.status === "error") {
+      return {
+        title: `${doc.filename} needs attention`,
+        detail: doc.errorMessage || "Parsing failed.",
+      }
+    }
+    if (doc.isPdfMode) {
+      const result = getParserResultForDoc(doc)
+      return {
+        title: `Review parser output for ${doc.filename}`,
+        detail: result
+          ? `${formatParserSummary(result)} · ${result.parser_label}`
+          : "Compare the parser results, then move the whole batch forward.",
+      }
+    }
+    const rows = ((doc.parsedData && doc.parsedData.rows) || [])
+    return {
+      title: `Preview ${doc.filename}`,
+      detail: `${rows.length} row${rows.length !== 1 ? "s" : ""} parsed. CSV files do not need a parser choice.`,
+    }
+  }
+
+  if (currentStep === 3) {
+    const readyDocs = getReadyDocs()
+    const summary = document.getElementById("parse-summary")
+    return {
+      title: `Confirm file periods for ${readyDocs.length} ready file${readyDocs.length !== 1 ? "s" : ""}`,
+      detail: (summary && summary.textContent) || "Month and year are saved per file in this batch.",
+    }
+  }
+
+  if (currentStep === 4) {
+    const duplicateCount = reviewRows.filter((row) => row.duplicate).length
+    const duplicateExcluded = reviewRows.filter((row) => row.duplicate && row.exclude).length
+    const duplicateIncluded = reviewRows.filter((row) => row.duplicate && !row.exclude).length
+    const duplicateInUpload = reviewRows.filter((row) => row.duplicate && row.duplicate_in_import).length
+    const duplicateInDbOnly = reviewRows.filter((row) => row.duplicate && row.duplicate_in_database && !row.duplicate_in_import).length
+    const paymentCount = reviewRows.filter((row) => row.is_payment).length
+    const keywordCount = reviewRows.filter((row) => row.keyword_resolution_needed).length
+    const parts = []
+    if (duplicateCount) {
+      let dupText = `${duplicateExcluded} duplicates off`
+      if (duplicateIncluded) dupText += `, ${duplicateIncluded} kept`
+      if (duplicateInUpload || duplicateInDbOnly) dupText += ` (${duplicateInUpload} upload, ${duplicateInDbOnly} database)`
+      parts.push(dupText)
+    }
+    if (paymentCount) parts.push(`${paymentCount} payments`)
+    if (keywordCount) parts.push(`${keywordCount} conflicts`)
+    return {
+      title: `${reviewRows.length} rows from ${importFilename || "this file"}`,
+      detail: parts.join(" · ") || "Review the rows below, then import the ones you want to keep.",
+    }
+  }
+
+  return { title: "", detail: "" }
+}
+
+function renderStageToolbar() {
+  const toolbar = document.getElementById("import-stage-toolbar")
+  const titleEl = document.getElementById("import-stage-title")
+  const detailEl = document.getElementById("import-stage-detail")
+  const backBtn = document.getElementById("btn-stage-back")
+  const selectAllBtn = document.getElementById("btn-select-all")
+  const deselectAllBtn = document.getElementById("btn-deselect-all")
+  const selectedCountEl = document.getElementById("review-selected-count")
+  if (!toolbar || !titleEl || !detailEl || !backBtn || !selectAllBtn || !deselectAllBtn || !selectedCountEl) return
+
+  const visible = currentStep >= 2 && currentStep <= 4 && (!!getActiveDoc() || !!importDocs.length)
+  toolbar.classList.toggle("hidden", !visible)
+  if (!visible) return
+
+  const meta = stageToolbarMeta()
+  titleEl.textContent = meta.title
+  detailEl.textContent = meta.detail
+  backBtn.dataset.step = String(previousStepFor(currentStep))
+
+  const reviewControlsVisible = currentStep === 4
+  selectAllBtn.classList.toggle("hidden", !reviewControlsVisible)
+  deselectAllBtn.classList.toggle("hidden", !reviewControlsVisible)
+  selectedCountEl.classList.toggle("hidden", !reviewControlsVisible)
 }
 
 function applyButtonState(button, state) {
@@ -761,19 +862,12 @@ function applyButtonState(button, state) {
 }
 
 function renderStageActionButtons() {
-  applyButtonState(document.getElementById("btn-use-parser"), parseStageAdvanceState())
-
-  const periodState = {
-    disabled: !importDocs.length || docsByStatus(["queued", "processing", "error"]).length > 0,
-    label: "Check duplicates for all files →",
-    reason: "Run duplicate checks across the whole batch and move every file into Review.",
-  }
-  applyButtonState(document.getElementById("btn-check-dups"), periodState)
-
-  if (currentStep === 4) {
-    const reviewState = reviewStageActionState()
-    document.querySelectorAll(".review-btn-commit-all").forEach((button) => applyButtonState(button, reviewState))
-  }
+  const primaryBtn = document.getElementById("btn-stage-primary")
+  if (!primaryBtn) return
+  const visible = currentStep >= 2 && currentStep <= 4 && (!!getActiveDoc() || !!importDocs.length)
+  primaryBtn.classList.toggle("hidden", !visible)
+  if (!visible) return
+  applyButtonState(primaryBtn, queuePrimaryActionState())
 }
 
 function queueStatusText(doc) {
@@ -791,7 +885,6 @@ function renderImportQueue() {
   if (!card) return
   if (!importDocs.length) {
     card.classList.add("hidden")
-    renderQueuePrimaryButton()
     return
   }
   card.classList.remove("hidden")
@@ -845,8 +938,6 @@ function renderImportQueue() {
     wrapper.appendChild(removeBtn)
     tabs.appendChild(wrapper)
   })
-
-  renderQueuePrimaryButton()
 }
 
 function updateParseStageIntro() {
@@ -988,6 +1079,7 @@ function renderApp() {
   syncGlobalsFromActiveDoc()
   renderImportQueue()
   renderStepPanels()
+  renderStageToolbar()
   renderStageActionButtons()
 }
 
@@ -1290,12 +1382,20 @@ function renderFilePeriodPickers() {
   if (!host) return
 
   const readyDocs = importDocs.filter((d) => d.status === "ready" && d.parsedData && d.parsedData.source_files && d.parsedData.source_files.length)
+  host.innerHTML = ""
   if (!readyDocs.length) {
-    host.innerHTML = ""
     return
   }
 
-  host.innerHTML = ""
+  // Column header row
+  const header = document.createElement("div")
+  header.className = "file-period-header"
+  header.innerHTML = `
+    <span class="file-period-header-label">File</span>
+    <span class="file-period-header-label">Month</span>
+    <span class="file-period-header-label">Year</span>
+  `
+  host.appendChild(header)
 
   readyDocs.forEach((doc) => {
     const data = doc.parsedData
@@ -1308,22 +1408,15 @@ function renderFilePeriodPickers() {
       data.perFilePeriod[fname] = { month: saved.month, year: saved.year }
 
       const row = document.createElement("div")
-      row.className = "fp-row flex gap-2 items-end mb-2 flex-wrap"
+      row.className = "file-period-row"
       row.dataset.fpIdx = String(idx)
       row.dataset.docId = doc.id
       row.innerHTML = `
-        <div style="min-width:10rem;font-weight:600;font-size:0.9rem;word-break:break-all">${escHtml(fname)}</div>
-        <div>
-          <label class="text-muted" style="font-size:0.75rem;display:block">Month</label>
-          <select class="fp-month" style="min-width:9rem;padding:0.35rem 0.5rem;border-radius:4px;background:var(--surface2);color:var(--text);border:1px solid var(--border)">
-            ${fpMonthOptionsHtml(saved.month)}
-          </select>
-        </div>
-        <div>
-          <label class="text-muted" style="font-size:0.75rem;display:block">Year</label>
-          <input type="number" class="fp-year" min="2000" max="2100" value="${saved.year}"
-            style="width:5.5rem;padding:0.35rem 0.5rem;border-radius:4px;background:var(--surface2);color:var(--text);border:1px solid var(--border)" />
-        </div>
+        <div class="file-period-file" title="${escHtml(fname)}">${escHtml(fname)}</div>
+        <select class="fp-month file-period-control">
+          ${fpMonthOptionsHtml(saved.month)}
+        </select>
+        <input type="number" class="fp-year file-period-control" min="2000" max="2100" value="${saved.year}" />
       `
       const onChange = () => {
         syncPerFilePeriodFromPickers(doc)
@@ -1456,7 +1549,7 @@ function renderReviewUnknownCatsBanner() {
   const pills = cats.map((cat) => `<span class="unknown-cats-pill">${escHtml(cat)}</span>`).join("")
   banner.innerHTML = `
     <div class="unknown-cats-title">PDF categories not yet resolved</div>
-    <p class="text-muted" style="font-size:0.82rem">These categories from your PDF were not matched. Go back to Parser step to decide, or they will import as <em>uncategorized</em>.</p>
+    <p class="text-muted unknown-cats-copy">These categories from your PDF were not matched. Go back to Parser step to decide, or they will import as <em>uncategorized</em>.</p>
     <div class="unknown-cats-pills">${pills}</div>`
   banner.classList.remove("hidden")
 }
@@ -1510,18 +1603,6 @@ function renderReviewTable(previewMode = false) {
     } else {
       keywordBanner.classList.add("hidden")
     }
-
-    document.getElementById("review-summary").textContent = `${reviewRows.length} rows from ${importFilename || "this file"}`
-    const warnings = []
-    if (duplicateCount) {
-      let dupText = `${duplicateExcluded} duplicates off`
-      if (duplicateIncluded) dupText += `, ${duplicateIncluded} kept`
-      if (duplicateInUpload || duplicateInDbOnly) dupText += ` (${duplicateInUpload} upload, ${duplicateInDbOnly} database)`
-      warnings.push(dupText)
-    }
-    if (paymentCount) warnings.push(`${paymentCount} payments`)
-    if (keywordCount) warnings.push(`${keywordCount} conflicts`)
-    document.getElementById("dup-warning").textContent = warnings.join(" · ")
   }
 
   let tabIdx = 1
@@ -1538,11 +1619,11 @@ function renderReviewTable(previewMode = false) {
       else if (row.duplicate_in_database) dupHint = "in database"
     }
     const dupBadge = row.duplicate
-      ? `<span class="badge badge-dup">DUP</span><span class="text-muted" style="font-size:0.65rem;margin-left:0.2rem">${dupHint ? escHtml(dupHint) : ""}</span>`
+      ? `<span class="badge badge-dup">DUP</span><span class="text-muted dup-badge-hint">${dupHint ? escHtml(dupHint) : ""}</span>`
       : ""
     const payBadge = row.is_payment ? `<span class="badge badge-transfer">PMT</span>` : ""
     const kwBadge = row.keyword_resolution_needed
-      ? `<button type="button" class="btn btn-ghost btn-sm kw-review-btn" data-idx="${i}" style="margin-left:0.3rem">Resolve</button>`
+      ? `<button type="button" class="btn btn-ghost btn-sm kw-review-btn" data-idx="${i}">Resolve</button>`
       : ""
 
     const typeOptions = ["expense", "income", "refund", "transfer"].map((type) =>
@@ -1568,7 +1649,7 @@ function renderReviewTable(previewMode = false) {
       ? `tabindex="${tabIndex.chk}" title="Duplicate: unchecked by default; check to include in import"`
       : `tabindex="${tabIndex.chk}"`
     const sourceCell = showFileCol
-      ? `<td class="text-muted" style="font-size:0.75rem;max-width:100px;overflow:hidden;text-overflow:ellipsis" title="${escHtml(row.source_file || "")}">${escHtml((row.source_file || "—").slice(0, 22))}${(row.source_file || "").length > 22 ? "…" : ""}</td>`
+      ? `<td class="text-muted source-file-cell" title="${escHtml(row.source_file || "")}">${escHtml((row.source_file || "—").slice(0, 22))}${(row.source_file || "").length > 22 ? "…" : ""}</td>`
       : ""
 
     const missingFields = rowMissingRequired(row)
@@ -1581,14 +1662,14 @@ function renderReviewTable(previewMode = false) {
       ? `<td style="white-space:nowrap">${payBadge}${missingFields.length ? `<span class="badge badge-missing" title="Missing: ${missingFields.join(", ")}">!</span>` : ""}</td>`
       : `<td style="white-space:nowrap">
           ${dupBadge}${payBadge}${kwBadge}
-          ${row.duplicate ? `<span class="text-muted dup-import-hint" style="font-size:0.72rem;margin-left:0.25rem" data-dup-hint="${i}">${row.exclude ? "deselected" : "will import"}</span>` : ""}
+          ${row.duplicate ? `<span class="text-muted dup-import-hint" data-dup-hint="${i}">${row.exclude ? "deselected" : "will import"}</span>` : ""}
          </td>`
 
     tr.innerHTML = `
       <td style="padding-left:0.75rem">
         <input type="checkbox" class="row-chk" data-idx="${i}" ${checked} ${dupChkAttrs} />
       </td>
-      <td class="text-muted" style="font-size:0.8rem">${i + 1}</td>
+      <td class="text-muted row-index-cell">${i + 1}</td>
       ${sourceCell}
       <td>
         <input type="date" class="review-inp date-inp${missingDate ? " required-missing" : ""}" data-idx="${i}"
@@ -1599,8 +1680,8 @@ function renderReviewTable(previewMode = false) {
           value="${escHtml(row.merchant_name || "")}" placeholder="merchant…" tabindex="${tabIndex.merchant}" />
       </td>
       <td>
-        <input type="number" class="review-inp amount-inp${missingAmount ? " required-missing" : ""}" data-idx="${i}"
-          value="${row.amount != null ? row.amount : ""}" step="0.01" min="0" tabindex="${tabIndex.amount}" style="width:90px" />
+        <input type="number" class="review-inp review-amount-inp amount-inp${missingAmount ? " required-missing" : ""}" data-idx="${i}"
+          value="${row.amount != null ? row.amount : ""}" step="0.01" min="0" tabindex="${tabIndex.amount}" />
       </td>
       <td>
         <select class="review-inp type-sel${missingType ? " required-missing" : ""}" data-idx="${i}" tabindex="${tabIndex.type}">${typeOptions}</select>
@@ -1619,6 +1700,7 @@ function renderReviewTable(previewMode = false) {
 
   attachReviewListeners()
   updateSelectedCount()
+  if (!previewMode) renderStageToolbar()
 }
 
 function renderParserPreviewTable() {
@@ -1642,12 +1724,12 @@ function renderParserPreviewTable() {
       ? `<span class="badge badge-missing" title="Missing: ${missing.join(", ")}" style="margin-left:0.3rem">!</span>`
       : ""
     tr.innerHTML = `
-      <td class="text-muted" style="font-size:0.8rem">${i + 1}</td>
+      <td class="text-muted row-index-cell">${i + 1}</td>
       <td>${escHtml(String(row.transaction_date || "—"))}</td>
       <td>${escHtml(row.merchant_name || "—")}${missingHint}</td>
       <td>${row.amount != null ? row.amount : "—"}</td>
       <td>${escHtml(row.transaction_type || "—")}</td>
-      <td class="text-muted" style="font-size:0.85rem">${escHtml(categoryDisplay || "uncategorized")}</td>
+      <td class="text-muted preview-category-cell">${escHtml(categoryDisplay || "uncategorized")}</td>
     `
     tbody.appendChild(tr)
   })
@@ -1676,9 +1758,8 @@ function renderParserWarnings() {
 
 function buildUnknownCatRows(cats) {
   return cats.map((cat) => `
-    <label style="display:flex;align-items:center;gap:0.6rem;padding:0.28rem 0;cursor:pointer">
-      <input type="checkbox" class="unknown-cat-cb" data-cat="${escHtml(cat)}" checked
-             style="width:15px;height:15px;accent-color:var(--accent);cursor:pointer;flex-shrink:0">
+    <label class="unknown-cat-choice">
+      <input type="checkbox" class="unknown-cat-cb" data-cat="${escHtml(cat)}" checked>
       <span class="unknown-cats-pill">${escHtml(cat)}</span>
     </label>`).join("")
 }
@@ -1698,7 +1779,7 @@ function renderUnknownCatsBannerStep2() {
   }
   banner.innerHTML = `
     <div class="unknown-cats-title">Categories from PDF not in your system</div>
-    <p class="text-muted" style="font-size:0.82rem">These categories from the file don't match any in your system. <strong style="color:var(--tone-warning-text)">Optional</strong> — if you skip this, all unrecognized categories will fall back to keyword matching automatically.</p>
+    <p class="text-muted unknown-cats-copy">These categories from the file don't match any in your system. <strong style="color:var(--tone-warning-text)">Optional</strong> — if you skip this, all unrecognized categories will fall back to keyword matching automatically.</p>
     <div id="unknown-cats-list" style="margin:0.5rem 0 0.75rem">${buildUnknownCatRows(cats)}</div>
     <div class="unknown-cats-actions">
       <button class="btn btn-ghost btn-sm" onclick="handleUnknownCatsSelectAll(true)">Select all</button>
@@ -1962,6 +2043,7 @@ async function reviewKeywordConflict(idx) {
   async function applyConflictRemovals({ removals, selectedCategory }) {
     categories = await CategoryKeywordTools.removeKeywords(removals)
     refreshKeywordStateForRows(reviewRows)
+    importDocs.forEach((d) => { if (d.reviewRows && d.reviewRows !== reviewRows) refreshKeywordStateForRows(d.reviewRows) })
     const updatedRow = reviewRows[idx]
     if (!updatedRow) {
       renderReviewTable()
@@ -2051,6 +2133,10 @@ async function reviewKeywordConflict(idx) {
   if (result.selectedCategory) {
     row.category_name = result.selectedCategory
   }
+  if (result.action === "done") {
+    row.keyword_resolution_needed = false
+    row.keyword_conflict_categories = false
+  }
   if (result.action === "prev" && prevIdx != null) {
     await reviewKeywordConflict(prevIdx)
     return
@@ -2059,7 +2145,35 @@ async function reviewKeywordConflict(idx) {
     await reviewKeywordConflict(nextIdx)
     return
   }
-  if (result.action === "close" || result.action === "done") {
+  if (result.action === "remove") {
+    // applyConflictRemovals already updated rows, rendered table, and marked dirty
+    const updatedState = result.updatedState
+    if (updatedState?.status === "multiple") {
+      // This row still has unresolved conflicts after the removal — re-open it
+      await reviewKeywordConflict(idx)
+    } else {
+      // Row resolved; find the next remaining conflict
+      const remaining = reviewRows
+        .map((r, i) => (r.keyword_resolution_needed ? i : -1))
+        .filter((i) => i >= 0)
+      if (remaining.length > 0) {
+        await reviewKeywordConflict(remaining[0])
+      }
+    }
+    return
+  }
+  if (result.action === "done") {
+    renderReviewTable()
+    markDraftDirty()
+    const remaining = reviewRows
+      .map((r, i) => (r.keyword_resolution_needed ? i : -1))
+      .filter((i) => i >= 0)
+    if (remaining.length > 0) {
+      await reviewKeywordConflict(remaining[0])
+    }
+    return
+  }
+  if (result.action === "close") {
     renderReviewTable()
     markDraftDirty()
   }
@@ -2154,10 +2268,7 @@ function finishImport(docsToRemove, result, titlePrefix) {
 }
 
 async function runCommitAll() {
-  const buttons = [
-    document.getElementById("btn-import-all-files"),
-    ...document.querySelectorAll(".review-btn-commit-all"),
-  ].filter(Boolean)
+  const buttons = [document.getElementById("btn-stage-primary")].filter(Boolean)
   setButtonBusy(buttons, "Importing…")
   try {
     await refreshDuplicatesAcrossDocs()
@@ -2186,18 +2297,17 @@ async function runCommitAll() {
   }
 }
 
-function handleQueuePrimaryAction() {
+async function handleQueuePrimaryAction() {
   if (currentStep === 2) {
     advanceAllParsers()
     return
   }
   if (currentStep === 3) {
-    const checkDupBtn = document.getElementById("btn-check-dups")
-    if (checkDupBtn) checkDupBtn.click()
+    await runDuplicateCheckAndGoReview()
     return
   }
   if (currentStep === 4) {
-    runCommitAll()
+    await runCommitAll()
   }
 }
 
@@ -2235,67 +2345,30 @@ function bindEvents() {
     if (fileInput.files && fileInput.files.length) handleFileList(fileInput.files)
   })
 
-  const addMoreBtn = document.getElementById("btn-add-more-files")
-  const importAllBtn = document.getElementById("btn-import-all-files")
-  const useParserBtn = document.getElementById("btn-use-parser")
-  const backToParserBtn = document.getElementById("btn-back-to-parser")
-  const checkDupBtn = document.getElementById("btn-check-dups")
-  const recheckDupBtn = document.getElementById("btn-recheck-dups")
-  const excludePaymentsBtn = document.getElementById("btn-exclude-payments")
+  const stageBackBtn = document.getElementById("btn-stage-back")
+  const stagePrimaryBtn = document.getElementById("btn-stage-primary")
   const selectAllBtn = document.getElementById("btn-select-all")
   const deselectAllBtn = document.getElementById("btn-deselect-all")
   const reviewKeywordBtn = document.getElementById("btn-review-keyword-conflicts")
   const addEntryBtn = document.getElementById("btn-add-entry-import")
 
-  if (addMoreBtn) addMoreBtn.addEventListener("click", () => fileInput.click())
-  if (importAllBtn) importAllBtn.addEventListener("click", handleQueuePrimaryAction)
-  if (useParserBtn) useParserBtn.addEventListener("click", advanceAllParsers)
-  if (backToParserBtn) backToParserBtn.addEventListener("click", () => {
-    goStep(2)
+  if (stageBackBtn) stageBackBtn.addEventListener("click", () => {
+    goStep(+stageBackBtn.dataset.step || previousStepFor(currentStep))
   })
-
-  if (checkDupBtn) checkDupBtn.addEventListener("click", async () => {
-    const button = document.getElementById("btn-check-dups")
-    if (button) {
-      button.disabled = true
-      button.textContent = "Checking…"
-    }
+  if (stagePrimaryBtn) stagePrimaryBtn.addEventListener("click", async () => {
+    const button = document.getElementById("btn-stage-primary")
+    if (!button || button.disabled) return
+    const stepAtClick = currentStep
+    if (stepAtClick === 3) setButtonBusy([button], "Checking…")
     try {
-      await runDuplicateCheckAndGoReview()
+      await handleQueuePrimaryAction()
     } catch (error) {
       showAlert(alertsEl, error.message, "error")
     } finally {
-      if (button) {
-        button.disabled = false
-        button.textContent = "Check Duplicates →"
-      }
+      if (stepAtClick === 3) resetButtonBusy([button])
+      renderStageToolbar()
+      renderStageActionButtons()
     }
-  })
-  if (recheckDupBtn) recheckDupBtn.addEventListener("click", async () => {
-    const button = document.getElementById("btn-recheck-dups")
-    if (button) button.disabled = true
-    try {
-      await refreshDuplicatesAcrossDocs()
-      renderReviewTable()
-    } catch (error) {
-      showAlert(alertsEl, error.message, "error")
-    } finally {
-      if (button) button.disabled = false
-    }
-  })
-  if (excludePaymentsBtn) excludePaymentsBtn.addEventListener("click", () => {
-    reviewRows.forEach((row, i) => {
-      if (!row.is_payment) return
-      row.exclude = true
-      const checkbox = document.querySelector(`.row-chk[data-idx="${i}"]`)
-      if (checkbox) {
-        checkbox.checked = false
-        checkbox.closest("tr").classList.toggle("review-excluded", true)
-      }
-      refreshDupHintForRow(i)
-    })
-    updateSelectedCount()
-    markDraftDirty()
   })
   if (selectAllBtn) selectAllBtn.addEventListener("click", () => {
     reviewRows.forEach((row, i) => {
@@ -2322,10 +2395,6 @@ function bindEvents() {
     })
     updateSelectedCount()
     markDraftDirty()
-  })
-  document.querySelectorAll(".review-btn-commit-all").forEach((button) => {
-    button.dataset.defaultLabel = button.textContent
-    button.addEventListener("click", runCommitAll)
   })
   if (reviewKeywordBtn) reviewKeywordBtn.addEventListener("click", async () => {
     const idx = reviewRows.findIndex((row) => row.keyword_resolution_needed)

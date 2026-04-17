@@ -6,48 +6,86 @@
   <title>Budget | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=9" />
+  <link rel="stylesheet" href="/static/css/main.css?v=16" />
   <style>
     /* Category budget table */
+    .budget-page .bulk-bar {
+      gap: 0.75rem;
+      padding: 0.72rem 0.9rem;
+      margin-bottom: 0.85rem;
+    }
+    .budget-page .bulk-count { font-size: var(--font-size-body); }
+    .budget-hint-bar {
+      justify-content: flex-end;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.65rem;
+    }
+    .budget-hint-chip {
+      margin: 0;
+      padding: 0.48rem 0.9rem;
+      font-size: var(--font-size-caption);
+      border-radius: 8px;
+    }
     .budget-table { width: 100%; border-collapse: collapse; }
     .budget-table th {
-      font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+      font-size: var(--font-size-table-head); font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.06em; color: var(--text-muted);
-      padding: 0 0.5rem 0.6rem; text-align: left;
+      padding: 0 0.75rem 0.7rem; text-align: left;
     }
     .budget-table th.right { text-align: right; }
-    .budget-table td { padding: 0.45rem 0.5rem; vertical-align: middle; border-top: 1px solid rgba(255,255,255,0.04); }
+    .budget-table td {
+      padding: 0.62rem 0.75rem;
+      vertical-align: middle;
+      border-top: 1px solid rgba(255,255,255,0.04);
+      font-size: var(--font-size-table-cell);
+    }
     .budget-table tr:first-child td { border-top: none; }
     .cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.4rem; flex-shrink: 0; }
+    .budget-avg { font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-body-sm); color: var(--text-muted); }
     .limit-input {
-      width: 90px; background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text); font-size: 0.84rem;
-      padding: 0.28rem 0.5rem; text-align: right;
+      width: 112px; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: var(--control-font-sm);
+      min-height: var(--control-height-sm);
+      padding: var(--control-pad-sm-y) var(--control-pad-sm-x); text-align: right;
       transition: border-color 0.15s;
     }
     .limit-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,130,255,0.15); }
     .total-budget-input {
       background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text); font-size: 0.84rem; font-weight: 700;
-      padding: 0.28rem 0.5rem; text-align: right;
+      border-radius: 8px; color: var(--text); font-size: var(--control-font-sm); font-weight: 700;
+      min-height: var(--control-height-sm);
+      padding: var(--control-pad-sm-y) var(--control-pad-sm-x); text-align: right;
       transition: border-color 0.15s;
     }
     .total-budget-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,130,255,0.15); }
     .total-budget-input.invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
-    .validation-hint { font-size: 0.78rem; color: var(--danger); margin-top: 0.5rem; min-height: 1.1em; }
-    .others-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.3rem; }
-    .save-status { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.4rem; min-height: 1.1em; transition: color 0.3s; }
+    .validation-hint { font-size: var(--font-size-caption); color: var(--danger); margin-top: 0.5rem; min-height: 1.1em; }
+    .others-hint { font-size: var(--font-size-caption); color: var(--text-muted); margin-top: 0.3rem; }
+    .save-status {
+      font-size: var(--font-size-caption);
+      color: var(--text-muted);
+      min-height: 1.1em;
+      min-width: 70px;
+      transition: color 0.3s;
+      display: inline-flex;
+      align-items: center;
+    }
     .save-status.saving { color: var(--text-muted); }
     .save-status.saved { color: #22c55e; }
     .save-status.error { color: var(--danger); }
 
     .budget-table tbody tr { position: relative; }
     .budget-table tbody tr.selected td { background: rgba(99,102,241,0.07); }
-    .cat-name-cell { display: flex; align-items: center; gap: 0.35rem; }
+    .cat-name-cell { display: flex; align-items: center; gap: 0.35rem; font-size: var(--font-size-body); font-weight: 600; }
     .cat-name-cell .cat-dot { margin-right: 0; }
-    .budget-row-chk { cursor: pointer; accent-color: var(--accent); width: 14px; height: 14px; flex-shrink: 0; }
+    .budget-row-chk { cursor: pointer; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
     .budget-table th.chk-col, .budget-table td.chk-col { width: 28px; padding-right: 0; text-align: center; }
     .add-cat-wrap { position: relative; display: inline-block; }
+    .budget-spacer { flex: 1; }
+    .budget-total-wrap { display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; flex-wrap: wrap; }
+    .budget-total-label { font-size: var(--font-size-caption); color: var(--text-muted); white-space: nowrap; }
+    .budget-table-card { margin-bottom: 1.05rem; }
     .cat-dropdown {
       position: absolute; top: calc(100% + 4px); left: 0;
       background: var(--surface2); border: 1px solid var(--border);
@@ -58,11 +96,11 @@
     .cat-dropdown.hidden { display: none; }
     .cat-dropdown-item {
       display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.875rem;
+      padding: 0.6rem 0.85rem; cursor: pointer; font-size: var(--font-size-body-sm);
       transition: background 0.1s;
     }
     .cat-dropdown-item:hover { background: rgba(255,255,255,0.06); }
-    .cat-dropdown-empty { padding: 0.75rem; font-size: 0.82rem; color: var(--text-muted); text-align: center; }
+    .cat-dropdown-empty { padding: 0.85rem; font-size: var(--font-size-caption); color: var(--text-muted); text-align: center; }
   </style>
 </head>
 <body>
@@ -78,7 +116,7 @@
   </div>
 </nav>
 
-<div class="page">
+<div class="page budget-page">
   <div class="page-header">
     <div>
       <h1>Budget</h1>
@@ -89,9 +127,9 @@
   <div id="alerts"></div>
 
   <!-- Unallocated / validation hint -->
-  <div id="budget-hint-bar" style="display:none;justify-content:flex-end;margin-bottom:0.4rem">
-    <div id="others-hint" class="alert alert-warning" style="margin:0;padding:0.35rem 0.85rem;font-size:0.82rem;border-radius:6px"></div>
-    <div id="validation-hint" class="alert alert-error" style="margin:0;padding:0.35rem 0.85rem;font-size:0.82rem;border-radius:6px;display:none"></div>
+  <div id="budget-hint-bar" class="budget-hint-bar" style="display:none">
+    <div id="others-hint" class="alert alert-warning budget-hint-chip"></div>
+    <div id="validation-hint" class="alert alert-error budget-hint-chip" style="display:none"></div>
   </div>
 
   <!-- Bulk action bar (always visible) -->
@@ -105,16 +143,16 @@
       <div class="cat-dropdown hidden" id="cat-dropdown"></div>
     </div>
     <button class="btn btn-danger btn-sm" id="btn-budget-bulk-delete" disabled>Delete selected</button>
-    <div style="flex:1"></div>
-    <div style="display:flex;align-items:center;gap:0.5rem;flex-shrink:0">
-      <span style="font-size:0.82rem;color:var(--text-muted);white-space:nowrap">Total budget</span>
-      <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="—" style="width:110px" />
-      <div class="save-status" id="save-status" style="min-width:60px"></div>
+    <div class="budget-spacer"></div>
+    <div class="budget-total-wrap">
+      <span class="budget-total-label">Total budget</span>
+      <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="—" />
+      <div class="save-status" id="save-status"></div>
     </div>
   </div>
 
   <!-- ── Category limits table ─────────────────────────────────────── -->
-  <div class="card" style="margin-bottom:1.25rem">
+  <div class="card budget-table-card">
     <table class="budget-table" id="budget-table">
       <thead>
         <tr>
@@ -135,7 +173,7 @@
 </div>
 
 <script src="/static/js/utils.js?v=9"></script>
-<script src="/static/js/api.js?v=7"></script>
+<script src="/static/js/api.js?v=8"></script>
 <script>
 let currentSettings = null;
 let saveTimer = null;
@@ -198,7 +236,7 @@ async function loadSettings() {
 }
 
 function fmtAvg(val) {
-  return `<span style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;color:var(--text-muted)">${fmtCurrency(val, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>`;
+  return `<span class="budget-avg">${fmtCurrency(val, undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>`;
 }
 
 // ── Bulk selection ────────────────────────────────────────────────────────────

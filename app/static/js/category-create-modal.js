@@ -14,9 +14,9 @@
               <input type="text" id="ccm-name" placeholder="e.g. groceries" />
             </div>
             <div>
-              <label>Keywords <span style="font-weight:400;color:var(--text-muted)">(one per line)</span></label>
-              <textarea id="ccm-keywords" rows="5"
-                style="resize:vertical;font-size:0.84rem;font-family:monospace;line-height:1.6"
+              <label>Keywords <span class="text-caption" style="font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:normal">(one per line)</span></label>
+              <textarea class="mono-textarea" id="ccm-keywords" rows="5"
+                style="resize:vertical"
                 placeholder="e.g. fruit&#10;e.g. veggies"></textarea>
             </div>
             <div style="display:flex;align-items:flex-end;gap:0.85rem;flex-wrap:wrap">
@@ -24,7 +24,7 @@
                 <label>Color</label>
                 <input type="color" id="ccm-color" value="#6366f1" style="display:block;width:56px;height:38px;padding:0;border:none;background:none" />
               </div>
-              <div class="text-muted" style="font-size:0.82rem;line-height:1.45">
+              <div class="text-meta text-muted" style="line-height:1.45">
                 This uses the same checks as the Categories page, including duplicate-name checks and keyword conflict review.
               </div>
             </div>

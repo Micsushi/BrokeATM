@@ -180,10 +180,7 @@ const API = {
     });
     if (!res.ok) {
       const detail = await parseApiError(res);
-      if (res.status === 409 || /already exists/i.test(detail)) {
-        throw new Error("That category name is already taken.");
-      }
-      throw new Error(detail);
+      throw new Error(detail || "Could not update category.");
     }
     return res.json();
   },

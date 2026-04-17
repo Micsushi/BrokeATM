@@ -66,7 +66,7 @@
                     style="position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform 0.2s;pointer-events:none"></span>
                 </span>
               </label>
-              <span style="font-size:0.85rem;font-weight:600;color:var(--text-muted)" id="atx-recur-label">Recurring</span>
+              <span class="text-meta text-muted" style="font-weight:600" id="atx-recur-label">Recurring</span>
             </div>
 
             <!-- Recurring fields (hidden by default) -->
@@ -93,7 +93,7 @@
                 <label>End date</label>
                 <input type="date" id="atx-recur-end" style="color-scheme:dark" />
               </div>
-              <div id="atx-recur-preview" style="font-size:0.8rem;color:var(--text-muted);margin-top:0.6rem;min-height:1.2em"></div>
+              <div id="atx-recur-preview" class="text-meta text-muted" style="margin-top:0.6rem;min-height:1.2em"></div>
             </div>
           </div>
           <div class="modal-actions">
