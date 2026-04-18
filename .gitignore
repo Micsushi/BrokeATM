@@ -28,5 +28,6 @@ uploads/
 # Env
 .env
 
-.claude/settings.local.json
-.codex
+.claude/
+.codex/
+

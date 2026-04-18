@@ -8,7 +8,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/main.css?v=19" />
   <style>
-    /* Category budget table */
     .budget-page {
       --budget-panel-pad: 1.35rem;
       --budget-cell-pad-x: 1rem;
@@ -19,53 +18,18 @@
       --budget-total-box-right-sync: var(--budget-cell-pad-x);
       --budget-column-divider: rgba(255,255,255,0.35);
     }
-    .budget-page-header {
-      display: flex;
-      flex-direction: column;
-      gap: 0.4rem;
-    }
+    .budget-page-header { display: flex; flex-direction: column; gap: 0.4rem; }
     .budget-header-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.85rem 1.15rem;
-      flex-wrap: wrap;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 0.85rem 1.15rem; flex-wrap: wrap;
     }
-    .budget-header-meta p {
-      margin: 0;
-      flex: 1 1 340px;
-    }
-    .budget-page .bulk-bar {
-      gap: 0.75rem;
-      padding: 0.82rem var(--budget-panel-pad);
-      margin-bottom: 0.85rem;
-    }
+    .budget-header-meta p { margin: 0; flex: 1 1 340px; }
+    .budget-page .bulk-bar { gap: 0.75rem; padding: 0.82rem var(--budget-panel-pad); margin-bottom: 0.85rem; }
     .budget-page .bulk-count { font-size: var(--font-size-body); }
-    .budget-hint-bar {
-      align-items: center;
-      justify-content: flex-end;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      margin-bottom: 0;
-    }
-    .budget-hint-chip {
-      margin: 0;
-      padding: 0.48rem 0.9rem;
-      font-size: var(--font-size-caption);
-      border-radius: 8px;
-    }
-    .budget-table-card {
-      margin-bottom: 1.05rem;
-      padding: 1.05rem var(--budget-panel-pad) 0.95rem;
-      overflow-x: auto;
-      overflow-y: hidden;
-    }
-    .budget-table {
-      width: 100%;
-      border-collapse: separate;
-      border-spacing: 0;
-      table-layout: fixed;
-    }
+    .budget-hint-bar { align-items: center; justify-content: flex-end; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0; }
+    .budget-hint-chip { margin: 0; padding: 0.48rem 0.9rem; font-size: var(--font-size-caption); border-radius: 8px; }
+    .budget-table-card { margin-bottom: 1.05rem; padding: 1.05rem var(--budget-panel-pad) 0.95rem; overflow-x: auto; overflow-y: hidden; }
+    .budget-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
     .budget-table col.chk-col { width: 42px; }
     .budget-table col.metric-col { width: var(--budget-metric-col-width); }
     .budget-table col.limit-col { width: var(--budget-limit-col-width); }
@@ -73,8 +37,7 @@
       font-size: var(--font-size-table-head); font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.06em; color: var(--text-muted);
       padding: 0.25rem var(--budget-cell-pad-x) 0.9rem;
-      text-align: left;
-      vertical-align: bottom;
+      text-align: left; vertical-align: bottom;
       border-bottom: 1px solid var(--border);
     }
     .budget-table td {
@@ -84,168 +47,66 @@
       font-size: var(--font-size-table-cell);
     }
     .budget-table tr:first-child td { border-top: none; }
-    .budget-table th + th,
-    .budget-table td + td {
-      border-left: 2px solid var(--budget-column-divider);
-    }
-    .budget-table th.num-col,
-    .budget-table td.num-col,
-    .budget-table th.limit-col,
-    .budget-table td.limit-col {
-      text-align: right;
-    }
-    .budget-table th.limit-col,
-    .budget-table td.limit-col {
-      background: none;
-    }
+    .budget-table th + th, .budget-table td + td { border-left: 2px solid var(--budget-column-divider); }
+    .budget-table th.num-col, .budget-table td.num-col,
+    .budget-table th.limit-col, .budget-table td.limit-col { text-align: right; }
     .cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.4rem; flex-shrink: 0; }
     .budget-avg { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; color: var(--text-muted); }
     .limit-input {
-      display: block;
-      width: var(--budget-limit-input-width);
-      max-width: 100%;
-      min-width: 0;
-      margin-left: auto;
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; color: var(--text); font-size: 1rem; font-weight: 600;
-      min-height: var(--control-height-sm);
-      padding: var(--control-pad-sm-y) var(--control-pad-sm-x); text-align: right;
-      transition: border-color 0.15s;
+      display: block; width: var(--budget-limit-input-width); max-width: 100%; min-width: 0; margin-left: auto;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 1rem; font-weight: 600;
+      min-height: var(--control-height-sm); padding: var(--control-pad-sm-y) var(--control-pad-sm-x);
+      text-align: right; transition: border-color 0.15s;
     }
     .limit-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,130,255,0.15); }
     .total-budget-input {
-      background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; color: var(--text); font-size: 1rem; font-weight: 700;
-      min-height: var(--control-height-sm);
-      padding: var(--control-pad-sm-y) var(--control-pad-sm-x); text-align: right;
-      transition: border-color 0.15s;
+      display: block; width: 100%; max-width: 100%; min-width: 0;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 1rem; font-weight: 700;
+      min-height: var(--control-height-sm); padding: var(--control-pad-sm-y) var(--control-pad-sm-x);
+      text-align: right; transition: border-color 0.15s;
     }
     .total-budget-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,130,255,0.15); }
     .total-budget-input.invalid { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(239,68,68,0.15); }
-    .validation-hint { font-size: var(--font-size-caption); color: var(--danger); margin-top: 0.5rem; min-height: 1.1em; }
-    .others-hint { font-size: var(--font-size-caption); color: var(--text-muted); margin-top: 0.3rem; }
     .save-status {
-      font-size: var(--font-size-caption);
-      color: var(--text-muted);
-      min-height: 0;
-      min-width: 0;
-      margin-left: 0.6rem;
-      transition: color 0.3s;
-      display: none;
-      align-items: center;
-      justify-content: flex-end;
-      text-align: right;
-      white-space: nowrap;
-      flex: 0 0 auto;
+      font-size: var(--font-size-caption); color: var(--text-muted);
+      min-height: 0; min-width: 0; margin-left: 0.6rem;
+      transition: color 0.3s; display: none;
+      align-items: center; justify-content: flex-end;
+      text-align: right; white-space: nowrap; flex: 0 0 auto;
     }
     .save-status:not(:empty) { display: inline-flex; }
     .save-status.saving { color: var(--text-muted); }
     .save-status.saved { color: #22c55e; }
     .save-status.error { color: var(--danger); }
-
     .sortable-th { cursor: pointer; user-select: none; white-space: nowrap; }
     .sortable-th:hover { color: var(--accent-hover); }
     .sortable-th.sort-active { color: var(--accent-hover); }
     .sort-icon { font-size: 0.7em; opacity: 0.7; }
-
     .budget-table tbody tr { position: relative; }
     .budget-table tbody tr.selected td { background: rgba(99,102,241,0.07); }
     .cat-name-cell { display: flex; align-items: center; gap: 0.35rem; min-width: 0; font-size: var(--font-size-body); font-weight: 600; }
     .cat-name-cell .cat-dot { margin-right: 0; }
     .budget-chk-wrap { display: flex; align-items: center; justify-content: center; min-height: 100%; }
-    .budget-row-chk {
-      cursor: pointer;
-      accent-color: var(--accent);
-      width: 16px;
-      height: 16px;
-      flex-shrink: 0;
-      display: block;
-      margin: 0 auto;
-    }
-    .budget-table th.chk-col,
-    .budget-table td.chk-col {
-      width: 42px;
-      padding-left: 0;
-      padding-right: 0.8rem;
-      text-align: center;
-    }
+    .budget-row-chk { cursor: pointer; accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; display: block; margin: 0 auto; }
+    .budget-table th.chk-col, .budget-table td.chk-col { width: 42px; padding-left: 0; padding-right: 0.8rem; text-align: center; }
     .add-cat-wrap { display: inline-flex; }
-    .add-cat-btn {
-      min-width: 42px;
-      padding-inline: 0;
-      justify-content: center;
-      font-size: 1.35rem;
-      line-height: 1;
-      font-weight: 700;
-    }
+    .add-cat-btn { min-width: 42px; padding-inline: 0; justify-content: center; font-size: 1.35rem; line-height: 1; font-weight: 700; }
     .budget-spacer { flex: 1; }
-    .budget-total-shell {
-      flex: 0 0 auto;
-      width: auto;
-      margin-left: auto;
-      padding-left: 0;
-      padding-right: var(--budget-total-box-right-sync);
-    }
-    .budget-total-wrap {
-      display: flex;
-      align-items: center;
-      gap: 0;
-      justify-content: flex-end;
-      width: auto;
-    }
-    .budget-total-label {
-      font-size: var(--font-size-table-head);
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      white-space: nowrap;
-      flex: 0 0 auto;
-    }
-    .budget-total-field {
-      display: flex;
-      flex: 0 0 auto;
-      align-items: center;
-      margin-left: 0;
-      width: var(--budget-total-box-width-sync);
-      min-width: var(--budget-total-box-width-sync);
-    }
-    .total-budget-input {
-      display: block;
-      width: 100%;
-      max-width: 100%;
-      min-width: 0;
-    }
+    .budget-total-shell { flex: 0 0 auto; margin-left: auto; padding-right: var(--budget-total-box-right-sync); }
+    .budget-total-wrap { display: flex; align-items: center; justify-content: flex-end; }
+    .budget-total-label { font-size: var(--font-size-table-head); font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; flex: 0 0 auto; }
+    .budget-total-field { display: flex; flex: 0 0 auto; align-items: center; width: var(--budget-total-box-width-sync); min-width: var(--budget-total-box-width-sync); }
 
     @media (max-width: 900px) {
-      .budget-total-shell {
-        flex-basis: 100%;
-        width: 100%;
-        padding-left: 0;
-        padding-right: 0;
-        padding-top: 0.7rem;
-        border-top: 1px solid var(--budget-column-divider);
-      }
+      .budget-total-shell { flex-basis: 100%; width: 100%; padding-right: 0; padding-top: 0.7rem; border-top: 1px solid var(--budget-column-divider); }
     }
-
     @media (max-width: 640px) {
-      .budget-table {
-        min-width: 760px;
-      }
-      .budget-hint-bar {
-        width: 100%;
-        justify-content: flex-start;
-      }
-      .budget-total-wrap {
-        flex-wrap: wrap;
-        width: 100%;
-      }
-      .budget-total-field {
-        flex: 1 1 100%;
-        width: 100%;
-        min-width: 0;
-        margin-left: 0;
-      }
+      .budget-table { min-width: 760px; }
+      .budget-hint-bar { width: 100%; justify-content: flex-start; }
+      .budget-total-wrap { flex-wrap: wrap; width: 100%; }
+      .budget-total-field { flex: 1 1 100%; width: 100%; min-width: 0; }
     }
   </style>
 </head>
@@ -276,7 +137,6 @@
 
   <div id="alerts"></div>
 
-  <!-- Bulk action bar (always visible) -->
   <div class="bulk-bar" id="budget-bulk-bar">
     <span class="bulk-count" id="budget-bulk-count">0 selected</span>
     <button class="btn btn-ghost btn-sm" id="btn-budget-select-all">Select All</button>
@@ -299,7 +159,6 @@
     </div>
   </div>
 
-  <!-- ── Category limits table ─────────────────────────────────────── -->
   <div class="card budget-table-card">
     <table class="budget-table" id="budget-table">
       <colgroup>
@@ -325,7 +184,6 @@
       </tbody>
     </table>
   </div>
-
 </div>
 
 <script src="/static/js/utils.js?v=9"></script>
@@ -338,8 +196,8 @@ let hiddenCategoryKeys = new Set();
 let budgetLayoutSyncRaf = 0;
 let budgetSortCol = "avg_6m";
 let budgetSortDir = "desc";
-
-// ── Auto-save (debounced 800ms) ────────────────────────────────────────────────
+let selectedCatKeys = new Set();
+let allCategories = [];
 
 function scheduleSave() {
   const status = document.getElementById("save-status");
@@ -381,19 +239,17 @@ async function doSave() {
   }
 }
 
-// ── Load settings (top panel) ─────────────────────────────────────────────────
-
 async function loadSettings() {
   try {
-    const r = await fetch(`/api/budget/settings`);
+    const r = await fetch("/api/budget/settings");
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json();
     currentSettings = data;
     renderBudgetTable(data);
     updateTotalHint();
   } catch (e) {
-    const tbody = document.getElementById("budget-tbody");
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--danger)">Failed to load: ${e.message}</td></tr>`;
+    document.getElementById("budget-tbody").innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--danger)">Failed to load: ${e.message}</td></tr>`;
   }
 }
 
@@ -444,10 +300,6 @@ function queueBudgetLayoutSync() {
   budgetLayoutSyncRaf = requestAnimationFrame(syncBudgetTotalInputGeometry);
 }
 
-// ── Bulk selection ────────────────────────────────────────────────────────────
-
-let selectedCatKeys = new Set();
-
 function updateBulkBar() {
   const n = selectedCatKeys.size;
   document.getElementById("budget-bulk-count").textContent = `${n} selected`;
@@ -467,9 +319,8 @@ function buildCatRow(catId, catName, catColor, avg6, avg3, avg1, limitVal) {
     ? `<span class="cat-dot" style="background:${escHtml(catColor)}"></span>`
     : `<span class="cat-dot" style="background:var(--border)"></span>`;
   const tr = document.createElement("tr");
-  const catKey = budgetCategoryKey(catId);
   tr.dataset.catId = catId ?? "";
-  tr.dataset.catKey = catKey;
+  tr.dataset.catKey = budgetCategoryKey(catId);
   tr.innerHTML = `
     <td class="chk-col"><div class="budget-chk-wrap"><input type="checkbox" class="budget-row-chk" /></div></td>
     <td class="category-col"><div class="cat-name-cell">${dot}${escHtml(catName)}</div></td>
@@ -480,13 +331,9 @@ function buildCatRow(catId, catName, catColor, avg6, avg3, avg1, limitVal) {
       <input type="number" class="limit-input" data-cat-id="${catId ?? ""}"
         min="0" step="1" placeholder="—" value="${limitVal}" />
     </td>`;
-  wireRow(tr);
-  return tr;
-}
-
-function wireRow(tr) {
   tr.querySelector(".limit-input").addEventListener("input", () => { updateTotalHint(); scheduleSave(); });
   tr.querySelector(".budget-row-chk").addEventListener("change", e => toggleRowSelect(tr, e.target.checked));
+  return tr;
 }
 
 function syncBudgetSortHeaders() {
@@ -506,10 +353,9 @@ function syncBudgetSortHeaders() {
 function sortBudgetCategories(cats) {
   const dir = budgetSortDir === "asc" ? 1 : -1;
   return [...cats].sort((a, b) => {
-    let av, bv;
-    if (budgetSortCol === "name") {
+    if (budgetSortCol === "name")
       return dir * (a.category_name || "").toLowerCase().localeCompare((b.category_name || "").toLowerCase());
-    }
+    let av, bv;
     switch (budgetSortCol) {
       case "avg_6m": av = a.avg_6m ?? 0; bv = b.avg_6m ?? 0; break;
       case "avg_3m": av = a.avg_3m ?? 0; bv = b.avg_3m ?? 0; break;
@@ -526,19 +372,18 @@ function rebuildBudgetTbody() {
   tbody.innerHTML = "";
   selectedCatKeys.clear();
 
-  const cats = currentSettings?.categories || [];
-  const visible = cats.filter(c => {
+  const visible = (currentSettings?.categories || []).filter(c => {
     const key = c.category_key || budgetCategoryKey(c.category_id);
     if (hiddenCategoryKeys.has(key)) return false;
     return (c.avg_6m ?? 0) > 0 || c.limit_amount != null;
   });
 
   sortBudgetCategories(visible).forEach(c => {
-    const avg6 = c.avg_6m ?? c.avg_monthly ?? 0;
-    const avg3 = c.avg_3m ?? 0;
-    const avg1 = c.avg_1m ?? 0;
-    const limitVal = c.limit_amount != null ? c.limit_amount : "";
-    tbody.appendChild(buildCatRow(c.category_id, c.category_name, c.category_color, avg6, avg3, avg1, limitVal));
+    tbody.appendChild(buildCatRow(
+      c.category_id, c.category_name, c.category_color,
+      c.avg_6m ?? 0, c.avg_3m ?? 0, c.avg_1m ?? 0,
+      c.limit_amount != null ? c.limit_amount : ""
+    ));
   });
 
   syncBudgetSortHeaders();
@@ -548,8 +393,7 @@ function rebuildBudgetTbody() {
 
 function renderBudgetTable(data) {
   hiddenCategoryKeys = new Set(data.hidden_category_keys || []);
-  const totalEl = document.getElementById("total-budget");
-  totalEl.value = data.total != null ? data.total : "";
+  document.getElementById("total-budget").value = data.total != null ? data.total : "";
   rebuildBudgetTbody();
 }
 
@@ -558,9 +402,8 @@ function getCategoryLimits() {
   document.querySelectorAll("#budget-tbody .limit-input").forEach(el => {
     const val = parseFloat(el.value);
     const catId = el.dataset.catId;
-    if (!isNaN(val) && val >= 0 && catId !== "") {
+    if (!isNaN(val) && val >= 0 && catId !== "")
       limits.push({ category_id: parseInt(catId), limit_amount: val });
-    }
   });
   return limits;
 }
@@ -594,14 +437,9 @@ function updateTotalHint() {
   }
 }
 
-// ── Add category picker ───────────────────────────────────────────────────────
-
-let allCategories = [];
-
 async function loadAllCategories() {
-  if (allCategories.length === 0) {
+  if (allCategories.length === 0)
     allCategories = await fetch("/api/categories").then(r => r.json());
-  }
 }
 
 function getExistingCatIds() {
@@ -631,31 +469,24 @@ async function getAvailableBudgetCategories() {
     .map(c => {
       const category_key = budgetCategoryKey(c.id);
       const meta = metaMap.get(category_key);
-      return {
-        ...c,
-        category_key,
-        avg_6m: meta?.avg_6m ?? meta?.avg_monthly ?? 0,
-      };
+      return { ...c, category_key, avg_6m: meta?.avg_6m ?? 0 };
     });
   const uncategorizedMeta = currentSettings?.categories?.find(c => c.category_id == null);
   if (uncategorizedMeta && !existingKeys.has("uncategorized")) {
     missing.push({
-      id: "",
-      name: uncategorizedMeta.category_name || "Uncategorized",
+      id: "", name: uncategorizedMeta.category_name || "Uncategorized",
       color: uncategorizedMeta.category_color || "",
-      category_key: "uncategorized",
-      avg_6m: uncategorizedMeta.avg_6m ?? uncategorizedMeta.avg_monthly ?? 0,
+      category_key: "uncategorized", avg_6m: uncategorizedMeta.avg_6m ?? 0,
     });
   }
   return missing.sort((a, b) => {
-    const avgDiff = (b.avg_6m || 0) - (a.avg_6m || 0);
-    if (avgDiff !== 0) return avgDiff;
-    return String(a.name || "").localeCompare(String(b.name || ""));
+    const d = (b.avg_6m || 0) - (a.avg_6m || 0);
+    return d !== 0 ? d : String(a.name || "").localeCompare(String(b.name || ""));
   });
 }
 
 async function openCategoryPicker() {
-  const items = (await getAvailableBudgetCategories()).map((item) => ({
+  const items = (await getAvailableBudgetCategories()).map(item => ({
     id: item.category_key === "uncategorized" ? null : item.id,
     value: item.category_key,
     key: item.category_key,
@@ -673,29 +504,24 @@ async function openCategoryPicker() {
     items,
     actionLabel: "Add",
     emptyMessage: "All categories are already in this budget.",
-    noResultsMessage: (query) => `No categories match "${query}".`,
+    noResultsMessage: query => `No categories match "${query}".`,
   });
 }
 
 function addCategoryRow(catId, catName, catColor) {
-  const tbody = document.getElementById("budget-tbody");
-  // Look up avgs from already-loaded settings (categories with spending but no budget rule)
-  const existing = currentSettings?.categories?.find(c => (
+  const existing = currentSettings?.categories?.find(c =>
     (catId == null && c.category_id == null) || c.category_id === catId
-  ));
-  const avg6 = existing?.avg_6m ?? 0;
-  const avg3 = existing?.avg_3m ?? 0;
-  const avg1 = existing?.avg_1m ?? 0;
+  );
   hiddenCategoryKeys.delete(budgetCategoryKey(catId));
-  const tr = buildCatRow(catId, catName, catColor, avg6, avg3, avg1, "");
-  tbody.appendChild(tr);
+  const tr = buildCatRow(catId, catName, catColor, existing?.avg_6m ?? 0, existing?.avg_3m ?? 0, existing?.avg_1m ?? 0, "");
+  document.getElementById("budget-tbody").appendChild(tr);
   updateTotalHint();
   scheduleSave();
   queueBudgetLayoutSync();
   tr.querySelector(".limit-input").focus();
 }
 
-document.getElementById("btn-add-cat").addEventListener("click", async (e) => {
+document.getElementById("btn-add-cat").addEventListener("click", async e => {
   e.stopPropagation();
   try {
     const picked = await openCategoryPicker();
@@ -705,8 +531,6 @@ document.getElementById("btn-add-cat").addEventListener("click", async (e) => {
     showAlert(document.getElementById("alerts"), err?.message || "Could not load categories.", "error");
   }
 });
-
-// ── Bulk-bar event listeners ──────────────────────────────────────────────────
 
 document.getElementById("btn-budget-select-all").addEventListener("click", () => {
   document.querySelectorAll("#budget-tbody tr[data-cat-id]").forEach(tr => {
@@ -727,7 +551,7 @@ document.getElementById("btn-budget-deselect").addEventListener("click", () => {
 document.getElementById("btn-budget-bulk-delete").addEventListener("click", async () => {
   const n = selectedCatKeys.size;
   if (!n) return;
-  if (!await confirmDialog({ title: `Remove from budget`, message: `Remove ${n} categor${n === 1 ? "y" : "ies"} from budget? Their limits will be cleared.`, confirmLabel: "Remove" })) return;
+  if (!await confirmDialog({ title: "Remove from budget", message: `Remove ${n} categor${n === 1 ? "y" : "ies"} from budget? Their limits will be cleared.`, confirmLabel: "Remove" })) return;
   const toRemove = new Set(selectedCatKeys);
   toRemove.forEach(key => hiddenCategoryKeys.add(key));
   document.querySelectorAll("#budget-tbody tr[data-cat-key]").forEach(tr => {
@@ -740,17 +564,10 @@ document.getElementById("btn-budget-bulk-delete").addEventListener("click", asyn
   queueBudgetLayoutSync();
 });
 
-// ── Event listeners ───────────────────────────────────────────────────────────
-
 document.getElementById("total-budget").addEventListener("input", () => {
   updateTotalHint();
   scheduleSave();
 });
-
-window.addEventListener("resize", queueBudgetLayoutSync);
-window.addEventListener("load", queueBudgetLayoutSync);
-
-// ── Sort header clicks ────────────────────────────────────────────────────────
 
 document.querySelectorAll("#budget-table .sortable-th").forEach(th => {
   th.addEventListener("click", () => {
@@ -765,7 +582,8 @@ document.querySelectorAll("#budget-table .sortable-th").forEach(th => {
   });
 });
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+window.addEventListener("resize", queueBudgetLayoutSync);
+window.addEventListener("load", queueBudgetLayoutSync);
 
 async function init() {
   await loadAppSettings();
