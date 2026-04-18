@@ -6,8 +6,10 @@ __pycache__/
 dist/
 build/
 
-# App data
+# App data (user databases stay local; starter JSON must be versioned)
 data/
+!app/data/
+!app/data/starter_categories.json
 *.db
 *.db-shm
 *.db-wal
