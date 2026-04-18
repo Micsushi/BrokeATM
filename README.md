@@ -66,6 +66,46 @@ atm --no-browser      # don't open browser
 atm --reload          # dev mode
 ```
 
+## Windows EXE / installer
+
+Yes — the current app can be packaged for Windows.
+
+End-user release goal:
+
+- User downloads `BrokeATM-Setup.exe`
+- User runs the installer
+- Installer adds a Start Menu shortcut and optional desktop shortcut
+- User clicks `BrokeATM`
+- BrokeATM starts its local server and opens the app in the default browser
+
+Build the Windows app bundle on a Windows machine (not WSL/Linux):
+
+```powershell
+py -3.13 -m pip install -e ".[build]"
+py -3.13 -m PyInstaller brokeatm.spec --clean --noconfirm
+```
+
+This creates `dist\BrokeATM\BrokeATM.exe`.
+
+To build an installer `.exe` as well:
+
+1. Install Inno Setup 6
+2. Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1 -Installer
+```
+
+That creates `dist\installer\BrokeATM-Setup.exe`.
+
+Notes:
+
+- The packaged app still stores data in `C:\Users\<YourName>\.brokeatm\brokeatm.db`
+- `--reload` is automatically disabled in the packaged app
+- PDF/OCR features may still require Java, Tesseract, Poppler, and Ghostscript installed on the target machine
+- The build is large because it bundles the Python runtime and parsing libraries
+- The build script defaults to `py -3.13`, which is the safer choice if multiple Python versions are installed
+
 ---
 
 ## Data

@@ -29,6 +29,14 @@ dependencies = [
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+[tool.setuptools.package-data]
+app = [
+    "data/*.json",
+    "static/css/*.css",
+    "static/js/*.js",
+    "templates/*.html",
+]
+
 [project.scripts]
 atm = "app.cli:main"
 
@@ -37,6 +45,9 @@ dev = [
     "ruff>=0.4.0",
     "pytest>=8.0.0",
     "httpx>=0.27.0",
+]
+build = [
+    "pyinstaller>=6.0.0",
 ]
 
 [tool.ruff]
