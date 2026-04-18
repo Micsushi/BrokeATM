@@ -106,6 +106,27 @@ Notes:
 - The build is large because it bundles the Python runtime and parsing libraries
 - The build script defaults to `py -3.13`, which is the safer choice if multiple Python versions are installed
 
+### GitHub Releases
+
+This repo now supports Windows releases through GitHub Actions.
+
+To publish a new Windows release:
+
+```powershell
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+That tag triggers `.github/workflows/windows-release.yml`, which:
+
+- builds `BrokeATM-Setup.exe` on `windows-latest`
+- uploads the installer to the matching GitHub Release
+- keeps the built `.exe` as a workflow artifact too
+
+Users can then download the latest Windows installer from:
+
+`https://github.com/Micsushi/BrokenATM/releases/latest`
+
 ---
 
 ## Data
