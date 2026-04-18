@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import argparse
 import errno
-import socket
 import sys
 import time
 import webbrowser
 from pathlib import PureWindowsPath
 from threading import Thread
 from typing import Any
+from urllib.error import URLError
+from urllib.request import urlopen
 
 
 def _program_name() -> str:
@@ -28,21 +29,24 @@ def _browser_host(host: str) -> str:
     return normalized
 
 
-def _wait_for_server(host: str, port: int, timeout: float = 15.0) -> None:
+def _wait_for_app(url: str, timeout: float = 15.0) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=0.5):
-                return
-        except OSError:
+            with urlopen(url, timeout=1.0) as response:
+                body = response.read(4096).decode("utf-8", errors="ignore")
+                if response.status < 500 and "BrokeATM" in body:
+                    return True
+        except (OSError, URLError):
             time.sleep(0.25)
+    return False
 
 
 def _open_browser_when_ready(host: str, port: int) -> None:
     browser_host = _browser_host(host)
     url = f"http://{browser_host}:{port}"
-    _wait_for_server(browser_host, port)
-    webbrowser.open(url)
+    if _wait_for_app(url):
+        webbrowser.open(url)
 
 
 def _uvicorn_app_target(reload_enabled: bool) -> Any:

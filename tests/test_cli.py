@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.error import URLError
+
 import app.cli as cli
 
 
@@ -40,6 +42,34 @@ def test_browser_host_uses_localhost_for_bind_all_addresses() -> None:
 def test_browser_host_keeps_specific_host() -> None:
     assert cli._browser_host("127.0.0.1") == "127.0.0.1"
     assert cli._browser_host("localhost") == "localhost"
+
+
+def test_wait_for_app_returns_true_when_brokeatm_marker_found(monkeypatch) -> None:
+    class _Response:
+        status = 200
+
+        def read(self, _size: int = -1) -> bytes:
+            return b"<title>Dashboard | BrokeATM</title>"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb) -> None:
+            return None
+
+    monkeypatch.setattr(cli, "urlopen", lambda url, timeout=1.0: _Response())
+
+    assert cli._wait_for_app("http://127.0.0.1:8000") is True
+
+
+def test_wait_for_app_returns_false_when_server_never_matches(monkeypatch) -> None:
+    def _raise_url_error(url, timeout=1.0):
+        raise URLError("down")
+
+    monkeypatch.setattr(cli, "urlopen", _raise_url_error)
+    monkeypatch.setattr(cli.time, "sleep", lambda _seconds: None)
+
+    assert cli._wait_for_app("http://127.0.0.1:8000", timeout=0.01) is False
 
 
 def test_uvicorn_target_uses_import_string_when_reload_is_on() -> None:

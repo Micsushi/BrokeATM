@@ -50,11 +50,19 @@ try {
   & $pythonCmd @pythonArgs @pyInstallerArgs
 
   if ($Installer) {
-    if (-not (Test-Path $IsccPath)) {
-      throw "Inno Setup compiler not found at '$IsccPath'. Install Inno Setup 6 or pass -IsccPath."
+    $innoCandidates = @(
+      $IsccPath,
+      "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+      "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+      "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+    ) | Where-Object { $_ }
+
+    $resolvedIscc = $innoCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if (-not $resolvedIscc) {
+      throw "Inno Setup compiler not found. Install Inno Setup 6 or pass -IsccPath."
     }
 
-    & $IsccPath "packaging/windows/BrokeATM.iss"
+    & $resolvedIscc "packaging/windows/BrokeATM.iss"
   }
 }
 finally {
