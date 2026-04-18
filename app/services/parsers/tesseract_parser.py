@@ -44,6 +44,14 @@ class TesseractParser(BaseParser):
         keyword_matcher: KeywordMatcher | None,
         known_categories: list[str],
     ) -> ParseResult:
+        if not _check_tesseract():
+            return ParseResult(
+                parser_id=self.parser_id,
+                parser_label=self.parser_label,
+                confidence=0.0,
+                rows=[],
+                missing_dependency="Tesseract",
+            )
         try:
             return self._parse_inner(content, filename, default_currency, keyword_matcher, known_categories)
         except Exception as exc:

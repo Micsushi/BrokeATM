@@ -47,7 +47,7 @@ class CamelotStreamParser(BaseParser):
                 parser_label=self.parser_label,
                 confidence=0.0,
                 rows=[],
-                errors=[_GS_ERROR],
+                missing_dependency="Ghostscript",
             )
         try:
             return self._parse_inner(content, filename, default_currency, keyword_matcher, known_categories)

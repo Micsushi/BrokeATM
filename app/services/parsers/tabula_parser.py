@@ -56,7 +56,7 @@ class TabulaParser(BaseParser):
                 parser_label=self.parser_label,
                 confidence=0.0,
                 rows=[],
-                errors=[_JAVA_ERROR],
+                missing_dependency="Java",
             )
         try:
             return self._parse_inner(content, filename, default_currency, keyword_matcher, known_categories)

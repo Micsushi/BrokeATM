@@ -18,6 +18,7 @@ class ParseResult:
     warnings: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
     unknown_pdf_categories: list[str] = field(default_factory=list)
+    missing_dependency: str | None = None
 
 
 class BaseParser(ABC):

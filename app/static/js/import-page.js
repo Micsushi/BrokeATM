@@ -645,12 +645,14 @@ function getParserInsightsFor(results) {
   if (!results.length) {
     return { recommended: null, maxRows: 0 }
   }
-  const recommended = results.reduce((best, current) => {
+  const available = results.filter(r => !r.missing_dependency)
+  const pool = available.length ? available : results
+  const recommended = pool.reduce((best, current) => {
     const bestRows = (best.rows || []).length
     const currentRows = (current.rows || []).length
     if (currentRows !== bestRows) return currentRows > bestRows ? current : best
     return (current.skipped_rows || 0) < (best.skipped_rows || 0) ? current : best
-  }, results[0])
+  }, pool[0])
   const maxRows = results.reduce((max, current) => Math.max(max, (current.rows || []).length), 0)
   return { recommended, maxRows }
 }
@@ -1784,25 +1786,27 @@ function renderParserTabs() {
   }
   const insights = getParserInsights()
   parserResults.forEach((result) => {
+    const dep = result.missing_dependency
     const isActive = result.parser_id === selectedParserId
     const rowCount = (result.rows || []).length
     const rowTone = rowsClass(rowCount, insights.maxRows)
     const isMostRows = insights.maxRows > 0 && rowCount === insights.maxRows
     const tab = document.createElement("div")
-    tab.className = `parser-tab rows-${rowTone}${isActive ? " active" : ""}`
+    tab.className = `parser-tab rows-${rowTone}${isActive ? " active" : ""}${dep ? " needs-dep" : ""}`
     tab.dataset.parserId = result.parser_id
     tab.innerHTML = `
       <div class="parser-tab-top">
         <div class="parser-tab-name">${escHtml(result.parser_label)}</div>
         <div class="parser-tab-tags">
-          ${isMostRows ? '<span class="parser-pill parser-pill-rows">Most rows</span>' : ""}
+          ${dep ? `<span class="parser-pill parser-pill-dep">Needs ${escHtml(dep)}</span>` : ""}
+          ${isMostRows && !dep ? '<span class="parser-pill parser-pill-rows">Most rows</span>' : ""}
         </div>
       </div>
-      <div class="parser-row-count ${rowTone}${rowCount ? "" : " empty"}">${rowCount ? `${rowCount} row${rowCount !== 1 ? "s" : ""} found` : "No rows found"}</div>
+      <div class="parser-row-count ${rowTone}${rowCount ? "" : " empty"}">${dep ? "Not available" : rowCount ? `${rowCount} row${rowCount !== 1 ? "s" : ""} found` : "No rows found"}</div>
       <div class="parser-tab-meta">
         ${result.skipped_rows ? `<span class="parser-meta-danger">${result.skipped_rows} skipped</span>` : ""}
       </div>`
-    tab.addEventListener("click", () => selectParser(result.parser_id))
+    if (!dep) tab.addEventListener("click", () => selectParser(result.parser_id))
     container.appendChild(tab)
   })
   refreshParserPanel()

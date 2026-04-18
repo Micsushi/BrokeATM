@@ -14,7 +14,7 @@ from app.services.parsers.pdfplumber_coords import PdfplumberCoordsParser
 from app.services.parsers.pdfplumber_table import PdfplumberTableParser
 from app.services.parsers.pdfplumber_text import PdfplumberTextParser
 from app.services.parsers.tabula_parser import TabulaParser
-from app.services.parsers.tesseract_parser import TesseractParser, _check_tesseract
+from app.services.parsers.tesseract_parser import TesseractParser
 
 if TYPE_CHECKING:
     from app.services.keyword_matching import KeywordMatcher
@@ -29,7 +29,7 @@ ALL_PARSERS: list[BaseParser] = [
     TabulaParser(),
     PdfplumberTextParser(),
     OcrParser(),
-    *([TesseractParser()] if _check_tesseract() else []),
+    TesseractParser(),
     OfxParser(),
     CsvWrapperParser(),
 ]
@@ -113,4 +113,5 @@ def _result_to_dict(r: ParseResult) -> dict[str, Any]:
         "warnings": r.warnings,
         "errors": r.errors,
         "unknown_pdf_categories": r.unknown_pdf_categories,
+        "missing_dependency": r.missing_dependency,
     }
