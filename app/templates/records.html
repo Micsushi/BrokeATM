@@ -6,7 +6,7 @@
   <title>Records | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=18" />
+  <link rel="stylesheet" href="/static/css/main.css?v=19" />
   <script src="/static/js/month-picker.js?v=2"></script>
   <script src="/static/js/month-filter.js?v=6"></script>
   <style>
@@ -355,7 +355,11 @@
       </div>
       <div class="filter-group">
         <label>Category</label>
-        <select id="f-category"><option value="">All categories</option></select>
+        <input type="hidden" id="f-category" value="" />
+        <button type="button" class="category-picker-trigger" id="f-category-trigger" style="width:100%;min-height:var(--records-control-height);font-size:var(--records-control-font);padding:var(--records-control-pad-y) var(--records-control-pad-x)">
+          <span class="category-picker-trigger-label" id="f-category-trigger-label">All categories</span>
+          <span class="category-picker-trigger-caret" aria-hidden="true">▾</span>
+        </button>
       </div>
       <div class="filter-group amount-filter">
         <label>Min amount</label>
@@ -530,7 +534,7 @@
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
 <script src="/static/js/keyword-conflict-modal.js?v=22"></script>
 <script src="/static/js/category-create-modal.js?v=1"></script>
-<script src="/static/js/add-tx-modal.js?v=4"></script>
+<script src="/static/js/add-tx-modal.js?v=5"></script>
 <script>
 renderMonthFilterSection("records-date-filter", {
   prefix: "records-date",
@@ -645,10 +649,6 @@ function initRecordsDateFilter() {
 }
 
 function populateFilterDropdowns() {
-  const catOpts = `<option value="">All categories</option>` +
-    categories.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
-  document.getElementById("f-category").innerHTML = catOpts;
-
   const editAccOpts = `<option value="">none</option>` +
     accounts.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join("");
   document.getElementById("edit-account-sel").innerHTML = editAccOpts;
@@ -682,8 +682,6 @@ async function openRecordCategoryPicker({
   title = "Select category",
   subtitle = "",
   selectedId,
-  noneLabel = "No category",
-  noneDescription = "",
   actionLabel = "Select",
   anchorEl = null,
 } = {}) {
@@ -693,11 +691,6 @@ async function openRecordCategoryPicker({
     searchPlaceholder: "Search categories...",
     selectedValue: selectedId,
     actionLabel,
-    noneOption: {
-      label: noneLabel,
-      description: noneDescription,
-      actionText: actionLabel,
-    },
     items: categories.map((category) => ({
       id: category.id,
       value: category.id,
@@ -878,8 +871,6 @@ document.getElementById("bulk-cat-trigger").addEventListener("click", async (eve
     title: "Set category",
     subtitle: `Search categories for ${selectedIds.size} selected transaction${selectedIds.size === 1 ? "" : "s"}.`,
     selectedId: bulkCategoryChoice === undefined ? undefined : bulkCategoryChoice,
-    noneLabel: "No category",
-    noneDescription: "Clear the category on the selected transactions.",
     actionLabel: "Use",
     anchorEl: event.currentTarget,
   });
@@ -1005,8 +996,6 @@ document.getElementById("edit-category-trigger").addEventListener("click", async
     title: "Set category",
     subtitle: "Search categories for this transaction.",
     selectedId: parseCategoryIdInput(document.getElementById("edit-category").value),
-    noneLabel: "No category",
-    noneDescription: "Clear the category on this transaction.",
     actionLabel: "Use",
     anchorEl: event.currentTarget,
   });
@@ -1060,9 +1049,36 @@ async function deleteTx(id) {
 
 // ── Filter listeners ──
 const debouncedLoad = debounce(() => { currentPage = 1; loadRecords(); }, 300);
-["f-search", "f-type", "f-category", "f-amount-min", "f-amount-max"].forEach(id => {
+["f-search", "f-type", "f-amount-min", "f-amount-max"].forEach(id => {
   document.getElementById(id).addEventListener("input", debouncedLoad);
   document.getElementById(id).addEventListener("change", debouncedLoad);
+});
+
+document.getElementById("f-category-trigger").addEventListener("click", async (event) => {
+  const currentId = document.getElementById("f-category").value;
+  const picked = await openCategoryPickerModal({
+    title: "Filter by category",
+    searchPlaceholder: "Search categories...",
+    selectedValue: currentId ? +currentId : null,
+    actionLabel: "Filter",
+    noneOption: { label: "All categories", description: "", actionText: "Show all" },
+    items: categories.map(c => ({
+      id: c.id,
+      value: c.id,
+      name: c.name,
+      color: c.color || "",
+    })),
+    emptyMessage: "No categories available.",
+    mode: "popover",
+    anchorEl: event.currentTarget,
+  });
+  if (!picked) return;
+  const newId = picked.value === null ? "" : String(picked.id);
+  document.getElementById("f-category").value = newId;
+  document.getElementById("f-category-trigger-label").textContent =
+    newId ? (categories.find(c => c.id === picked.id)?.name || "All categories") : "All categories";
+  currentPage = 1;
+  loadRecords();
 });
 
 document.getElementById("page-size-sel").addEventListener("change", (e) => {
@@ -1119,9 +1135,11 @@ document.getElementById("btn-prune-dup-extras").addEventListener("click", async 
 });
 
 document.getElementById("btn-clear-filters").addEventListener("click", () => {
-  ["f-search", "f-type", "f-category", "f-amount-min", "f-amount-max"].forEach(id => {
+  ["f-search", "f-type", "f-amount-min", "f-amount-max"].forEach(id => {
     document.getElementById(id).value = "";
   });
+  document.getElementById("f-category").value = "";
+  document.getElementById("f-category-trigger-label").textContent = "All categories";
   recordsDateSelected.clear();
   recordsDateFilter?.refresh();
   duplicatesView = false;
@@ -1250,8 +1268,6 @@ async function openInlineCategoryPicker(td, tx) {
     title: "Set category",
     subtitle: `Search categories for "${tx.merchant_name || "this transaction"}".`,
     selectedId: tx.category_id ?? null,
-    noneLabel: "No category",
-    noneDescription: "Clear the category on this transaction.",
     actionLabel: "Use",
     anchorEl: td,
   });

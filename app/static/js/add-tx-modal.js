@@ -6,6 +6,7 @@
   const MODAL_ID = "add-tx-modal";
 
   let _onSuccess = null;
+  let _atxCategories = [];
 
   function injectHTML() {
     if (document.getElementById(MODAL_ID)) return;
@@ -42,7 +43,11 @@
               <div>
                 <label>Category</label>
                 <div style="display:flex;gap:0.5rem;align-items:stretch">
-                  <select id="atx-category" style="flex:1"></select>
+                  <input type="hidden" id="atx-category" value="" />
+                  <button type="button" class="category-picker-trigger" id="atx-category-trigger" style="flex:1;min-height:38px;font-size:0.91rem;padding:0.3rem 0.85rem">
+                    <span class="category-picker-trigger-label" id="atx-category-trigger-label">No category</span>
+                    <span class="category-picker-trigger-caret" aria-hidden="true">▾</span>
+                  </button>
                   <button type="button" class="btn btn-secondary btn-field-action" id="atx-new-category">+ Category</button>
                 </div>
               </div>
@@ -136,6 +141,28 @@
     );
 
     document.getElementById("atx-save").addEventListener("click", saveEntry);
+    document.getElementById("atx-category-trigger").addEventListener("click", async (event) => {
+      const currentVal = document.getElementById("atx-category").value;
+      const picked = await openCategoryPickerModal({
+        title: "Set category",
+        searchPlaceholder: "Search categories...",
+        selectedValue: currentVal ? +currentVal : null,
+        actionLabel: "Select",
+        items: _atxCategories.map(c => ({
+          id: c.id,
+          value: c.id,
+          name: c.name,
+          color: c.color || "",
+        })),
+        emptyMessage: "No categories available yet.",
+        noResultsMessage: (q) => `No categories match "${q}".`,
+        mode: "popover",
+        anchorEl: event.currentTarget,
+      });
+      if (!picked) return;
+      document.getElementById("atx-category").value = picked.value === null ? "" : String(picked.id);
+      document.getElementById("atx-category-trigger-label").textContent = picked.value === null ? "No category" : picked.name;
+    });
     document.getElementById("atx-new-category").addEventListener("click", async () => {
       const created = await openCategoryCreateModal({
         title: "Create Category",
@@ -185,12 +212,12 @@
   }
 
   async function refreshCategoryOptions(providedCategories = null, selectedId = null) {
-    const cats = providedCategories || await API.getCategories().catch(() => []);
-    const html =
-      '<option value="">No category</option>' +
-      cats.map(c => `<option value="${c.id}">${escHtml(c.name)}</option>`).join("");
-    document.getElementById("atx-category").innerHTML = html;
-    document.getElementById("atx-category").value = selectedId ? String(selectedId) : "";
+    _atxCategories = providedCategories || await API.getCategories().catch(() => []);
+    const catId = selectedId ? String(selectedId) : "";
+    document.getElementById("atx-category").value = catId;
+    const selectedCat = selectedId ? _atxCategories.find(c => c.id === selectedId) : null;
+    document.getElementById("atx-category-trigger-label").textContent =
+      selectedCat ? selectedCat.name : "No category";
   }
 
   async function saveEntry() {
@@ -275,6 +302,8 @@
     document.getElementById("atx-merchant").value = "";
     document.getElementById("atx-amount").value = "";
     document.getElementById("atx-type").value = "expense";
+    document.getElementById("atx-category").value = "";
+    document.getElementById("atx-category-trigger-label").textContent = "No category";
     document.getElementById("atx-notes").value = "";
 
     // Reset recurring

@@ -562,7 +562,7 @@ tr:hover td { background: rgba(124,130,255,0.07); }
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.9rem 1rem;
+  padding: 0.52rem 1rem;
   border: 1px solid rgba(255,255,255,0.06);
   border-radius: 12px;
   background:
@@ -583,7 +583,7 @@ tr:hover td { background: rgba(124,130,255,0.07); }
   outline: none;
 }
 .category-picker-popover .category-picker-item {
-  padding: 0.76rem 0.88rem;
+  padding: 0.42rem 0.88rem;
   border-radius: 10px;
 }
 .category-picker-item-main {

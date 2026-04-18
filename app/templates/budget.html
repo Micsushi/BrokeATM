@@ -6,16 +6,18 @@
   <title>Budget | BrokeATM</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/main.css?v=18" />
+  <link rel="stylesheet" href="/static/css/main.css?v=19" />
   <style>
     /* Category budget table */
     .budget-page {
       --budget-panel-pad: 1.35rem;
       --budget-cell-pad-x: 1rem;
       --budget-metric-col-width: 14%;
-      --budget-limit-col-width: clamp(220px, 30%, 340px);
+      --budget-limit-col-width: 180px;
       --budget-limit-input-width: calc(var(--budget-limit-col-width) - (var(--budget-cell-pad-x) * 2));
-      --budget-column-divider: rgba(255,255,255,0.06);
+      --budget-total-box-width-sync: var(--budget-limit-input-width);
+      --budget-total-box-right-sync: var(--budget-cell-pad-x);
+      --budget-column-divider: rgba(255,255,255,0.35);
     }
     .budget-page-header {
       display: flex;
@@ -70,30 +72,21 @@
     .budget-table th {
       font-size: var(--font-size-table-head); font-weight: 700; text-transform: uppercase;
       letter-spacing: 0.06em; color: var(--text-muted);
-      padding: 0.45rem var(--budget-cell-pad-x) 0.9rem;
+      padding: 0.25rem var(--budget-cell-pad-x) 0.9rem;
       text-align: left;
       vertical-align: bottom;
-      position: relative;
       border-bottom: 1px solid var(--border);
     }
     .budget-table td {
-      padding: 0.82rem var(--budget-cell-pad-x);
+      padding: 0.35rem var(--budget-cell-pad-x);
       vertical-align: middle;
-      border-top: 1px solid rgba(255,255,255,0.04);
+      border-top: 1px solid rgba(255,255,255,0.12);
       font-size: var(--font-size-table-cell);
-      position: relative;
     }
     .budget-table tr:first-child td { border-top: none; }
-    .budget-table th + th::before,
-    .budget-table td + td::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0.7rem;
-      bottom: 0.7rem;
-      width: 1px;
-      background: var(--budget-column-divider);
-      pointer-events: none;
+    .budget-table th + th,
+    .budget-table td + td {
+      border-left: 2px solid var(--budget-column-divider);
     }
     .budget-table th.num-col,
     .budget-table td.num-col,
@@ -103,10 +96,10 @@
     }
     .budget-table th.limit-col,
     .budget-table td.limit-col {
-      background: linear-gradient(180deg, rgba(124,130,255,0.08), rgba(124,130,255,0.02));
+      background: none;
     }
     .cat-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 0.4rem; flex-shrink: 0; }
-    .budget-avg { font-family: 'JetBrains Mono', monospace; font-size: var(--font-size-body-sm); color: var(--text-muted); }
+    .budget-avg { font-family: 'JetBrains Mono', monospace; font-size: 1rem; font-weight: 600; color: var(--text-muted); }
     .limit-input {
       display: block;
       width: var(--budget-limit-input-width);
@@ -114,7 +107,7 @@
       min-width: 0;
       margin-left: auto;
       background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; color: var(--text); font-size: var(--control-font-sm);
+      border-radius: 8px; color: var(--text); font-size: 1rem; font-weight: 600;
       min-height: var(--control-height-sm);
       padding: var(--control-pad-sm-y) var(--control-pad-sm-x); text-align: right;
       transition: border-color 0.15s;
@@ -122,7 +115,7 @@
     .limit-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,130,255,0.15); }
     .total-budget-input {
       background: var(--surface2); border: 1px solid var(--border);
-      border-radius: 8px; color: var(--text); font-size: var(--control-font-sm); font-weight: 700;
+      border-radius: 8px; color: var(--text); font-size: 1rem; font-weight: 700;
       min-height: var(--control-height-sm);
       padding: var(--control-pad-sm-y) var(--control-pad-sm-x); text-align: right;
       transition: border-color 0.15s;
@@ -136,6 +129,7 @@
       color: var(--text-muted);
       min-height: 0;
       min-width: 0;
+      margin-left: 0.6rem;
       transition: color 0.3s;
       display: none;
       align-items: center;
@@ -148,6 +142,11 @@
     .save-status.saving { color: var(--text-muted); }
     .save-status.saved { color: #22c55e; }
     .save-status.error { color: var(--danger); }
+
+    .sortable-th { cursor: pointer; user-select: none; white-space: nowrap; }
+    .sortable-th:hover { color: var(--accent-hover); }
+    .sortable-th.sort-active { color: var(--accent-hover); }
+    .sort-icon { font-size: 0.7em; opacity: 0.7; }
 
     .budget-table tbody tr { position: relative; }
     .budget-table tbody tr.selected td { background: rgba(99,102,241,0.07); }
@@ -184,14 +183,13 @@
       flex: 0 0 auto;
       width: auto;
       margin-left: auto;
-      padding-left: 1rem;
-      padding-right: var(--budget-cell-pad-x);
-      border-left: 1px solid var(--budget-column-divider);
+      padding-left: 0;
+      padding-right: var(--budget-total-box-right-sync);
     }
     .budget-total-wrap {
       display: flex;
       align-items: center;
-      gap: 0.7rem;
+      gap: 0;
       justify-content: flex-end;
       width: auto;
     }
@@ -207,11 +205,15 @@
     .budget-total-field {
       display: flex;
       flex: 0 0 auto;
-      width: var(--budget-limit-input-width);
-      min-width: var(--budget-limit-input-width);
+      align-items: center;
+      margin-left: 0;
+      width: var(--budget-total-box-width-sync);
+      min-width: var(--budget-total-box-width-sync);
     }
     .total-budget-input {
+      display: block;
       width: 100%;
+      max-width: 100%;
       min-width: 0;
     }
 
@@ -222,7 +224,6 @@
         padding-left: 0;
         padding-right: 0;
         padding-top: 0.7rem;
-        border-left: none;
         border-top: 1px solid var(--budget-column-divider);
       }
     }
@@ -243,6 +244,7 @@
         flex: 1 1 100%;
         width: 100%;
         min-width: 0;
+        margin-left: 0;
       }
     }
   </style>
@@ -288,10 +290,11 @@
     <div class="budget-total-shell">
       <div class="budget-total-wrap">
         <span class="budget-total-label">Total budget</span>
-        <div class="save-status" id="save-status"></div>
+        <div style="width:0.85rem" aria-hidden="true"></div>
         <div class="budget-total-field">
           <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="—" />
         </div>
+        <div class="save-status" id="save-status"></div>
       </div>
     </div>
   </div>
@@ -310,11 +313,11 @@
       <thead>
         <tr>
           <th class="chk-col"></th>
-          <th class="category-col">Category</th>
-          <th class="num-col">6 mo avg</th>
-          <th class="num-col">3 mo avg</th>
-          <th class="num-col">Last mo</th>
-          <th class="limit-col">Limit</th>
+          <th class="category-col sortable-th" data-sort="name">Category <span class="sort-icon"></span></th>
+          <th class="num-col sortable-th" data-sort="avg_6m">6 mo avg <span class="sort-icon"></span></th>
+          <th class="num-col sortable-th" data-sort="avg_3m">3 mo avg <span class="sort-icon"></span></th>
+          <th class="num-col sortable-th" data-sort="avg_1m">Last mo <span class="sort-icon"></span></th>
+          <th class="limit-col sortable-th" data-sort="limit">Limit <span class="sort-icon"></span></th>
         </tr>
       </thead>
       <tbody id="budget-tbody">
@@ -332,6 +335,9 @@
 let currentSettings = null;
 let saveTimer = null;
 let hiddenCategoryKeys = new Set();
+let budgetLayoutSyncRaf = 0;
+let budgetSortCol = "avg_6m";
+let budgetSortDir = "desc";
 
 // ── Auto-save (debounced 800ms) ────────────────────────────────────────────────
 
@@ -412,6 +418,32 @@ function getHiddenCategoryKeys() {
   return [...hiddenCategoryKeys].filter(key => key && !visible.has(key));
 }
 
+function syncBudgetTotalInputGeometry() {
+  const page = document.querySelector(".budget-page");
+  const bulkBar = document.getElementById("budget-bulk-bar");
+  const sample = document.querySelector("#budget-tbody .limit-input");
+  if (!page || !bulkBar) return;
+  if (!sample) {
+    page.style.removeProperty("--budget-total-box-width-sync");
+    page.style.removeProperty("--budget-total-box-right-sync");
+    return;
+  }
+  const sampleRect = sample.getBoundingClientRect();
+  const bulkRect = bulkBar.getBoundingClientRect();
+  const width = sampleRect.width;
+  const bulkPadRight = parseFloat(getComputedStyle(bulkBar).paddingRight) || 0;
+  const rightInset = Math.max(0, bulkRect.right - bulkPadRight - sampleRect.right);
+  if (width > 0) {
+    page.style.setProperty("--budget-total-box-width-sync", `${Math.round(width)}px`);
+    page.style.setProperty("--budget-total-box-right-sync", `${Math.round(rightInset)}px`);
+  }
+}
+
+function queueBudgetLayoutSync() {
+  cancelAnimationFrame(budgetLayoutSyncRaf);
+  budgetLayoutSyncRaf = requestAnimationFrame(syncBudgetTotalInputGeometry);
+}
+
 // ── Bulk selection ────────────────────────────────────────────────────────────
 
 let selectedCatKeys = new Set();
@@ -457,15 +489,51 @@ function wireRow(tr) {
   tr.querySelector(".budget-row-chk").addEventListener("change", e => toggleRowSelect(tr, e.target.checked));
 }
 
-function renderBudgetTable(data) {
-  selectedCatKeys.clear();
-  hiddenCategoryKeys = new Set(data.hidden_category_keys || []);
+function syncBudgetSortHeaders() {
+  document.querySelectorAll("#budget-table .sortable-th").forEach(th => {
+    const col = th.dataset.sort;
+    const icon = th.querySelector(".sort-icon");
+    if (col === budgetSortCol) {
+      th.classList.add("sort-active");
+      icon.textContent = budgetSortDir === "asc" ? " ▲" : " ▼";
+    } else {
+      th.classList.remove("sort-active");
+      icon.textContent = " ⇅";
+    }
+  });
+}
+
+function sortBudgetCategories(cats) {
+  const dir = budgetSortDir === "asc" ? 1 : -1;
+  return [...cats].sort((a, b) => {
+    let av, bv;
+    if (budgetSortCol === "name") {
+      return dir * (a.category_name || "").toLowerCase().localeCompare((b.category_name || "").toLowerCase());
+    }
+    switch (budgetSortCol) {
+      case "avg_6m": av = a.avg_6m ?? 0; bv = b.avg_6m ?? 0; break;
+      case "avg_3m": av = a.avg_3m ?? 0; bv = b.avg_3m ?? 0; break;
+      case "avg_1m": av = a.avg_1m ?? 0; bv = b.avg_1m ?? 0; break;
+      case "limit":  av = a.limit_amount ?? -1; bv = b.limit_amount ?? -1; break;
+      default:       av = a.avg_6m ?? 0; bv = b.avg_6m ?? 0;
+    }
+    return dir * (av < bv ? -1 : av > bv ? 1 : 0);
+  });
+}
+
+function rebuildBudgetTbody() {
   const tbody = document.getElementById("budget-tbody");
   tbody.innerHTML = "";
+  selectedCatKeys.clear();
 
-  data.categories
-    .filter(c => !hiddenCategoryKeys.has(c.category_key || budgetCategoryKey(c.category_id)))
-    .forEach(c => {
+  const cats = currentSettings?.categories || [];
+  const visible = cats.filter(c => {
+    const key = c.category_key || budgetCategoryKey(c.category_id);
+    if (hiddenCategoryKeys.has(key)) return false;
+    return (c.avg_6m ?? 0) > 0 || c.limit_amount != null;
+  });
+
+  sortBudgetCategories(visible).forEach(c => {
     const avg6 = c.avg_6m ?? c.avg_monthly ?? 0;
     const avg3 = c.avg_3m ?? 0;
     const avg1 = c.avg_1m ?? 0;
@@ -473,9 +541,16 @@ function renderBudgetTable(data) {
     tbody.appendChild(buildCatRow(c.category_id, c.category_name, c.category_color, avg6, avg3, avg1, limitVal));
   });
 
+  syncBudgetSortHeaders();
+  updateBulkBar();
+  queueBudgetLayoutSync();
+}
+
+function renderBudgetTable(data) {
+  hiddenCategoryKeys = new Set(data.hidden_category_keys || []);
   const totalEl = document.getElementById("total-budget");
   totalEl.value = data.total != null ? data.total : "";
-  updateBulkBar();
+  rebuildBudgetTbody();
 }
 
 function getCategoryLimits() {
@@ -616,6 +691,7 @@ function addCategoryRow(catId, catName, catColor) {
   tbody.appendChild(tr);
   updateTotalHint();
   scheduleSave();
+  queueBudgetLayoutSync();
   tr.querySelector(".limit-input").focus();
 }
 
@@ -661,6 +737,7 @@ document.getElementById("btn-budget-bulk-delete").addEventListener("click", asyn
   updateTotalHint();
   updateBulkBar();
   scheduleSave();
+  queueBudgetLayoutSync();
 });
 
 // ── Event listeners ───────────────────────────────────────────────────────────
@@ -668,6 +745,24 @@ document.getElementById("btn-budget-bulk-delete").addEventListener("click", asyn
 document.getElementById("total-budget").addEventListener("input", () => {
   updateTotalHint();
   scheduleSave();
+});
+
+window.addEventListener("resize", queueBudgetLayoutSync);
+window.addEventListener("load", queueBudgetLayoutSync);
+
+// ── Sort header clicks ────────────────────────────────────────────────────────
+
+document.querySelectorAll("#budget-table .sortable-th").forEach(th => {
+  th.addEventListener("click", () => {
+    const col = th.dataset.sort;
+    if (budgetSortCol === col) {
+      budgetSortDir = budgetSortDir === "asc" ? "desc" : "asc";
+    } else {
+      budgetSortCol = col;
+      budgetSortDir = col === "name" ? "asc" : "desc";
+    }
+    rebuildBudgetTbody();
+  });
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────
