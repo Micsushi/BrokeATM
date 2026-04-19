@@ -418,7 +418,7 @@ tr:hover td { background: rgba(124,130,255,0.07); }
   border-color: var(--accent);
 }
 
-/* All / Clear — text-style buttons */
+/* All / Clear text-style buttons */
 .ctrl-chip {
   background: none;
   border: none;

@@ -1,7 +1,3 @@
-// Shared "Add Transaction" modal — used by records and import pages.
-// Requires: utils.js (escHtml, showAlert), api.js (API)
-// Usage: openAddTxModal({ onSuccess: (count) => {} })
-
 (function () {
   const MODAL_ID = "add-tx-modal";
 
@@ -258,7 +254,6 @@
           return;
         }
 
-        // Save as a recurring rule
         await API.createRecurringRule({
           ...base,
           frequency: document.getElementById("atx-recur-freq").value,
@@ -266,7 +261,6 @@
           end_date: endVal || null,
         });
 
-        // Process immediately so past-due entries are created now
         const result = await API.processRecurring();
         closeModal();
         if (_onSuccess) _onSuccess(result.created, true);
@@ -297,7 +291,6 @@
       '<option value="">No account</option>' +
       accs.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join("");
 
-    // Reset all fields
     document.getElementById("atx-date").value = new Date().toISOString().slice(0, 10);
     document.getElementById("atx-merchant").value = "";
     document.getElementById("atx-amount").value = "";
@@ -306,7 +299,6 @@
     document.getElementById("atx-category-trigger-label").textContent = "No category";
     document.getElementById("atx-notes").value = "";
 
-    // Reset recurring
     const toggle = document.getElementById("atx-recur-toggle");
     toggle.checked = false;
     document.getElementById("atx-recur-slider").style.background = "var(--border)";

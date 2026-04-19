@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from app.services.keyword_matching import KeywordMatcher
 
 _GS_ERROR = (
-    "Ghostscript not found — install from https://ghostscript.com and add to PATH. "
+    "Ghostscript not found - install from https://ghostscript.com and add to PATH. "
     "Camelot requires Ghostscript for PDF rendering."
 )
 
@@ -106,7 +106,7 @@ class CamelotLatticeParser(BaseParser):
                 pass
 
         if not tables or len(tables) == 0:
-            warnings.append("No lattice tables found — PDF may not have bordered tables. Try Camelot Stream.")
+            warnings.append("No lattice tables found - PDF may not have bordered tables. Try Camelot Stream.")
             return ParseResult(
                 parser_id=self.parser_id,
                 parser_label=self.parser_label,
@@ -133,12 +133,12 @@ class CamelotLatticeParser(BaseParser):
             has_amount = "amount" in col_map
 
             if "date" not in col_map or "merchant" not in col_map:
-                warnings.append(f"Table {tbl_idx + 1}: skipped — no date/merchant columns")
+                warnings.append(f"Table {tbl_idx + 1}: skipped - no date/merchant columns")
                 skipped += max(0, len(df) - 1)
                 continue
 
             if not has_amount and not has_split:
-                warnings.append(f"Table {tbl_idx + 1}: skipped — no amount column")
+                warnings.append(f"Table {tbl_idx + 1}: skipped - no amount column")
                 skipped += max(0, len(df) - 1)
                 continue
 

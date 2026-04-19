@@ -121,7 +121,7 @@ class TesseractParser(BaseParser):
                     merchant = rest
                 else:
                     skipped += 1
-                    errors.append(f"Line {line_idx + 1}: no amount — '{line[:60]}'")
+                    errors.append(f"Line {line_idx + 1}: no amount - '{line[:60]}'")
                     continue
             else:
                 amount_str = am.group(1)

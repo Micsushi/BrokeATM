@@ -105,14 +105,14 @@ class PdfplumberTableParser(BaseParser):
 
                     if "date" not in col_map or "merchant" not in col_map:
                         warnings.append(
-                            f"Page {page_num}: table skipped — could not identify date/merchant columns"
+                            f"Page {page_num}: table skipped - could not identify date/merchant columns"
                         )
                         skipped += max(0, len(table) - 1)
                         continue
 
                     if not has_amount and not has_split:
                         warnings.append(
-                            f"Page {page_num}: table skipped — no amount/debit/credit column found"
+                            f"Page {page_num}: table skipped - no amount/debit/credit column found"
                         )
                         skipped += max(0, len(table) - 1)
                         continue
@@ -159,7 +159,7 @@ class PdfplumberTableParser(BaseParser):
                             errors.append(f"Page {page_num} row {row_idx}: {row_exc}")
 
         if not rows and not errors:
-            warnings.append("No tables found in PDF — try a different parser")
+            warnings.append("No tables found in PDF - try a different parser")
 
         valid = sum(1 for r in rows if is_valid_row(r))
         confidence = compute_confidence(valid, skipped)

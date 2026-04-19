@@ -135,6 +135,7 @@ function serializeDocForDraft(doc) {
     reviewRows: cloneForDraft(doc.reviewRows || []),
     errorMessage: doc.errorMessage || "",
     hasStoredFile: !!(doc.file || doc.hasStoredFile),
+    jobId: doc.jobId || null,
   }
 }
 
@@ -285,7 +286,9 @@ async function restoreImportDraft() {
   restoringDraft = true
   try {
     importDocs = record.importDocs.map((doc, index) => {
-      const status = (doc.status === "processing" || doc.status === "queued") ? "queued" : doc.status
+      const hasActiveJob = !!(doc.jobId) && doc.status === "waiting"
+      const status = hasActiveJob ? "waiting" :
+                     (doc.status === "processing" || doc.status === "queued") ? "queued" : doc.status
       const fileMeta = fileMetaMap.get(doc.id)
       const restoredDoc = {
         id: doc.id,
@@ -302,6 +305,7 @@ async function restoreImportDraft() {
         reviewRows: doc.reviewRows || [],
         errorMessage: doc.status === "error" ? (doc.errorMessage || "") : "",
         hasStoredFile: !!doc.hasStoredFile,
+        jobId: hasActiveJob ? doc.jobId : null,
       }
       const fallbackSourceFile =
         (restoredDoc.parsedData && Array.isArray(restoredDoc.parsedData.source_files) && restoredDoc.parsedData.source_files[0]) ||
@@ -383,6 +387,9 @@ async function restoreImportDraft() {
   } finally {
     restoringDraft = false
   }
+  if (importDocs.some((d) => d.status === "waiting" && d.jobId)) {
+    startJobPoller()
+  }
   return true
 }
 
@@ -423,6 +430,7 @@ function createImportDoc(file) {
     parsedData: null,
     reviewRows: [],
     errorMessage: "",
+    jobId: null,
   }
 }
 
@@ -449,7 +457,7 @@ function docsByStatus(statuses) {
 
 function maxBatchStage() {
   if (!importDocs.length) return doneSummary ? 5 : 1
-  if (docsByStatus(["queued", "processing", "error"]).length) return 2
+  if (docsByStatus(["queued", "processing", "waiting", "error"]).length) return 2
   if (importDocs.some((doc) => doc.status !== "ready")) return 2
   if (importDocs.some((doc) => !doc.periodReady)) return 2
   if (importDocs.some((doc) => !doc.reviewReady)) return 3
@@ -468,7 +476,7 @@ function parseStageAdvanceState() {
   if (!importDocs.length) {
     return { disabled: true, label: "Add files to continue", reason: "No files in this batch yet." }
   }
-  const blockingDocs = docsByStatus(["queued", "processing"])
+  const blockingDocs = docsByStatus(["queued", "processing", "waiting"])
   if (blockingDocs.length) {
     return {
       disabled: true,
@@ -755,11 +763,11 @@ function stageToolbarMeta() {
         detail: "Pick a file in the queue to review its parsed rows.",
       }
     }
-    if (doc.status === "processing") {
+    if (doc.status === "processing" || doc.status === "waiting") {
       const position = importDocs.findIndex((item) => item.id === doc.id) + 1
       return {
         title: `Processing ${doc.filename}`,
-        detail: `File ${position} of ${importDocs.length}. You can go back to uploads while this finishes.`,
+        detail: `File ${position} of ${importDocs.length}. You can navigate away; processing continues in the background.`,
       }
     }
     if (doc.status === "queued") {
@@ -854,6 +862,7 @@ function renderStageActionButtons() {
 
 function queueStatusText(doc) {
   if (doc.status === "processing") return "Processing"
+  if (doc.status === "waiting") return "Processing"
   if (doc.status === "queued") return "Queued"
   if (doc.status === "error") return "Needs attention"
   if (currentStep === 2) return "Ready"
@@ -872,7 +881,7 @@ function renderImportQueue() {
   card.classList.remove("hidden")
 
   const ready = getReadyDocs().length
-  const loading = importDocs.filter((doc) => doc.status === "queued" || doc.status === "processing").length
+  const loading = importDocs.filter((doc) => doc.status === "queued" || doc.status === "processing" || doc.status === "waiting").length
   const errors = importDocs.filter((doc) => doc.status === "error").length
   const parts = [`${importDocs.length} file${importDocs.length !== 1 ? "s" : ""} in this batch`]
   if (ready) parts.push(`${ready} ready`)
@@ -941,7 +950,7 @@ function renderProcessingPanel() {
   const body = document.getElementById("import-processing-body")
   const doc = getActiveDoc()
   if (!panel || !body) return
-  if (!doc || currentStep !== 2 || !["queued", "processing", "error"].includes(doc.status)) {
+  if (!doc || currentStep !== 2 || !["queued", "processing", "waiting", "error"].includes(doc.status)) {
     panel.classList.add("hidden")
     body.innerHTML = ""
     return
@@ -969,10 +978,10 @@ function renderProcessingPanel() {
   panel.classList.remove("error-state")
   const position = importDocs.findIndex((item) => item.id === doc.id) + 1
   const total = importDocs.length
-  const title = doc.status === "processing" ? "Processing your file" : "Waiting in the queue"
+  const title = (doc.status === "processing" || doc.status === "waiting") ? "Processing your file" : "Waiting in the queue"
   const copy =
-    doc.status === "processing"
-      ? "Large PDFs and image-heavy statements can take a bit. You can go back to uploads while we keep working in the background."
+    (doc.status === "processing" || doc.status === "waiting")
+      ? "Processing continues even if you navigate away. You'll get a notification when it's ready."
       : "This file is next in line. As soon as it is ready, you can switch into it without losing anything from the rest of the batch."
   body.innerHTML = `
     <div class="import-processing-spinner"></div>
@@ -1002,7 +1011,7 @@ function renderStepPanels() {
 
   const parserStepContent = document.getElementById("parser-step-content")
   const activeDoc = getActiveDoc()
-  const showProcessing = visibleStep === 2 && activeDoc && ["queued", "processing", "error"].includes(activeDoc.status)
+  const showProcessing = visibleStep === 2 && activeDoc && ["queued", "processing", "waiting", "error"].includes(activeDoc.status)
   if (parserStepContent) {
     parserStepContent.classList.toggle(
       "hidden",
@@ -1089,7 +1098,7 @@ function focusBestRemainingDoc({ replaceHistory = true } = {}) {
   }
   const nextDoc =
     importDocs.find((doc) => doc.status === "ready") ||
-    importDocs.find((doc) => doc.status === "processing" || doc.status === "queued") ||
+    importDocs.find((doc) => doc.status === "processing" || doc.status === "waiting" || doc.status === "queued") ||
     importDocs[0]
   activateDoc(nextDoc.id, { step: clampBatchStep(currentStep || 1), replaceHistory, pushHistory: true })
 }
@@ -1155,16 +1164,33 @@ function shouldAutoOpenDoc(docId) {
   return false
 }
 
-async function parseStructuredDoc(doc) {
-  await ensureDocFileLoaded(doc)
-  const fd = new FormData()
-  fd.append("file", doc.file)
-  const resp = await fetch("/api/import/parse-all", { method: "POST", body: fd })
-  if (!resp.ok) {
-    const err = await resp.json().catch(() => ({ detail: resp.statusText }))
-    throw new Error(err.detail || resp.statusText)
-  }
-  const results = await resp.json()
+const IMPORT_JOBS_STORAGE_KEY = "brokeatm-import-pending-jobs"
+
+function addPendingJobToStorage(jobId, filename) {
+  try {
+    const raw = localStorage.getItem(IMPORT_JOBS_STORAGE_KEY)
+    const jobs = raw ? JSON.parse(raw) : []
+    if (!jobs.find((j) => j.job_id === jobId)) {
+      jobs.push({ job_id: jobId, filename })
+      localStorage.setItem(IMPORT_JOBS_STORAGE_KEY, JSON.stringify(jobs))
+    }
+  } catch (_) {}
+}
+
+function removePendingJobFromStorage(jobId) {
+  try {
+    const raw = localStorage.getItem(IMPORT_JOBS_STORAGE_KEY)
+    if (!raw) return
+    const jobs = JSON.parse(raw).filter((j) => j.job_id !== jobId)
+    if (jobs.length) {
+      localStorage.setItem(IMPORT_JOBS_STORAGE_KEY, JSON.stringify(jobs))
+    } else {
+      localStorage.removeItem(IMPORT_JOBS_STORAGE_KEY)
+    }
+  } catch (_) {}
+}
+
+function applyPdfResult(doc, results) {
   if (!results.length) {
     throw new Error("No parsers returned results.")
   }
@@ -1180,9 +1206,7 @@ async function parseStructuredDoc(doc) {
   doc.step = 2
 }
 
-async function parseCsvDoc(doc) {
-  await ensureDocFileLoaded(doc)
-  const parsed = await API.parseCSV(doc.file)
+function applyCsvResult(doc, parsed) {
   if (!parsed.format) {
     throw new Error(((parsed.errors || [])[0]) || "Unrecognized CSV format.")
   }
@@ -1215,28 +1239,105 @@ async function parseCsvDoc(doc) {
   }
 }
 
-async function processQueue() {
-  if (queueProcessing) return
-  queueProcessing = true
-  try {
-    while (true) {
-      const doc = importDocs.find((item) => item.status === "queued")
-      if (!doc) break
-      doc.status = "processing"
-      doc.errorMessage = ""
-      renderApp()
-      scheduleDraftSave()
-      if (activeDocId === doc.id && currentStep !== 1) {
-        updateHistory({ replace: true })
-      }
-      await yieldToBrowser()
+async function parseStructuredDoc(doc) {
+  await ensureDocFileLoaded(doc)
+  const fd = new FormData()
+  fd.append("file", doc.file)
+  const resp = await fetch("/api/import/parse-all", { method: "POST", body: fd })
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }))
+    throw new Error(err.detail || resp.statusText)
+  }
+  const results = await resp.json()
+  applyPdfResult(doc, results)
+}
 
+async function parseCsvDoc(doc) {
+  await ensureDocFileLoaded(doc)
+  const parsed = await API.parseCSV(doc.file)
+  applyCsvResult(doc, parsed)
+}
+
+async function submitCsvJob(doc) {
+  await ensureDocFileLoaded(doc)
+  const fd = new FormData()
+  fd.append("file", doc.file)
+  const resp = await fetch("/api/import/parse-async", { method: "POST", body: fd })
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }))
+    throw new Error(err.detail || resp.statusText)
+  }
+  const { job_id } = await resp.json()
+  return job_id
+}
+
+async function submitPdfJob(doc) {
+  await ensureDocFileLoaded(doc)
+  const fd = new FormData()
+  fd.append("file", doc.file)
+  const resp = await fetch("/api/import/parse-all-async", { method: "POST", body: fd })
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({ detail: resp.statusText }))
+    throw new Error(err.detail || resp.statusText)
+  }
+  const { job_id } = await resp.json()
+  return job_id
+}
+
+let _jobPollInterval = null
+
+function startJobPoller() {
+  if (_jobPollInterval) return
+  if (!importDocs.some((d) => d.status === "waiting" && d.jobId)) return
+  _jobPollInterval = setInterval(() => { void pollWaitingJobs() }, 2000)
+}
+
+function stopJobPoller() {
+  if (_jobPollInterval) {
+    clearInterval(_jobPollInterval)
+    _jobPollInterval = null
+  }
+}
+
+async function pollWaitingJobs() {
+  const waiting = importDocs.filter((d) => d.status === "waiting" && d.jobId)
+  if (!waiting.length) {
+    stopJobPoller()
+    return
+  }
+  for (const doc of waiting) {
+    let jobData
+    try {
+      const resp = await fetch(`/api/import/job/${doc.jobId}`)
+      if (!resp.ok) {
+        if (resp.status === 404) {
+          doc.status = "error"
+          doc.errorMessage = "Processing expired. Add the file again."
+          removePendingJobFromStorage(doc.jobId)
+          doc.jobId = null
+          showAlert(alertsEl, `${doc.filename}: ${doc.errorMessage}`, "error")
+          scheduleDraftSave()
+          renderApp()
+        }
+        continue
+      }
+      jobData = await resp.json()
+    } catch (_) {
+      continue
+    }
+    if (jobData.status === "pending") continue
+    if (jobData.status === "done") {
       try {
-        if (doc.isPdfMode) await parseStructuredDoc(doc)
-        else await parseCsvDoc(doc)
+        if (doc.isPdfMode) {
+          applyPdfResult(doc, jobData.result)
+        } else {
+          applyCsvResult(doc, jobData.result)
+        }
         if (!getDocById(doc.id)) continue
         doc.status = "ready"
         doc.file = null
+        removePendingJobFromStorage(doc.jobId)
+        doc.jobId = null
         scheduleDraftSave()
         if (shouldAutoOpenDoc(doc.id)) {
           activateDoc(doc.id, {
@@ -1247,31 +1348,81 @@ async function processQueue() {
         } else {
           renderApp()
         }
-      } catch (error) {
+      } catch (err) {
         if (!getDocById(doc.id)) continue
         doc.status = "error"
-        doc.file = null
-        doc.errorMessage = error.message || "Parse failed."
+        doc.errorMessage = err.message || "Parse failed."
+        removePendingJobFromStorage(doc.jobId)
+        doc.jobId = null
         showAlert(alertsEl, `${doc.filename}: ${doc.errorMessage}`, "error")
         scheduleDraftSave()
         if (shouldAutoOpenDoc(doc.id)) {
-          activateDoc(doc.id, {
-            step: 2,
-            replaceHistory: currentStep !== 1,
-            pushHistory: true,
-          })
+          activateDoc(doc.id, { step: 2, replaceHistory: currentStep !== 1, pushHistory: true })
         } else {
           renderApp()
         }
       }
+    } else if (jobData.status === "error") {
+      if (!getDocById(doc.id)) continue
+      doc.status = "error"
+      doc.errorMessage = jobData.error || "Parse failed."
+      removePendingJobFromStorage(doc.jobId)
+      doc.jobId = null
+      showAlert(alertsEl, `${doc.filename}: ${doc.errorMessage}`, "error")
+      scheduleDraftSave()
+      if (shouldAutoOpenDoc(doc.id)) {
+        activateDoc(doc.id, { step: 2, replaceHistory: currentStep !== 1, pushHistory: true })
+      } else {
+        renderApp()
+      }
+    }
+  }
+  if (!importDocs.some((d) => d.status === "waiting")) {
+    stopJobPoller()
+  }
+}
+
+async function processQueue() {
+  if (queueProcessing) return
+  queueProcessing = true
+  try {
+    const queued = importDocs.filter((d) => d.status === "queued")
+    for (const doc of queued) {
+      if (!getDocById(doc.id)) continue
+      doc.status = "processing"
+      doc.errorMessage = ""
+      renderApp()
+      scheduleDraftSave()
       await yieldToBrowser()
+      try {
+        const jobId = doc.isPdfMode ? await submitPdfJob(doc) : await submitCsvJob(doc)
+        if (!getDocById(doc.id)) continue
+        doc.jobId = jobId
+        doc.status = "waiting"
+        doc.file = null
+        addPendingJobToStorage(jobId, doc.filename)
+        scheduleDraftSave()
+        renderApp()
+      } catch (error) {
+        if (!getDocById(doc.id)) continue
+        doc.status = "error"
+        doc.file = null
+        doc.errorMessage = error.message || "Failed to submit for processing."
+        showAlert(alertsEl, `${doc.filename}: ${doc.errorMessage}`, "error")
+        scheduleDraftSave()
+        if (shouldAutoOpenDoc(doc.id)) {
+          activateDoc(doc.id, { step: 2, replaceHistory: currentStep !== 1, pushHistory: true })
+        } else {
+          renderApp()
+        }
+      }
     }
   } finally {
     queueProcessing = false
     renderApp()
     scheduleDraftSave()
   }
-  // Safety: docs may have been added while we were finishing the last item
+  startJobPoller()
   if (importDocs.some((d) => d.status === "queued")) {
     void processQueue()
   }
@@ -1622,7 +1773,7 @@ function renderReviewTable(previewMode = false) {
       ? `tabindex="${tabIndex.chk}" title="Duplicate: unchecked by default; check to include in import"`
       : `tabindex="${tabIndex.chk}"`
     const sourceCell = showFileCol
-      ? `<td class="text-muted source-file-cell" title="${escHtml(row.source_file || "")}">${escHtml((row.source_file || "—").slice(0, 22))}${(row.source_file || "").length > 22 ? "…" : ""}</td>`
+      ? `<td class="text-muted source-file-cell" title="${escHtml(row.source_file || "")}">${escHtml((row.source_file || "-").slice(0, 22))}${(row.source_file || "").length > 22 ? "…" : ""}</td>`
       : ""
 
     const missingFields = rowMissingRequired(row)
@@ -1698,10 +1849,10 @@ function renderParserPreviewTable() {
       : ""
     tr.innerHTML = `
       <td class="text-muted row-index-cell">${i + 1}</td>
-      <td>${escHtml(String(row.transaction_date || "—"))}</td>
-      <td>${escHtml(row.merchant_name || "—")}${missingHint}</td>
-      <td>${row.amount != null ? row.amount : "—"}</td>
-      <td>${escHtml(row.transaction_type || "—")}</td>
+      <td>${escHtml(String(row.transaction_date || "-"))}</td>
+      <td>${escHtml(row.merchant_name || "-")}${missingHint}</td>
+      <td>${row.amount != null ? row.amount : "-"}</td>
+      <td>${escHtml(row.transaction_type || "-")}</td>
       <td class="text-muted preview-category-cell">${escHtml(categoryDisplay || "uncategorized")}</td>
     `
     tbody.appendChild(tr)
@@ -1752,7 +1903,7 @@ function renderUnknownCatsBannerStep2() {
   }
   banner.innerHTML = `
     <div class="unknown-cats-title">Categories from PDF not in your system</div>
-    <p class="text-muted unknown-cats-copy">These categories from the file don't match any in your system. <strong style="color:var(--tone-warning-text)">Optional</strong> — if you skip this, all unrecognized categories will fall back to keyword matching automatically.</p>
+    <p class="text-muted unknown-cats-copy">These categories from the file don't match any in your system. <strong style="color:var(--tone-warning-text)">Optional</strong>: if you skip this, all unrecognized categories will fall back to keyword matching automatically.</p>
     <div id="unknown-cats-list" style="margin:0.5rem 0 0.75rem">${buildUnknownCatRows(cats)}</div>
     <div class="unknown-cats-actions">
       <button class="btn btn-ghost btn-sm" onclick="handleUnknownCatsSelectAll(true)">Select all</button>
@@ -2146,7 +2297,7 @@ async function reviewKeywordConflict(idx) {
     // applyConflictRemovals already updated rows, rendered table, and marked dirty
     const updatedState = result.updatedState
     if (updatedState?.status === "multiple") {
-      // This row still has unresolved conflicts after the removal — re-open it
+      // This row still has unresolved conflicts after the removal, so reopen it.
       await reviewKeywordConflict(idx)
     } else {
       // Row resolved; find the next remaining conflict
@@ -2427,6 +2578,10 @@ async function init() {
     }
   }
 }
+
+CategoryBus.onChanged(async () => {
+  categories = await API.getCategories()
+})
 
 init().catch((error) => {
   showAlert(alertsEl, error.message || "Import page failed to load.", "error")

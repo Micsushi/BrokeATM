@@ -227,9 +227,34 @@ const API = {
     return res.json();
   },
 
+  async updateRecurringRule(id, payload) {
+    const res = await fetch(`/api/recurring/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => null);
+      const err = new Error(body?.detail?.message || body?.detail || "Update failed");
+      if (res.status === 409 && body?.detail?.overlap_count) err.overlap = body.detail;
+      throw err;
+    }
+    return res.json();
+  },
+
   async deleteRecurringRule(id) {
     const res = await fetch(`/api/recurring/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error(await res.text());
+  },
+
+  async deleteRecurringRuleFrom(id, from_date) {
+    const res = await fetch(`/api/recurring/${id}/delete-from`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from_date }),
+    });
+    if (!res.ok) throw new Error(await parseApiError(res));
+    return res.json();
   },
 
   async processRecurring() {

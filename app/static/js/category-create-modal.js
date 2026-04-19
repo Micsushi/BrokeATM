@@ -87,6 +87,7 @@
       color,
       keywords: keywords.join(", ") || null,
     });
+    CategoryBus.emit();
     const refreshed = await API.getCategories();
     if (typeof onCategoriesUpdated === "function") {
       await onCategoriesUpdated(refreshed, created);

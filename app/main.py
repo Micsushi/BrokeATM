@@ -41,9 +41,12 @@ def _prewarm_ocr() -> None:
 
 threading.Thread(target=_prewarm_ocr, daemon=True).start()
 
+from app.services.recurring_service import process_due_rules
+
 with SessionLocal() as _db:
     seed_starter_categories(_db)
     ensure_app_settings(_db)
+    process_due_rules(_db)
 
 app = FastAPI(
     title=settings.app_name,
@@ -107,3 +110,8 @@ def settings_page() -> FileResponse:
 @app.get("/budget")
 def budget_page() -> FileResponse:
     return _html("budget.html")
+
+
+@app.get("/recurring")
+def recurring_page() -> FileResponse:
+    return _html("recurring.html")

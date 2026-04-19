@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Recurring | BrokeATM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/main.css?v=19" />
+  <style>
+    .recurring-page { padding-top: 1.3rem; }
+    .recurring-page .page-header { margin-bottom: 1rem; }
+    .recurring-table-card { padding: 0; overflow-x: auto; }
+    .recurring-table {
+      width: 100%; border-collapse: separate; border-spacing: 0;
+    }
+    .recurring-table th {
+      font-size: var(--font-size-table-head); font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--text-muted); padding: 0.8rem 1rem;
+      text-align: left; border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .recurring-table td {
+      padding: 0.65rem 1rem; font-size: 0.93rem;
+      border-top: 1px solid rgba(255,255,255,0.09);
+      vertical-align: middle;
+    }
+    .recurring-table tr:first-child td { border-top: none; }
+    .recurring-table tr:hover td { background: rgba(255,255,255,0.03); }
+    .recurring-table .amount-cell { font-family: 'JetBrains Mono', monospace; font-weight: 600; }
+    .recurring-table .actions-cell { white-space: nowrap; text-align: right; }
+    .recurring-table .actions-cell .btn { min-height: 32px; font-size: 0.84rem; padding: 0.2rem 0.65rem; }
+    .freq-badge {
+      display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px;
+      font-size: 0.76rem; font-weight: 600; text-transform: capitalize;
+      background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border);
+    }
+    .type-badge {
+      display: inline-block; padding: 0.2rem 0.55rem; border-radius: 6px;
+      font-size: 0.76rem; font-weight: 600; text-transform: capitalize;
+    }
+    .type-expense { background: rgba(239,68,68,0.15); color: #f87171; }
+    .type-income  { background: rgba(34,197,94,0.15);  color: #4ade80; }
+    .type-refund  { background: rgba(99,102,241,0.15); color: #818cf8; }
+    .type-transfer { background: rgba(251,191,36,0.15); color: #fbbf24; }
+    .cat-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 0.4rem; }
+    .empty-state { text-align: center; padding: 3.5rem 1rem; color: var(--text-muted); }
+    .empty-state h3 { margin-bottom: 0.4rem; color: var(--text); }
+    /* modal overrides */
+    .modal-body .form-row {
+      display: flex; gap: 0.75rem; flex-wrap: wrap;
+    }
+    .modal-body .form-row .form-group { flex: 1 1 180px; }
+    .modal-body .form-group { margin-bottom: 0.85rem; }
+    .modal-body label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.28rem; }
+    .modal-body input, .modal-body select, .modal-body textarea {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 0.93rem;
+      padding: 0.45rem 0.75rem; min-height: 38px;
+    }
+    .modal-body input:focus, .modal-body select:focus, .modal-body textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .modal-body textarea { min-height: 72px; resize: vertical; }
+    .overlap-warning {
+      background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.35);
+      border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 0.85rem;
+      font-size: 0.87rem; color: #fbbf24;
+    }
+    .overlap-warning strong { display: block; margin-bottom: 0.3rem; }
+    .overlap-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .delete-from-section { margin-top: 0.5rem; }
+    .delete-from-section label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.28rem; }
+    .delete-from-section input[type="date"] {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 0.93rem; padding: 0.45rem 0.75rem; min-height: 38px; width: 100%;
+    }
+    #tx-count-badge { font-size: 0.8rem; color: var(--text-muted); margin-left: 0.5rem; }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="nav-brand">💸 BrokeATM</span>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/records">Records</a>
+    <a href="/budget">Budget</a>
+    <a href="/categories">Categories</a>
+    <a href="/recurring" class="active">Recurring</a>
+    <a href="/import">Import</a>
+    <a href="/settings">Settings</a>
+  </div>
+</nav>
+
+<div class="page recurring-page">
+  <div class="page-header flex items-center justify-between">
+    <div>
+      <h1>Recurring Entries</h1>
+      <p>Manage rules that auto-generate transactions on a schedule</p>
+    </div>
+    <button class="btn btn-primary" id="add-rule-btn">+ Add Rule</button>
+  </div>
+
+  <div class="card recurring-table-card">
+    <table class="recurring-table" id="recurring-table">
+      <thead>
+        <tr>
+          <th>Merchant</th>
+          <th>Amount</th>
+          <th>Type</th>
+          <th>Frequency</th>
+          <th>Start Date</th>
+          <th>End Date</th>
+          <th>Category</th>
+          <th>Account</th>
+          <th>Entries</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="recurring-tbody">
+        <tr><td colspan="10"><div class="empty-state"><p>Loading...</p></div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add / Edit Modal -->
+<div class="modal-overlay" id="rule-modal" style="display:none">
+  <div class="modal" style="max-width:540px;width:100%">
+    <div class="modal-header">
+      <h2 id="rule-modal-title">Add Recurring Rule</h2>
+      <button class="modal-close" id="rule-modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div id="overlap-warning" class="overlap-warning" style="display:none">
+        <strong id="overlap-msg"></strong>
+        <div class="overlap-actions">
+          <button class="btn btn-sm btn-secondary" id="overlap-keep-btn">Keep existing entries</button>
+          <button class="btn btn-sm btn-danger"    id="overlap-remove-btn">Remove entries after new end date</button>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:2 1 260px">
+          <label>Merchant Name *</label>
+          <input type="text" id="f-merchant" placeholder="e.g. Netflix" />
+        </div>
+        <div class="form-group" style="flex:1 1 130px">
+          <label>Amount *</label>
+          <input type="number" id="f-amount" step="0.01" min="0" placeholder="0.00" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <select id="f-type">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+            <option value="refund">Refund</option>
+            <option value="transfer">Transfer</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Frequency *</label>
+          <select id="f-frequency">
+            <option value="monthly">Monthly</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Bi-weekly</option>
+            <option value="yearly">Yearly</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Currency</label>
+          <input type="text" id="f-currency" value="CAD" maxlength="3" style="text-transform:uppercase" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Date *</label>
+          <input type="date" id="f-start-date" />
+        </div>
+        <div class="form-group">
+          <label>End Date <span style="font-weight:400;color:var(--text-muted)">(leave blank = ongoing)</span></label>
+          <input type="date" id="f-end-date" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Category</label>
+          <select id="f-category">
+            <option value="">None</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Account</label>
+          <select id="f-account">
+            <option value="">None</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="f-notes" placeholder="Optional notes"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:0.6rem;justify-content:flex-end">
+      <button class="btn btn-secondary" id="rule-modal-cancel">Cancel</button>
+      <button class="btn btn-primary"   id="rule-modal-save">Save Rule</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="delete-modal" style="display:none">
+  <div class="modal" style="max-width:440px;width:100%">
+    <div class="modal-header">
+      <h2>Delete Recurring Rule</h2>
+      <button class="modal-close" id="delete-modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="delete-modal-desc" style="margin-bottom:1rem"></p>
+      <div style="display:flex;flex-direction:column;gap:0.85rem">
+        <label style="font-weight:600;font-size:0.93rem">
+          <input type="radio" name="del-mode" value="all" checked style="margin-right:0.4rem" />
+          Delete rule + all linked entries <span id="tx-count-badge"></span>
+        </label>
+        <label style="font-weight:600;font-size:0.93rem">
+          <input type="radio" name="del-mode" value="from" style="margin-right:0.4rem" />
+          Delete from a specific date onwards
+        </label>
+        <div class="delete-from-section" id="from-date-section" style="display:none;padding-left:1.4rem">
+          <label>From date (inclusive)</label>
+          <input type="date" id="del-from-date" />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:0.6rem;justify-content:flex-end">
+      <button class="btn btn-secondary" id="delete-modal-cancel">Cancel</button>
+      <button class="btn btn-danger"    id="delete-modal-confirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/utils.js?v=11"></script>
+<script src="/static/js/api.js?v=5"></script>
+<script>
+(function () {
+  let rules = [];
+  let categories = [];
+  let accounts = [];
+  let editingRuleId = null;
+  let pendingOverlapPayload = null;
+
+  const FREQ_LABELS = { monthly: 'Monthly', weekly: 'Weekly', biweekly: 'Bi-weekly', yearly: 'Yearly' };
+
+  // Helpers
+
+  function fmt(amount) {
+    return (amount < 0 ? '-' : '') + '$' + Math.abs(amount).toFixed(2);
+  }
+
+  function fmtDate(d) {
+    if (!d) return '-';
+    return d;
+  }
+
+  function showToast(msg, type = 'success') {
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3200);
+  }
+
+  // Data
+
+  async function loadAll() {
+    [rules, categories, accounts] = await Promise.all([
+      API.getRecurringRules(),
+      API.getCategories(),
+      API.getAccounts(),
+    ]);
+    populateCategorySelect(document.getElementById('f-category'));
+    populateAccountSelect(document.getElementById('f-account'));
+    renderTable();
+  }
+
+  function populateCategorySelect(sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">None</option>';
+    categories.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id;
+      o.textContent = c.name;
+      sel.appendChild(o);
+    });
+    sel.value = cur;
+  }
+
+  function populateAccountSelect(sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">None</option>';
+    accounts.forEach(a => {
+      const o = document.createElement('option');
+      o.value = a.id;
+      o.textContent = a.name + (a.card_number_masked ? ' ' + a.card_number_masked : '');
+      sel.appendChild(o);
+    });
+    sel.value = cur;
+  }
+
+  // Render
+
+  function renderTable() {
+    const tbody = document.getElementById('recurring-tbody');
+    if (!rules.length) {
+      tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">
+        <h3>No recurring rules yet</h3>
+        <p>Add a rule to auto-generate transactions on a schedule.</p>
+      </div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rules.map(r => {
+      const catColor = r.category_id ? (categories.find(c => c.id === r.category_id)?.color || '#888') : null;
+      const catName = r.category_name || '-';
+      const accName = r.account_name || '-';
+      const typeClass = `type-${r.transaction_type}`;
+      return `<tr data-id="${r.id}">
+        <td><strong>${esc(r.merchant_name)}</strong></td>
+        <td class="amount-cell">${fmt(r.amount)} <small style="color:var(--text-muted)">${esc(r.currency)}</small></td>
+        <td><span class="type-badge ${typeClass}">${esc(r.transaction_type)}</span></td>
+        <td><span class="freq-badge">${FREQ_LABELS[r.frequency] || r.frequency}</span></td>
+        <td>${fmtDate(r.start_date)}</td>
+        <td>${fmtDate(r.end_date)}</td>
+        <td>${catColor ? `<span class="cat-dot" style="background:${catColor}"></span>` : ''}${esc(catName)}</td>
+        <td>${esc(accName)}</td>
+        <td style="text-align:center">${r.transaction_count}</td>
+        <td class="actions-cell">
+          <button class="btn btn-secondary btn-sm" onclick="editRule(${r.id})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${r.id})" style="margin-left:0.3rem">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  function esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // Add/edit modal
+
+  function openAddModal() {
+    editingRuleId = null;
+    pendingOverlapPayload = null;
+    document.getElementById('rule-modal-title').textContent = 'Add Recurring Rule';
+    document.getElementById('f-merchant').value = '';
+    document.getElementById('f-amount').value = '';
+    document.getElementById('f-type').value = 'expense';
+    document.getElementById('f-frequency').value = 'monthly';
+    document.getElementById('f-currency').value = 'CAD';
+    document.getElementById('f-start-date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('f-end-date').value = '';
+    document.getElementById('f-category').value = '';
+    document.getElementById('f-account').value = '';
+    document.getElementById('f-notes').value = '';
+    hideOverlapWarning();
+    document.getElementById('rule-modal').style.display = 'flex';
+    document.getElementById('f-merchant').focus();
+  }
+
+  window.editRule = function (id) {
+    const rule = rules.find(r => r.id === id);
+    if (!rule) return;
+    editingRuleId = id;
+    pendingOverlapPayload = null;
+    document.getElementById('rule-modal-title').textContent = 'Edit Recurring Rule';
+    document.getElementById('f-merchant').value = rule.merchant_name;
+    document.getElementById('f-amount').value = rule.amount;
+    document.getElementById('f-type').value = rule.transaction_type;
+    document.getElementById('f-frequency').value = rule.frequency;
+    document.getElementById('f-currency').value = rule.currency;
+    document.getElementById('f-start-date').value = rule.start_date;
+    document.getElementById('f-end-date').value = rule.end_date || '';
+    document.getElementById('f-category').value = rule.category_id || '';
+    document.getElementById('f-account').value = rule.account_id || '';
+    document.getElementById('f-notes').value = rule.notes || '';
+    hideOverlapWarning();
+    document.getElementById('rule-modal').style.display = 'flex';
+    document.getElementById('f-merchant').focus();
+  };
+
+  function closeRuleModal() {
+    document.getElementById('rule-modal').style.display = 'none';
+    pendingOverlapPayload = null;
+    hideOverlapWarning();
+  }
+
+  function hideOverlapWarning() {
+    document.getElementById('overlap-warning').style.display = 'none';
+  }
+
+  function showOverlapWarning(info) {
+    document.getElementById('overlap-msg').textContent =
+      `${info.overlap_count} existing transaction(s) fall after the new end date.`;
+    document.getElementById('overlap-warning').style.display = 'block';
+  }
+
+  function collectFormPayload() {
+    const merchant = document.getElementById('f-merchant').value.trim();
+    const amount = parseFloat(document.getElementById('f-amount').value);
+    const frequency = document.getElementById('f-frequency').value;
+    const startDate = document.getElementById('f-start-date').value;
+    if (!merchant) { alert('Merchant name is required.'); return null; }
+    if (isNaN(amount) || amount <= 0) { alert('Enter a valid amount.'); return null; }
+    if (!frequency) { alert('Frequency is required.'); return null; }
+    if (!startDate) { alert('Start date is required.'); return null; }
+    const endDate = document.getElementById('f-end-date').value || null;
+    const catVal = document.getElementById('f-category').value;
+    const accVal = document.getElementById('f-account').value;
+    return {
+      merchant_name: merchant,
+      amount: amount,
+      transaction_type: document.getElementById('f-type').value,
+      currency: (document.getElementById('f-currency').value.trim() || 'CAD').toUpperCase(),
+      frequency: frequency,
+      start_date: startDate,
+      end_date: endDate,
+      category_id: catVal ? parseInt(catVal) : null,
+      account_id: accVal ? parseInt(accVal) : null,
+      notes: document.getElementById('f-notes').value.trim() || null,
+    };
+  }
+
+  async function saveRule() {
+    const payload = collectFormPayload();
+    if (!payload) return;
+    const btn = document.getElementById('rule-modal-save');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    try {
+      if (editingRuleId) {
+        await API.updateRecurringRule(editingRuleId, payload);
+        showToast('Rule updated');
+      } else {
+        await API.createRecurringRule(payload);
+        showToast('Rule created; entries generated');
+      }
+      closeRuleModal();
+      await loadAll();
+    } catch (err) {
+      if (err.overlap) {
+        pendingOverlapPayload = payload;
+        showOverlapWarning(err.overlap);
+      } else {
+        showToast(err.message || 'Error saving rule', 'error');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save Rule';
+    }
+  }
+
+  async function resolveOverlap(keep) {
+    if (!pendingOverlapPayload || !editingRuleId) return;
+    const payload = {
+      ...pendingOverlapPayload,
+      keep_overlap: keep,
+      force_remove_overlap: !keep,
+    };
+    const btn = keep
+      ? document.getElementById('overlap-keep-btn')
+      : document.getElementById('overlap-remove-btn');
+    btn.disabled = true;
+    try {
+      await API.updateRecurringRule(editingRuleId, payload);
+      showToast('Rule updated');
+      closeRuleModal();
+      await loadAll();
+    } catch (err) {
+      showToast(err.message || 'Error updating rule', 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // Delete modal
+
+  let deletingRuleId = null;
+
+  window.openDeleteModal = function (id) {
+    deletingRuleId = id;
+    const rule = rules.find(r => r.id === id);
+    document.getElementById('delete-modal-desc').textContent =
+      `"${rule?.merchant_name}" with ${rule?.transaction_count || 0} linked transaction(s)`;
+    document.getElementById('tx-count-badge').textContent =
+      `(${rule?.transaction_count || 0} entries)`;
+    document.querySelector('input[name="del-mode"][value="all"]').checked = true;
+    document.getElementById('from-date-section').style.display = 'none';
+    document.getElementById('del-from-date').value = '';
+    document.getElementById('delete-modal').style.display = 'flex';
+  };
+
+  function closeDeleteModal() {
+    document.getElementById('delete-modal').style.display = 'none';
+    deletingRuleId = null;
+  }
+
+  async function confirmDelete() {
+    if (!deletingRuleId) return;
+    const mode = document.querySelector('input[name="del-mode"]:checked').value;
+    const btn = document.getElementById('delete-modal-confirm');
+    btn.disabled = true;
+    btn.textContent = 'Deleting...';
+    try {
+      if (mode === 'all') {
+        await API.deleteRecurringRule(deletingRuleId);
+        showToast('Rule and all entries deleted');
+      } else {
+        const fromDate = document.getElementById('del-from-date').value;
+        if (!fromDate) { alert('Select a from date.'); return; }
+        const res = await API.deleteRecurringRuleFrom(deletingRuleId, fromDate);
+        showToast(`Deleted ${res.deleted} entries from ${fromDate}`);
+      }
+      closeDeleteModal();
+      await loadAll();
+    } catch (err) {
+      showToast(err.message || 'Delete failed', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+    }
+  }
+
+  // Event wiring
+
+  document.getElementById('add-rule-btn').addEventListener('click', openAddModal);
+  document.getElementById('rule-modal-close').addEventListener('click', closeRuleModal);
+  document.getElementById('rule-modal-cancel').addEventListener('click', closeRuleModal);
+  document.getElementById('rule-modal-save').addEventListener('click', saveRule);
+  document.getElementById('overlap-keep-btn').addEventListener('click', () => resolveOverlap(true));
+  document.getElementById('overlap-remove-btn').addEventListener('click', () => resolveOverlap(false));
+  document.getElementById('delete-modal-close').addEventListener('click', closeDeleteModal);
+  document.getElementById('delete-modal-cancel').addEventListener('click', closeDeleteModal);
+  document.getElementById('delete-modal-confirm').addEventListener('click', confirmDelete);
+
+  document.querySelectorAll('input[name="del-mode"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.getElementById('from-date-section').style.display =
+        radio.value === 'from' ? 'block' : 'none';
+    });
+  });
+
+  document.getElementById('rule-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('rule-modal')) closeRuleModal();
+  });
+  document.getElementById('delete-modal').addEventListener('click', e => {
+    if (e.target === document.getElementById('delete-modal')) closeDeleteModal();
+  });
+
+  // Init
+  loadAll();
+})();
+</script>
+</body>
+</html>

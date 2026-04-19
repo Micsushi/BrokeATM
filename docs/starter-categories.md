@@ -1,24 +1,24 @@
 # Starter Categories
 
-`app/data/starter_categories.json` is the source of truth for the app's base category set.
+`app/data/starter_categories.json` defines the app's default category set.
 
-## How it works now
+## How it works
 
 - On startup, the app seeds starter categories only if the live `categories` table is empty.
 - Those starter categories are copied into the real database and then behave like normal categories.
 - Import matching uses the saved database categories, not the JSON file directly.
 
-## Why this exists
+## Why this file exists
 
-This separates:
+This keeps a clear split between:
 
 - starter templates you want every new install or future new user to begin with
 - live categories that people can rename, delete, merge, recolor, and edit freely
 
-## Future user accounts
+## If we add user accounts
 
 When multi-user support is added, this file should stay the base template set.
-The signup flow can clone these starter templates into that new user's own categories.
+The signup flow can copy these starter templates into that user's own categories.
 
 ## Editing rules
 
@@ -27,7 +27,7 @@ The signup flow can clone these starter templates into that new user's own categ
 - Put keywords in the `keywords` array.
 - The file order is preserved when starter categories are copied into a fresh database.
 
-## Important note
+## Note
 
 Changing `starter_categories.json` does not rewrite categories already saved in an existing database.
 It affects:

@@ -64,7 +64,6 @@ function fmtDate(dateStr) {
   return d.toLocaleDateString("en-CA", { year: "numeric", month: "short", day: "numeric" });
 }
 
-/** ISO datetime or date string from API */
 function fmtDateTime(isoStr) {
   if (!isoStr) return "-";
   const d = new Date(isoStr);
@@ -111,10 +110,6 @@ function escHtml(s) {
   return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/**
- * Custom confirm dialog. Returns Promise<boolean>.
- * Usage: if (!await confirmDialog({ title, message, confirmLabel })) return;
- */
 function confirmDialog({ title = "Confirm", message = "", confirmLabel = "Confirm", confirmClass = "btn-danger", cancelLabel = "Cancel" } = {}) {
   return new Promise(resolve => {
     let overlay = document.getElementById("__confirm-overlay");
@@ -155,6 +150,16 @@ function confirmDialog({ title = "Confirm", message = "", confirmLabel = "Confir
   });
 }
 
+const CategoryBus = (() => {
+  const ch = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("brokeatm_categories") : null;
+  const listeners = [];
+  if (ch) ch.onmessage = () => listeners.forEach(fn => fn());
+  return {
+    emit() { ch?.postMessage("changed"); },
+    onChanged(fn) { listeners.push(fn); },
+  };
+})();
+
 function debounce(fn, ms = 300) {
   let t;
   return (...args) => {
@@ -163,8 +168,6 @@ function debounce(fn, ms = 300) {
   };
 }
 
-// Called once per page load to catch up any due recurring entries.
-// Shows a toast at the top of the page if entries were created.
 async function processRecurringOnLoad() {
   try {
     const result = await fetch("/api/recurring/process", { method: "POST" }).then(r => r.json());
@@ -173,7 +176,7 @@ async function processRecurringOnLoad() {
       showAlert(container, `${result.created} recurring entr${result.created === 1 ? "y" : "ies"} added automatically.`, "success");
     }
   } catch (_) {
-    // silently ignore — recurring is best-effort
+    // Ignore recurring catch-up errors.
   }
 }
 
@@ -190,3 +193,62 @@ function el(tag, attrs = {}, ...children) {
   }
   return node;
 }
+
+const _IMPORT_JOBS_STORAGE_KEY = "brokeatm-import-pending-jobs";
+
+function _showImportReadyToast(count) {
+  let toast = document.getElementById("__import-bg-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "__import-bg-toast";
+    toast.className = "app-toast";
+    toast.style.cssText = "pointer-events:auto;max-width:320px;line-height:1.4";
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `${count} file${count !== 1 ? "s" : ""} parsed and ready. <a href="/import" style="color:#fff;text-decoration:underline">Review \u2192</a>`;
+  toast.classList.add("show");
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.remove("show"), 9000);
+}
+
+async function pollPendingImportJobs() {
+  const raw = localStorage.getItem(_IMPORT_JOBS_STORAGE_KEY);
+  if (!raw) return;
+  let pending;
+  try { pending = JSON.parse(raw); } catch (_) { localStorage.removeItem(_IMPORT_JOBS_STORAGE_KEY); return; }
+  if (!Array.isArray(pending) || !pending.length) { localStorage.removeItem(_IMPORT_JOBS_STORAGE_KEY); return; }
+
+  const onImportPage = window.location.pathname === "/import" || window.location.pathname.startsWith("/import?");
+  let remaining = [...pending];
+  let doneCount = 0;
+
+  const interval = setInterval(async () => {
+    if (!remaining.length) { clearInterval(interval); return; }
+    const stillPending = [];
+    await Promise.all(remaining.map(async (job) => {
+      try {
+        const res = await fetch(`/api/import/job/${job.job_id}`);
+        if (!res.ok) {
+          // 404 = job expired (server restart); drop it. Other errors = transient, keep retrying.
+          if (res.status !== 404) stillPending.push(job);
+          return;
+        }
+        const data = await res.json();
+        if (data.status === "pending") { stillPending.push(job); return; }
+        if (data.status === "done") doneCount++;
+      } catch (_) {
+        stillPending.push(job);
+      }
+    }));
+    remaining = stillPending;
+    if (remaining.length) {
+      localStorage.setItem(_IMPORT_JOBS_STORAGE_KEY, JSON.stringify(remaining));
+    } else {
+      localStorage.removeItem(_IMPORT_JOBS_STORAGE_KEY);
+      clearInterval(interval);
+      if (!onImportPage && doneCount > 0) _showImportReadyToast(doneCount);
+    }
+  }, onImportPage ? 2000 : 5000);
+}
+
+document.addEventListener("DOMContentLoaded", () => { void pollPendingImportJobs(); });

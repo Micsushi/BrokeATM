@@ -20,9 +20,9 @@ For those that are broke at the moment to be less broke in the future
 
 ### Prerequisites
 
-- **Python 3.11+**: https://www.python.org/downloads/ — check "Add Python to PATH" during install
+- **Python 3.11+**: https://www.python.org/downloads/ - check "Add Python to PATH" during install
 
-**For PDF imports** (optional — CSV works without these):
+**For PDF imports** (optional; CSV works without these):
 
 | Tool | Download |
 |---|---|
@@ -31,7 +31,7 @@ For those that are broke at the moment to be less broke in the future
 | Poppler | https://github.com/oschwartz10612/poppler-windows/releases |
 | Ghostscript | https://www.ghostscript.com/releases/ |
 
-Parsers with missing dependencies show as inactive in the UI — the rest still run.
+Parsers with missing dependencies show as inactive in the UI. The rest still run.
 
 ### Install
 
@@ -68,7 +68,7 @@ atm --reload          # dev mode
 
 ## Windows EXE / installer
 
-Yes — the current app can be packaged for Windows.
+Yes. The current app can be packaged for Windows.
 
 End-user release goal:
 

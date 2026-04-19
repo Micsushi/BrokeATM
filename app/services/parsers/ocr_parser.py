@@ -136,7 +136,7 @@ class OcrParser(BaseParser):
                 parser_label=self.parser_label,
                 confidence=0.0,
                 rows=[],
-                warnings=["PDF has a text layer — OCR skipped. Use Generic Text or Bank-Specific."],
+                warnings=["PDF has a text layer; OCR skipped. Use Generic Text or Bank-Specific."],
             )
 
         rows: list[dict[str, Any]] = []
@@ -188,7 +188,7 @@ class OcrParser(BaseParser):
                     merchant = rest
                 else:
                     skipped += 1
-                    errors.append(f"Line {line_idx + 1}: no amount — '{line[:60]}'")
+                    errors.append(f"Line {line_idx + 1}: no amount - '{line[:60]}'")
                     continue
             else:
                 pre = rest[: am.start()].rstrip()

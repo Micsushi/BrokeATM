@@ -122,12 +122,12 @@ class CamelotStreamParser(BaseParser):
             has_amount = "amount" in col_map
 
             if "date" not in col_map or "merchant" not in col_map:
-                warnings.append(f"Table {tbl_idx + 1}: skipped — no date/merchant columns identified")
+                warnings.append(f"Table {tbl_idx + 1}: skipped - no date/merchant columns identified")
                 skipped += max(0, len(df) - 1)
                 continue
 
             if not has_amount and not has_split:
-                warnings.append(f"Table {tbl_idx + 1}: skipped — no amount column identified")
+                warnings.append(f"Table {tbl_idx + 1}: skipped - no amount column identified")
                 skipped += max(0, len(df) - 1)
                 continue
 
@@ -146,7 +146,7 @@ class CamelotStreamParser(BaseParser):
                     txn_date = try_parse_date(date_str, fallback_year)
                     if txn_date is None and date_str:
                         skipped += 1
-                        errors.append(f"Table {tbl_idx + 1} row {row_idx}: date format not recognized — '{date_str}'")
+                        errors.append(f"Table {tbl_idx + 1} row {row_idx}: date format not recognized - '{date_str}'")
                         continue
 
                     if has_split:

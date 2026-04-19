@@ -118,6 +118,7 @@
     <a href="/records">Records</a>
     <a href="/budget" class="active">Budget</a>
     <a href="/categories">Categories</a>
+    <a href="/recurring">Recurring</a>
     <a href="/import">Import</a>
     <a href="/settings">Settings</a>
   </div>
@@ -152,7 +153,7 @@
         <span class="budget-total-label">Total budget</span>
         <div style="width:0.85rem" aria-hidden="true"></div>
         <div class="budget-total-field">
-          <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="—" />
+          <input type="number" class="total-budget-input" id="total-budget" min="0" step="1" placeholder="-" />
         </div>
         <div class="save-status" id="save-status"></div>
       </div>
@@ -186,7 +187,7 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=9"></script>
+<script src="/static/js/utils.js?v=11"></script>
 <script src="/static/js/api.js?v=8"></script>
 <script src="/static/js/category-picker-modal.js?v=1"></script>
 <script>
@@ -329,7 +330,7 @@ function buildCatRow(catId, catName, catColor, avg6, avg3, avg1, limitVal) {
     <td class="num-col">${fmtAvg(avg1)}</td>
     <td class="limit-col">
       <input type="number" class="limit-input" data-cat-id="${catId ?? ""}"
-        min="0" step="1" placeholder="—" value="${limitVal}" />
+        min="0" step="1" placeholder="-" value="${limitVal}" />
     </td>`;
   tr.querySelector(".limit-input").addEventListener("input", () => { updateTotalHint(); scheduleSave(); });
   tr.querySelector(".budget-row-chk").addEventListener("change", e => toggleRowSelect(tr, e.target.checked));

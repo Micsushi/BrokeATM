@@ -147,6 +147,7 @@
     <a href="/records">Records</a>
     <a href="/budget">Budget</a>
     <a href="/categories">Categories</a>
+    <a href="/recurring">Recurring</a>
     <a href="/import">Import</a>
     <a href="/settings" class="active">Settings</a>
   </div>
@@ -301,10 +302,9 @@
 
 <div class="app-toast" id="saved-toast">Saved</div>
 
-<script src="/static/js/utils.js?v=7"></script>
+<script src="/static/js/utils.js?v=11"></script>
 <script src="/static/js/api.js?v=8"></script>
 <script>
-// ── Column definitions (id matches what records.html expects) ─────────────────
 const ALL_COLUMNS = [
   { id: "date_added", label: "Date Added",  required: false, defaultOn: true  },
   { id: "category",   label: "Category",    required: false, defaultOn: true  },
@@ -326,7 +326,6 @@ const DEFAULTS = {
   autoSortCategories: [],
 };
 
-// ── Persistence ───────────────────────────────────────────────────────────────
 
 function loadSettings() {
   try {
@@ -397,7 +396,6 @@ function buildCurrencyOptions(selected) {
   sel.innerHTML = codes.map(code => `<option value="${code}"${code === selected ? " selected" : ""}>${code}</option>`).join("");
 }
 
-// ── Column grid ───────────────────────────────────────────────────────────────
 
 function buildColumnGrid(s) {
   const grid = document.getElementById("col-grid");
@@ -419,7 +417,6 @@ function buildColumnGrid(s) {
   });
 }
 
-// ── UI helpers ────────────────────────────────────────────────────────────────
 
 function updateInputStates(s) {
   document.getElementById("threshold-amount").disabled = !s.enableAmount;
@@ -437,10 +434,9 @@ function updatePreview(s) {
   if (s.enablePct) parts.push(`≥ <strong>${s.thresholdPct}%</strong> of its month total`);
   box.innerHTML = parts.length
     ? `Flagging expenses where: ${parts.join(" <em>or</em> ")}.`
-    : "No thresholds enabled — Large Expenses section will be hidden on the Dashboard.";
+    : "No thresholds enabled. The Large Expenses section will be hidden on the Dashboard.";
 }
 
-// ── Auto-save on any change ───────────────────────────────────────────────────
 
 async function onAnyChange() {
   const s = readForm();
@@ -478,7 +474,6 @@ document.addEventListener("focusout", e => {
   if (e.target.type === "number") onAnyChange();
 });
 
-// ── Reset ─────────────────────────────────────────────────────────────────────
 
 document.getElementById("btn-reset").addEventListener("click", async () => {
   buildCurrencyOptions(DEFAULTS.defaultCurrency);
@@ -488,7 +483,6 @@ document.getElementById("btn-reset").addEventListener("click", async () => {
   setAppSettingsCache(next);
 });
 
-// ── Auto-sort categories ──────────────────────────────────────────────────────
 
 function buildAutoSortList(s) {
   const list = document.getElementById("autosort-list");
@@ -534,7 +528,6 @@ document.getElementById("autosort-input").addEventListener("keydown", e => {
   if (e.key === "Enter") document.getElementById("btn-autosort-add").click();
 });
 
-// ── Init ──────────────────────────────────────────────────────────────────────
 
 async function initSettingsPage() {
   const appSettings = await loadAppSettings();
@@ -546,7 +539,6 @@ async function initSettingsPage() {
 
 initSettingsPage();
 
-// ── Danger zone ───────────────────────────────────────────────────────────────
 
 let _clearAction = null;
 

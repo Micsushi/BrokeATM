@@ -1,6 +1,3 @@
-/**
- * Shared month/date range controls for static HTML pages.
- */
 function renderDateRangeFilterBlock(targetId, {
   fromId,
   toId,
@@ -34,9 +31,6 @@ function renderDateRangeFilterBlock(targetId, {
   `;
 }
 
-/**
- * Shared month filter section markup for static HTML pages.
- */
 function renderMonthFilterSection(targetId, {
   prefix,
   title,
@@ -71,12 +65,6 @@ function renderMonthFilterSection(targetId, {
   `;
 }
 
-/**
- * MonthFilterGroup — shared month-range + control-chip + MonthPicker wrapper.
- *
- * Expected DOM ids for a prefix like "pie":
- *   pie-all, pie-clear, pie-range-from, pie-range-to, pie-picker
- */
 class MonthFilterGroup {
   constructor(prefix, {
     selectedSet,

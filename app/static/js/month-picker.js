@@ -1,29 +1,3 @@
-/**
- * MonthPicker — reusable scrollable month chip selector.
- *
- * Modes:
- *   'single'  one chip active at a time; onChange(idx, ym)
- *   'multi'   toggle chips into/out of a Set; onChange(selectedSet<ym>)
- *
- * HTML contract: pass the id of a .month-picker element that is already
- * wrapped in .picker-scroll-outer. The component owns only the inner div.
- *
- * Usage (single):
- *   const p = new MonthPicker('month-chips', {
- *     mode: 'single',
- *     onChange: (idx, ym) => { ... }
- *   });
- *   p.render([{ label: 'Apr 2026', ym: '2026-04' }, ...], 0);
- *
- * Usage (multi):
- *   const p = new MonthPicker('pie-picker', {
- *     mode: 'multi',
- *     onChange: (set) => { ... }
- *   });
- *   const sel = new Set(['2026-04', '2026-03']);
- *   p.render([{ label, ym }, ...], sel);
- *   p.setActive(sel);  // re-sync after external changes (All / Clear buttons)
- */
 class MonthPicker {
   constructor(containerId, { mode = 'single', onChange = () => {} } = {}) {
     this.el = document.getElementById(containerId);
@@ -34,23 +8,19 @@ class MonthPicker {
     this._bindWheelScroll();
   }
 
-  /** Rebuild chips. initial: idx (single) or Set<ym> (multi). */
   render(months, initial) {
     this._months = months;
     if (initial !== undefined) this._active = initial;
     this._build();
   }
 
-  /** Sync visual state after external selection changes — no DOM rebuild. */
   setActive(active) {
     this._active = active;
     this._sync();
   }
 
-  /** Current selection: idx (single) or Set<ym> (multi). */
   get selected() { return this._active; }
 
-  // ── private ────────────────────────────────────────────────────────────────
 
   _build() {
     this.el.innerHTML = '';

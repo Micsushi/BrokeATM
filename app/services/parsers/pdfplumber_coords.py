@@ -49,7 +49,7 @@ class PageColumns:
 BANK_PROFILES: list[BankProfile] = [
     BankProfile(
         name="TD Visa",
-        # must come before TD Chequing — generic "td.com" pattern would match both
+        # must come before TD Chequing; generic "td.com" would match both
         detect_patterns=["TD Visa", "TD® Visa", "TD Credit Card", "TD CASH BACK", "TD Cash Back"],
         date_x=(30, 92),
         desc_x=(136, 316),
@@ -68,7 +68,7 @@ BANK_PROFILES: list[BankProfile] = [
     ),
     BankProfile(
         name="CIBC Visa",
-        # must come before CIBC Chequing — "CIBC" alone would match chequing profile first
+        # must come before CIBC Chequing; "CIBC" alone would match chequing first
         detect_patterns=["CIBC Visa", "CIBC Credit Card", "CIBC Dividend"],
         # transactions on page 2: trans date x=37-50, post date x=79-92 (excluded), desc x=119+, amount x=516
         date_x=(30, 72),
@@ -96,7 +96,7 @@ BANK_PROFILES: list[BankProfile] = [
     ),
     BankProfile(
         name="RBC Visa",
-        # must come before RBC Chequing — "Royal Bank" matches both
+        # must come before RBC Chequing; "Royal Bank" matches both
         detect_patterns=["RBC Visa", "RBC Rewards", "RBC Avion", "Visa Platinum", "RBC Credit Card"],
         date_x=(55, 105),
         desc_x=(105, 295),
@@ -396,7 +396,7 @@ class PdfplumberCoordsParser(BaseParser):
             profile = _detect_bank(header_text)
             if profile is None:
                 warnings.append(
-                    "Bank not recognized — coordinate extraction may be inaccurate. "
+                    "Bank not recognized - coordinate extraction may be inaccurate. "
                     "Try Generic Table or Generic Text parsers for better results."
                 )
                 profile = BANK_PROFILES[0]

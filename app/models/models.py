@@ -84,6 +84,9 @@ class Transaction(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     import_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     is_excluded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    recurring_rule_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("recurring_rules.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

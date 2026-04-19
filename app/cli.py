@@ -84,7 +84,7 @@ def main() -> None:
     print(f"BrokeATM starting at {browser_url}")
     if getattr(sys, "frozen", False):
         print("Your browser will open automatically.")
-        print("Keep this window open — closing it will stop BrokeATM.")
+        print("Keep this window open. Closing it will stop BrokeATM.")
         print("Press Ctrl+C or close this window to quit.\n")
     else:
         print("Press Ctrl+C to stop.\n")

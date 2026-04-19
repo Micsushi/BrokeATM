@@ -286,6 +286,7 @@
     <a href="/records" class="active">Records</a>
     <a href="/budget">Budget</a>
     <a href="/categories">Categories</a>
+    <a href="/recurring">Recurring</a>
     <a href="/import">Import</a>
     <a href="/settings">Settings</a>
   </div>
@@ -528,12 +529,12 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=9"></script>
+<script src="/static/js/utils.js?v=11"></script>
 <script src="/static/js/api.js?v=8"></script>
 <script src="/static/js/category-picker-modal.js?v=1"></script>
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
 <script src="/static/js/keyword-conflict-modal.js?v=22"></script>
-<script src="/static/js/category-create-modal.js?v=1"></script>
+<script src="/static/js/category-create-modal.js?v=2"></script>
 <script src="/static/js/add-tx-modal.js?v=5"></script>
 <script>
 renderMonthFilterSection("records-date-filter", {
@@ -543,7 +544,6 @@ renderMonthFilterSection("records-date-filter", {
   containerClass: "records-date-section",
 });
 
-/** Calendar date portion of API ``created_at`` (matches Date column formatting). */
 function fmtDateAdded(isoVal) {
   if (!isoVal) return "-";
   const s = String(isoVal).trim();
@@ -567,7 +567,6 @@ let lastTableItems = [];
 let inlineEditBlurTimer = null;
 const NO_RECORD_MONTHS = "__none__";
 
-// ── Column visibility (from Settings) ────────────────────────────────────────
 // Columns that can be toggled: date_added, category, type, notes, account, currency
 // Required (always shown): date, merchant, amount, actions
 const TOGGLE_COLS = ["date_added", "category", "type", "notes", "account", "currency"];
@@ -772,7 +771,6 @@ async function loadRecords() {
   }
 }
 
-// ── Totals ──
 function renderTotals(s, typeFilter) {
   document.getElementById("tot-expense").textContent = fmtCurrency(s.expense);
   document.getElementById("tot-expense-count").textContent = `${s.counts.expense} rows`;
@@ -789,7 +787,6 @@ function renderTotals(s, typeFilter) {
   document.getElementById("tot-transfer-wrap").style.display = showTransfer ? "" : "none";
 }
 
-// ── Table ──
 function renderTable(data) {
   const tbody = document.getElementById("records-tbody");
   tbody.innerHTML = "";
@@ -797,7 +794,7 @@ function renderTable(data) {
 
   if (!data.items.length) {
     const dupMsg = duplicatesView
-      ? "No exact duplicate groups found. Rows are compared on all business fields (date, merchant, amount, type, category, etc.) — import batch is ignored."
+      ? "No exact duplicate groups found. Rows are compared on all business fields (date, merchant, amount, type, category, etc.). Import batch is ignored."
       : "No transactions found";
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-muted)">${escHtml(dupMsg)}</td></tr>`;
     updateBulkBar();
@@ -848,7 +845,6 @@ function renderTable(data) {
   renderPagination(pages);
 }
 
-// ── Bulk bar ──
 function updateBulkBar() {
   const n = selectedIds.size;
   const hasSelection = n > 0;
@@ -933,7 +929,6 @@ document.getElementById("btn-bulk-type").addEventListener("click", async () => {
   }
 });
 
-// ── Pagination ──
 function renderPagination(pages) {
   const pg = document.getElementById("pagination");
   pg.innerHTML = "";
@@ -954,12 +949,10 @@ function renderPagination(pages) {
   mkBtn("»", pages);
 }
 
-// ── Add Entry ──
 document.getElementById("btn-add-entry").addEventListener("click", () => {
   openAddTxModal({ onSuccess: () => loadRecords() });
 });
 
-// ── Edit ──
 function openEdit(id) {
   editingId = id;
   fetch(`/api/transactions/${id}`).then(r => r.json()).then(tx => {
@@ -1034,7 +1027,6 @@ document.getElementById("edit-save").addEventListener("click", async () => {
   }
 });
 
-// ── Delete single ──
 async function deleteTx(id) {
   if (!await confirmDialog({ title: "Delete transaction", message: "Delete this transaction? This cannot be undone.", confirmLabel: "Delete" })) return;
   try {
@@ -1047,7 +1039,6 @@ async function deleteTx(id) {
   }
 }
 
-// ── Filter listeners ──
 const debouncedLoad = debounce(() => { currentPage = 1; loadRecords(); }, 300);
 ["f-search", "f-type", "f-amount-min", "f-amount-max"].forEach(id => {
   document.getElementById(id).addEventListener("input", debouncedLoad);
@@ -1087,7 +1078,6 @@ document.getElementById("page-size-sel").addEventListener("change", (e) => {
   loadRecords();
 });
 
-// ── Sort header clicks ──
 document.querySelectorAll(".sortable-th").forEach(th => {
   th.addEventListener("click", () => {
     const col = th.dataset.sort;
@@ -1352,6 +1342,11 @@ document.getElementById("records-table").addEventListener("click", (e) => {
   const tx = lastTableItems.find((t) => t.id === id);
   if (!tx) return;
   startCellInlineEdit(td, tx, field);
+});
+
+CategoryBus.onChanged(async () => {
+  categories = await API.getCategories();
+  loadRecords();
 });
 
 init();

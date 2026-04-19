@@ -358,6 +358,32 @@ class RecurringRuleOut(BaseModel):
     end_date: date | None
     last_created_date: date | None
     created_at: datetime
+    category_name: str | None = None
+    account_name: str | None = None
+    transaction_count: int = 0
+
+
+class RecurringRuleUpdate(BaseModel):
+    merchant_name: str | None = None
+    amount: float | None = None
+    transaction_type: str | None = None
+    currency: str | None = None
+    category_id: int | None = None
+    account_id: int | None = None
+    notes: str | None = None
+    frequency: str | None = None
+    end_date: date | None = None
+    keep_overlap: bool = False
+    force_remove_overlap: bool = False
+
+
+class RecurringDeleteFromRequest(BaseModel):
+    from_date: date
+
+
+class RecurringEndDateOverlapInfo(BaseModel):
+    overlap_count: int
+    message: str
 
 
 class ProcessRecurringResponse(BaseModel):

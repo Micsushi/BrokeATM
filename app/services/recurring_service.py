@@ -19,14 +19,9 @@ def _next_date(current: date, frequency: str) -> date:
 
 
 def _due_dates(rule: RecurringRule, today: date) -> list[date]:
-    """Return all dates that are due but not yet created for this rule."""
     ceiling = min(today, rule.end_date) if rule.end_date else today
 
-    if rule.last_created_date is None:
-        # First run — start from start_date
-        cursor = rule.start_date
-    else:
-        cursor = _next_date(rule.last_created_date, rule.frequency)
+    cursor = _next_date(rule.last_created_date, rule.frequency) if rule.last_created_date else rule.start_date
 
     dates = []
     while cursor <= ceiling:
@@ -58,6 +53,7 @@ def process_due_rules(db: Session) -> dict:
                 category_id=rule.category_id,
                 account_id=rule.account_id,
                 notes=rule.notes,
+                recurring_rule_id=rule.id,
             )
             db.add(tx)
             total_created += 1
@@ -66,3 +62,70 @@ def process_due_rules(db: Session) -> dict:
 
     db.commit()
     return {"created": total_created, "rules_triggered": rules_triggered}
+
+
+def update_rule_and_transactions(db: Session, rule: RecurringRule, fields: dict) -> None:
+    tx_fields = {k: v for k, v in fields.items() if k in (
+        "merchant_name", "amount", "transaction_type", "currency",
+        "category_id", "account_id", "notes",
+    )}
+
+    for key, val in fields.items():
+        setattr(rule, key, val)
+
+    if tx_fields:
+        db.query(Transaction).filter(
+            Transaction.recurring_rule_id == rule.id
+        ).update(tx_fields, synchronize_session=False)
+
+    db.commit()
+    db.refresh(rule)
+
+
+def delete_rule_transactions_from(db: Session, rule: RecurringRule, from_date: date) -> int:
+    deleted = db.query(Transaction).filter(
+        Transaction.recurring_rule_id == rule.id,
+        Transaction.transaction_date >= from_date,
+    ).delete(synchronize_session=False)
+
+    prev_last = None
+    if rule.last_created_date and rule.last_created_date >= from_date:
+        prev_date = from_date - timedelta(days=1)
+        remaining = db.query(Transaction).filter(
+            Transaction.recurring_rule_id == rule.id,
+            Transaction.transaction_date <= prev_date,
+        ).order_by(Transaction.transaction_date.desc()).first()
+        prev_last = remaining.transaction_date if remaining else None
+        rule.last_created_date = prev_last
+
+    new_end = from_date - timedelta(days=1)
+    if rule.start_date > new_end:
+        db.delete(rule)
+    else:
+        rule.end_date = new_end
+
+    db.commit()
+    return deleted
+
+
+def delete_rule_and_all_transactions(db: Session, rule: RecurringRule) -> int:
+    deleted = db.query(Transaction).filter(
+        Transaction.recurring_rule_id == rule.id
+    ).delete(synchronize_session=False)
+    db.delete(rule)
+    db.commit()
+    return deleted
+
+
+def count_transactions_after(db: Session, rule_id: int, after_date: date) -> int:
+    return db.query(Transaction).filter(
+        Transaction.recurring_rule_id == rule_id,
+        Transaction.transaction_date > after_date,
+    ).count()
+
+
+def remove_transactions_after(db: Session, rule_id: int, after_date: date) -> int:
+    return db.query(Transaction).filter(
+        Transaction.recurring_rule_id == rule_id,
+        Transaction.transaction_date > after_date,
+    ).delete(synchronize_session=False)

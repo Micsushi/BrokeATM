@@ -722,7 +722,7 @@
       <div class="kcm-entry-card">
         <div class="kcm-entry-label">Entry</div>
         <div class="kcm-entry-text">${escHtml(merchantName || "Untitled entry")}</div>
-        <div class="kcm-entry-normalized"><em>Normalized match text:</em> <code>${escHtml(normalizedMerchant || "") || "—"}</code></div>
+        <div class="kcm-entry-normalized"><em>Normalized match text:</em> <code>${escHtml(normalizedMerchant || "") || "-"}</code></div>
       </div>
       <div class="kcm-section">
         <label class="kcm-category-label" for="kcm-category-select">Category for this row</label>
@@ -733,7 +733,7 @@
         </select>
       </div>
       <div class="kcm-section">
-        <div class="kcm-section-title">Keyword matches — check to remove</div>
+        <div class="kcm-section-title">Keyword matches - check to remove</div>
         <div class="kcm-conflict-list">
           ${removalCandidates.map((item, i) => {
             const willRemove = item.categoryName !== currentCategory;

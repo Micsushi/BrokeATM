@@ -118,12 +118,12 @@ class PdfplumberTextParser(BaseParser):
                     merchant = rest
                 else:
                     skipped += 1
-                    errors.append(f"Line {line_idx + 1}: no amount found — '{line[:60]}'")
+                    errors.append(f"Line {line_idx + 1}: no amount found - '{line[:60]}'")
                     continue
             else:
                 # Check if there's a second (earlier) amount before the last one.
                 # Debit/Credit/Balance format ends with: ... txn_amount  balance
-                # In that case the last number is the running balance — use the one before it.
+                # In that case the last number is the running balance, so use the one before it.
                 pre = rest[: am.start()].rstrip()
                 inner_am = _END_AMOUNT_RE.search(pre)
                 if inner_am:

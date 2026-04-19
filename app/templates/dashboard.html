@@ -107,6 +107,7 @@
     <a href="/records">Records</a>
     <a href="/budget">Budget</a>
     <a href="/categories">Categories</a>
+    <a href="/recurring">Recurring</a>
     <a href="/import">Import</a>
     <a href="/settings">Settings</a>
   </div>
@@ -123,7 +124,6 @@
 
   <div id="alerts"></div>
 
-  <!-- ── PIE SECTION ─────────────────────────────────────────────────── -->
   <div id="pie-filter-section"></div>
 
   <!-- Stat cards -->
@@ -156,7 +156,6 @@
     </div>
   </div>
 
-  <!-- ── BAR SECTION ─────────────────────────────────────────────────── -->
   <div id="bar-filter-section"></div>
 
   <!-- Bar chart -->
@@ -243,7 +242,7 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=7"></script>
+<script src="/static/js/utils.js?v=11"></script>
 <script src="/static/js/api.js?v=8"></script>
 <script>
 renderMonthFilterSection("pie-filter-section", { prefix: "pie", title: "Totals & Pie Charts" });
@@ -264,7 +263,6 @@ const CHART_DEFAULTS = { maintainAspectRatio: false };
 Chart.defaults.color = "#8892b0";
 Chart.defaults.borderColor = "#2e3250";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function prevMonth(year, month) {
   if (month === 1) return { year: year - 1, month: 12 };
@@ -289,7 +287,6 @@ function ymFromDate(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
-// ── Filter persistence ────────────────────────────────────────────────────────
 
 const FILTERS_KEY = "brokeAtmDashFilters";
 
@@ -324,7 +321,6 @@ function restoreFilters() {
   } catch (_) { return false; }
 }
 
-// ── Init ─────────────────────────────────────────────────────────────────────
 
 function getDashboardSettings() {
   try {
@@ -378,7 +374,6 @@ async function init() {
   await Promise.all([loadPie(), loadBar(), loadLargeExpenses(), loadPerfChart(), loadCatBreakdown()]);
 }
 
-/** Convert availableMonths to [{label, ym}] sorted newest-first. */
 function buildMonthList() {
   return [...availableMonths]
     .sort((a, b) => b.ym.localeCompare(a.ym))
@@ -388,7 +383,6 @@ function buildMonthList() {
     });
 }
 
-// ── Pie + Stats ───────────────────────────────────────────────────────────────
 
 async function loadPie() {
   if (pieSelected.size === 0) {
@@ -408,7 +402,6 @@ async function loadPie() {
   }
 }
 
-// ── Bar ───────────────────────────────────────────────────────────────────────
 
 async function loadBar() {
   if (barSelected.size === 0) {
@@ -424,7 +417,6 @@ async function loadBar() {
   }
 }
 
-// ── Large Expenses (independent of bar chart) ─────────────────────────────────
 
 let leCurrentPage = 1;
 const lePageSize = 10;
@@ -492,7 +484,7 @@ function renderLargeExpenses(resp, s) {
     <tr>
       <td>${fmtDate(r.transaction_date)}</td>
       <td style="font-weight:600">${escHtml(r.merchant_name)}</td>
-      <td style="color:var(--text-muted)">${escHtml(r.category || "—")}</td>
+      <td style="color:var(--text-muted)">${escHtml(r.category || "-")}</td>
       <td class="text-right text-danger" style="font-family:'JetBrains Mono',monospace;font-weight:700">${fmtCurrency(r.amount, r.currency)}</td>
       <td class="text-right" style="color:var(--text-muted)">${r.pct_of_month}%</td>
     </tr>`).join("");
@@ -533,7 +525,6 @@ document.getElementById("btn-refresh").addEventListener("click", async () => {
   await Promise.all([loadPie(), loadBar(), loadLargeExpenses(true), loadPerfChart(), loadCatBreakdown()]);
 });
 
-// ── Render helpers ────────────────────────────────────────────────────────────
 
 function renderStats(data) {
   document.getElementById("stat-expenses").textContent = fmtCurrency(data.total_expenses);
@@ -685,7 +676,6 @@ function renderBar(months) {
   });
 }
 
-// ── Budget widgets ────────────────────────────────────────────────────────────
 
 function initPerfDates() {
   const now = new Date();

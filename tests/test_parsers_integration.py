@@ -153,7 +153,7 @@ class TestOcrParser:
 
     def test_rbc_chequing_scanned(self):
         result = self.parser.parse(pdf_bytes("rbc_chequing"), "rbc_chequing.pdf", "CAD", None, [])
-        # eStatement has partial text layer — may skip or extract rows
+        # eStatement has a partial text layer, so this may skip or extract rows.
         assert isinstance(result.rows, list)
 
     def test_corrupt_pdf_returns_gracefully(self):
@@ -162,14 +162,14 @@ class TestOcrParser:
 
 
 # ---------------------------------------------------------------------------
-# Camelot parsers — skip if Ghostscript not available
+# Camelot parsers - skip if Ghostscript is not available
 # ---------------------------------------------------------------------------
 
 class TestCamelotParsers:
     def test_lattice_graceful_without_ghostscript(self):
         from app.services.parsers.camelot_lattice import CamelotLatticeParser, _check_ghostscript
         if _check_ghostscript():
-            pytest.skip("Ghostscript available — skipping graceful-error test")
+            pytest.skip("Ghostscript available; skipping graceful-error test")
         result = CamelotLatticeParser().parse(pdf_bytes("td_visa"), "td_visa.pdf", "CAD", None, [])
         assert result.confidence == 0.0
         assert any("Ghostscript" in e for e in result.errors)
@@ -178,7 +178,7 @@ class TestCamelotParsers:
         from app.services.parsers.camelot_stream import CamelotStreamParser
         from app.services.parsers.camelot_lattice import _check_ghostscript
         if _check_ghostscript():
-            pytest.skip("Ghostscript available — skipping graceful-error test")
+            pytest.skip("Ghostscript available; skipping graceful-error test")
         result = CamelotStreamParser().parse(pdf_bytes("td_visa"), "td_visa.pdf", "CAD", None, [])
         assert result.confidence == 0.0
         assert any("Ghostscript" in e for e in result.errors)
