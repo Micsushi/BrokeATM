@@ -60,9 +60,9 @@ def update_rule(rule_id: int, payload: RecurringRuleUpdate, db: Session = Depend
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
-    fields = payload.model_dump(exclude_none=True, exclude={"keep_overlap", "force_remove_overlap"})
+    fields = payload.model_dump(exclude_unset=True, exclude={"keep_overlap", "force_remove_overlap"})
 
-    if "end_date" in fields:
+    if "end_date" in fields and fields["end_date"] is not None:
         new_end = fields["end_date"]
         overlap_count = count_transactions_after(db, rule_id, new_end)
         if overlap_count > 0 and not payload.keep_overlap and not payload.force_remove_overlap:

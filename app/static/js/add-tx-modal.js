@@ -300,17 +300,22 @@
     document.getElementById("atx-notes").value = "";
 
     const toggle = document.getElementById("atx-recur-toggle");
-    toggle.checked = false;
-    document.getElementById("atx-recur-slider").style.background = "var(--border)";
-    document.getElementById("atx-recur-knob").style.transform = "translateX(0)";
-    document.getElementById("atx-recur-label").style.color = "var(--text-muted)";
-    document.getElementById("atx-recurring-section").style.display = "none";
+    const forceRecurring = !!opts.recurringDefault;
+    toggle.checked = forceRecurring;
+    document.getElementById("atx-recur-slider").style.background = forceRecurring ? "var(--accent)" : "var(--border)";
+    document.getElementById("atx-recur-knob").style.transform = forceRecurring ? "translateX(18px)" : "translateX(0)";
+    document.getElementById("atx-recur-label").style.color = forceRecurring ? "var(--text)" : "var(--text-muted)";
+    document.getElementById("atx-recurring-section").style.display = forceRecurring ? "" : "none";
+    // hide the toggle row when recurring is forced so user can't uncheck it
+    document.getElementById("atx-recur-toggle").closest("div[style]").style.display = forceRecurring ? "none" : "";
     document.getElementById("atx-recur-ends").value = "forever";
     document.getElementById("atx-recur-end-row").style.display = "none";
     document.getElementById("atx-recur-end").value = "";
     document.getElementById("atx-recur-freq").value = "monthly";
     document.getElementById("atx-recur-preview").textContent = "";
-    document.getElementById("atx-date-label").innerHTML = 'Date <span style="color:var(--danger)">*</span>';
+    document.getElementById("atx-date-label").innerHTML = forceRecurring
+      ? 'Start date <span style="color:var(--danger)">*</span>'
+      : 'Date <span style="color:var(--danger)">*</span>';
 
     document.getElementById(MODAL_ID).classList.remove("hidden");
   }

@@ -36,13 +36,13 @@ def _prune_old_jobs() -> None:
 
 async def _run_csv_job(job_id: str, content: bytes, filename: str, default_currency: str, keyword_matcher: Any) -> None:
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
             functools.partial(parse_csv, content, default_currency=default_currency, keyword_matcher=keyword_matcher),
         )
         _jobs[job_id]["status"] = "done"
-        _jobs[job_id]["result"] = result.model_dump()
+        _jobs[job_id]["result"] = result  # already a dict
     except Exception as exc:
         _jobs[job_id]["status"] = "error"
         _jobs[job_id]["error"] = str(exc)
@@ -50,13 +50,13 @@ async def _run_csv_job(job_id: str, content: bytes, filename: str, default_curre
 
 async def _run_pdf_job(job_id: str, content: bytes, filename: str, currency: str, keyword_matcher: Any, known_categories: list[str]) -> None:
     try:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(
             None,
             functools.partial(run_all, content, filename, currency, keyword_matcher, known_categories),
         )
         _jobs[job_id]["status"] = "done"
-        _jobs[job_id]["result"] = [r.model_dump() for r in results]
+        _jobs[job_id]["result"] = results  # already dicts from _result_to_dict
     except Exception as exc:
         _jobs[job_id]["status"] = "error"
         _jobs[job_id]["error"] = str(exc)

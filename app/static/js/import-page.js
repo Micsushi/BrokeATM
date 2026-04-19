@@ -1285,6 +1285,7 @@ async function submitPdfJob(doc) {
 }
 
 let _jobPollInterval = null
+let _pollInFlight = false
 
 function startJobPoller() {
   if (_jobPollInterval) return
@@ -1297,34 +1298,40 @@ function stopJobPoller() {
     clearInterval(_jobPollInterval)
     _jobPollInterval = null
   }
+  _pollInFlight = false
 }
 
 async function pollWaitingJobs() {
-  const waiting = importDocs.filter((d) => d.status === "waiting" && d.jobId)
-  if (!waiting.length) {
-    stopJobPoller()
-    return
-  }
-  for (const doc of waiting) {
-    let jobData
-    try {
-      const resp = await fetch(`/api/import/job/${doc.jobId}`)
-      if (!resp.ok) {
-        if (resp.status === 404) {
-          doc.status = "error"
-          doc.errorMessage = "Processing expired. Add the file again."
-          removePendingJobFromStorage(doc.jobId)
-          doc.jobId = null
-          showAlert(alertsEl, `${doc.filename}: ${doc.errorMessage}`, "error")
-          scheduleDraftSave()
-          renderApp()
+  if (_pollInFlight) return
+  _pollInFlight = true
+  try {
+    const waiting = importDocs.filter((d) => d.status === "waiting" && d.jobId)
+    if (!waiting.length) {
+      stopJobPoller()
+      return
+    }
+    for (const doc of waiting) {
+      // re-check inside the loop — a previous iteration may have already resolved this doc
+      if (doc.status !== "waiting" || !doc.jobId) continue
+      let jobData
+      try {
+        const resp = await fetch(`/api/import/job/${doc.jobId}`)
+        if (!resp.ok) {
+          if (resp.status === 404) {
+            doc.status = "error"
+            doc.errorMessage = "Processing expired. Add the file again."
+            removePendingJobFromStorage(doc.jobId)
+            doc.jobId = null
+            showAlert(alertsEl, `${doc.filename}: ${doc.errorMessage}`, "error")
+            scheduleDraftSave()
+            renderApp()
+          }
+          continue
         }
+        jobData = await resp.json()
+      } catch (_) {
         continue
       }
-      jobData = await resp.json()
-    } catch (_) {
-      continue
-    }
     if (jobData.status === "pending") continue
     if (jobData.status === "done") {
       try {
@@ -1377,8 +1384,11 @@ async function pollWaitingJobs() {
       }
     }
   }
-  if (!importDocs.some((d) => d.status === "waiting")) {
-    stopJobPoller()
+    if (!importDocs.some((d) => d.status === "waiting")) {
+      stopJobPoller()
+    }
+  } finally {
+    _pollInFlight = false
   }
 }
 
