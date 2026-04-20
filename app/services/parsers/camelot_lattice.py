@@ -5,6 +5,7 @@ import os
 import tempfile
 from typing import TYPE_CHECKING, Any
 
+from app.services.parsers._dependency_utils import ensure_executable_on_path
 from app.services.parsers._pdf_utils import (
     build_row,
     infer_year_from_text,
@@ -31,12 +32,7 @@ _GS_ERROR = (
 
 
 def _check_ghostscript() -> bool:
-    import shutil
-    return (
-        shutil.which("gs") is not None
-        or shutil.which("gswin64c") is not None
-        or shutil.which("gswin32c") is not None
-    )
+    return ensure_executable_on_path("gs", "gswin64c", "gswin32c") is not None
 
 
 class CamelotLatticeParser(BaseParser):

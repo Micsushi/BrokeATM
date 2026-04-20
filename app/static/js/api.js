@@ -236,7 +236,10 @@ const API = {
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       const err = new Error(body?.detail?.message || body?.detail || "Update failed");
-      if (res.status === 409 && body?.detail?.overlap_count) err.overlap = body.detail;
+      if (res.status === 409 && body?.detail?.needs_confirmation) {
+        err.scheduleImpact = body.detail;
+        if (body.detail.overlap_count) err.overlap = body.detail;
+      }
       throw err;
     }
     return res.json();

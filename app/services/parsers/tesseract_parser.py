@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, Any
 
+from app.services.parsers._dependency_utils import ensure_executable_on_path
 from app.services.parsers._pdf_utils import (
     build_row,
     infer_year_from_text,
@@ -25,8 +26,7 @@ if TYPE_CHECKING:
 
 
 def _check_tesseract() -> bool:
-    import shutil
-    return shutil.which("tesseract") is not None
+    return ensure_executable_on_path("tesseract") is not None
 
 
 class TesseractParser(BaseParser):
@@ -72,6 +72,10 @@ class TesseractParser(BaseParser):
         known_categories: list[str],
     ) -> ParseResult:
         import pytesseract
+
+        tesseract_cmd = ensure_executable_on_path("tesseract")
+        if tesseract_cmd:
+            pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
         rows: list[dict[str, Any]] = []
         errors: list[str] = []

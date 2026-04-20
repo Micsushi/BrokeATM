@@ -254,16 +254,14 @@
           return;
         }
 
-        await API.createRecurringRule({
+        const createdRule = await API.createRecurringRule({
           ...base,
           frequency: document.getElementById("atx-recur-freq").value,
           start_date: dateVal,
           end_date: endVal || null,
         });
-
-        const result = await API.processRecurring();
         closeModal();
-        if (_onSuccess) _onSuccess(result.created, true);
+        if (_onSuccess) _onSuccess(createdRule.transaction_count || 0, true, createdRule);
       } else {
         await API.createTransaction({ ...base, transaction_date: dateVal });
         closeModal();

@@ -372,9 +372,12 @@ class RecurringRuleUpdate(BaseModel):
     account_id: int | None = None
     notes: str | None = None
     frequency: str | None = None
+    start_date: date | None = None
     end_date: date | None = None
     keep_overlap: bool = False
     force_remove_overlap: bool = False
+    backfill_missing: bool = False
+    skip_backfill: bool = False
 
 
 class RecurringDeleteFromRequest(BaseModel):
