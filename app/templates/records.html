@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/main.css?v=19" />
   <script src="/static/js/month-picker.js?v=2"></script>
-  <script src="/static/js/month-filter.js?v=6"></script>
+  <script src="/static/js/month-filter.js?v=7"></script>
   <style>
     .records-page {
       --records-control-height: 38px;
@@ -529,13 +529,13 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=11"></script>
+<script src="/static/js/utils.js?v=12"></script>
 <script src="/static/js/api.js?v=8"></script>
 <script src="/static/js/category-picker-modal.js?v=1"></script>
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
 <script src="/static/js/keyword-conflict-modal.js?v=22"></script>
 <script src="/static/js/category-create-modal.js?v=2"></script>
-<script src="/static/js/add-tx-modal.js?v=6"></script>
+<script src="/static/js/add-tx-modal.js?v=7"></script>
 <script>
 renderMonthFilterSection("records-date-filter", {
   prefix: "records-date",
@@ -561,11 +561,15 @@ let bulkCategoryChoice = undefined;
 let recordsAvailableMonths = [];
 let recordsDateSelected = new Set();
 let recordsDateFilter = null;
+let recordsDateSelectionHydrated = false;
 let editingId = null;
 let selectedIds = new Set();
 let lastTableItems = [];
 let inlineEditBlurTimer = null;
 const NO_RECORD_MONTHS = "__none__";
+const RECORDS_STATE_KEY = "brokeAtmRecordsState";
+const RECORD_SORT_COLUMNS = new Set(["date", "date_added", "merchant", "category", "type", "amount"]);
+const RECORD_PAGE_SIZES = new Set(["10", "20", "50", "5000"]);
 
 // Columns that can be toggled: date_added, category, type, notes, account, currency
 // Required (always shown): date, merchant, amount, actions
@@ -606,6 +610,7 @@ async function init() {
     API.getAvailableMonths(),
   ]);
   populateFilterDropdowns();
+  restoreRecordsPageState();
   setEditCategoryValue(null);
   setBulkCategoryChoice(undefined);
   initRecordsDateFilter();
@@ -632,7 +637,7 @@ function buildRecordsMonthList() {
 }
 
 function initRecordsDateFilter() {
-  if (!recordsDateSelected.size && recordsAvailableMonths.length > 0) {
+  if (!recordsDateSelected.size && !recordsDateSelectionHydrated && recordsAvailableMonths.length > 0) {
     recordsDateSelected.add(recordsAvailableMonths[0].ym);
   }
 
@@ -640,6 +645,7 @@ function initRecordsDateFilter() {
     selectedSet: recordsDateSelected,
     getAvailableMonths: () => recordsAvailableMonths,
     onChange: () => {
+      recordsDateSelectionHydrated = true;
       currentPage = 1;
       loadRecords();
     },
@@ -662,6 +668,78 @@ function parseCategoryIdInput(value) {
 function categoryNameById(categoryId) {
   if (categoryId == null) return "No category";
   return categories.find((category) => category.id === categoryId)?.name || "Unknown category";
+}
+
+function syncFilterCategoryLabel() {
+  const categoryId = parseCategoryIdInput(document.getElementById("f-category").value);
+  document.getElementById("f-category-trigger-label").textContent =
+    categoryId == null ? "All categories" : categoryNameById(categoryId);
+}
+
+function readRecordsPageState() {
+  try {
+    const raw = sessionStorage.getItem(RECORDS_STATE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function saveRecordsPageState() {
+  try {
+    sessionStorage.setItem(RECORDS_STATE_KEY, JSON.stringify({
+      search: document.getElementById("f-search").value,
+      transaction_type: document.getElementById("f-type").value,
+      category_id: document.getElementById("f-category").value,
+      min_amount: document.getElementById("f-amount-min").value,
+      max_amount: document.getElementById("f-amount-max").value,
+      months: [...recordsDateSelected].sort(),
+      duplicatesView,
+      currentPage,
+      pageSize,
+      sortBy,
+      sortDir,
+    }));
+  } catch (_) {
+    /* ignore storage failures */
+  }
+}
+
+function restoreRecordsPageState() {
+  const state = readRecordsPageState();
+  if (!state) {
+    document.getElementById("page-size-sel").value = String(pageSize);
+    syncFilterCategoryLabel();
+    return;
+  }
+
+  document.getElementById("f-search").value = typeof state.search === "string" ? state.search : "";
+  document.getElementById("f-type").value = typeof state.transaction_type === "string" ? state.transaction_type : "";
+  document.getElementById("f-amount-min").value = typeof state.min_amount === "string" ? state.min_amount : "";
+  document.getElementById("f-amount-max").value = typeof state.max_amount === "string" ? state.max_amount : "";
+
+  const categoryId = parseCategoryIdInput(state.category_id);
+  const hasKnownCategory = categoryId != null && categories.some((category) => category.id === categoryId);
+  document.getElementById("f-category").value = hasKnownCategory ? String(categoryId) : "";
+  syncFilterCategoryLabel();
+
+  if (Array.isArray(state.months)) {
+    recordsDateSelectionHydrated = true;
+    const availableMonths = new Set(recordsAvailableMonths.map(({ ym }) => ym));
+    recordsDateSelected = new Set(state.months.map(String).filter((ym) => availableMonths.has(ym)));
+  }
+
+  duplicatesView = Boolean(state.duplicatesView);
+
+  const parsedPage = Number.parseInt(state.currentPage, 10);
+  if (Number.isInteger(parsedPage) && parsedPage > 0) currentPage = parsedPage;
+
+  const nextPageSize = String(state.pageSize ?? "");
+  if (RECORD_PAGE_SIZES.has(nextPageSize)) pageSize = Number(nextPageSize);
+  document.getElementById("page-size-sel").value = String(pageSize);
+
+  if (RECORD_SORT_COLUMNS.has(state.sortBy)) sortBy = state.sortBy;
+  if (state.sortDir === "asc" || state.sortDir === "desc") sortDir = state.sortDir;
 }
 
 function setEditCategoryValue(categoryId) {
@@ -751,6 +829,7 @@ function syncDupToggleUi() {
 }
 
 async function loadRecords() {
+  saveRecordsPageState();
   const params = { page: currentPage, page_size: pageSize, ...getFilterParams() };
   const tbody = document.getElementById("records-tbody");
   tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:2rem"><span class="spinner"></span></td></tr>`;
@@ -840,6 +919,16 @@ function renderTable(data) {
 
   const total = data.total;
   const pages = Math.ceil(total / pageSize);
+  if (pages > 0 && currentPage > pages) {
+    currentPage = pages;
+    saveRecordsPageState();
+    loadRecords();
+    return;
+  }
+  if (pages === 0 && currentPage !== 1) {
+    currentPage = 1;
+    saveRecordsPageState();
+  }
   document.getElementById("page-info").textContent =
     `${total} transaction${total !== 1 ? "s" : ""} · Page ${currentPage} of ${pages || 1}`;
   renderPagination(pages);
@@ -898,6 +987,7 @@ document.getElementById("btn-bulk-delete").addEventListener("click", async () =>
   try {
     const res = await API.bulkDelete([...selectedIds]);
     selectedIds.clear();
+    TransactionBus.emit();
     showAlert(document.getElementById("alerts"), `Deleted ${res.deleted} transaction(s).`, "success");
     loadRecords();
   } catch (e) {
@@ -911,6 +1001,7 @@ document.getElementById("btn-bulk-cat").addEventListener("click", async () => {
       category_id: bulkCategoryChoice == null ? null : +bulkCategoryChoice,
     });
     setBulkCategoryChoice(undefined);
+    TransactionBus.emit();
     showAlert(document.getElementById("alerts"), `Updated ${res.updated} transaction(s).`, "success");
     loadRecords();
   } catch (e) {
@@ -922,6 +1013,7 @@ document.getElementById("btn-bulk-type").addEventListener("click", async () => {
   const type = document.getElementById("bulk-type-sel").value;
   try {
     const res = await API.bulkUpdate([...selectedIds], { transaction_type: type });
+    TransactionBus.emit();
     showAlert(document.getElementById("alerts"), `Updated ${res.updated} transaction(s).`, "success");
     loadRecords();
   } catch (e) {
@@ -1020,6 +1112,7 @@ document.getElementById("edit-save").addEventListener("click", async () => {
 
   try {
     await API.updateTransaction(editingId, payload);
+    TransactionBus.emit();
     document.getElementById("edit-modal").classList.add("hidden");
     loadRecords();
   } catch (e) {
@@ -1033,6 +1126,7 @@ async function deleteTx(id) {
     await API.deleteTransaction(id);
     selectedIds.delete(id);
     updateBulkBar();
+    TransactionBus.emit();
     loadRecords();
   } catch (e) {
     showAlert(document.getElementById("alerts"), e.message, "error");
@@ -1041,8 +1135,16 @@ async function deleteTx(id) {
 
 const debouncedLoad = debounce(() => { currentPage = 1; loadRecords(); }, 300);
 ["f-search", "f-type", "f-amount-min", "f-amount-max"].forEach(id => {
-  document.getElementById(id).addEventListener("input", debouncedLoad);
-  document.getElementById(id).addEventListener("change", debouncedLoad);
+  document.getElementById(id).addEventListener("input", () => {
+    currentPage = 1;
+    saveRecordsPageState();
+    debouncedLoad();
+  });
+  document.getElementById(id).addEventListener("change", () => {
+    currentPage = 1;
+    saveRecordsPageState();
+    debouncedLoad();
+  });
 });
 
 document.getElementById("f-category-trigger").addEventListener("click", async (event) => {
@@ -1066,8 +1168,7 @@ document.getElementById("f-category-trigger").addEventListener("click", async (e
   if (!picked) return;
   const newId = picked.value === null ? "" : String(picked.id);
   document.getElementById("f-category").value = newId;
-  document.getElementById("f-category-trigger-label").textContent =
-    newId ? (categories.find(c => c.id === picked.id)?.name || "All categories") : "All categories";
+  syncFilterCategoryLabel();
   currentPage = 1;
   loadRecords();
 });
@@ -1117,6 +1218,7 @@ document.getElementById("btn-prune-dup-extras").addEventListener("click", async 
   if (!await confirmDialog({ title: "Remove duplicates", message: msg, confirmLabel: "Remove" })) return;
   try {
     const res = await API.pruneExactDuplicates(true);
+    TransactionBus.emit();
     showAlert(document.getElementById("alerts"), `Removed ${res.deleted} duplicate row(s).`, "success");
     loadRecords();
   } catch (e) {
@@ -1129,7 +1231,8 @@ document.getElementById("btn-clear-filters").addEventListener("click", () => {
     document.getElementById(id).value = "";
   });
   document.getElementById("f-category").value = "";
-  document.getElementById("f-category-trigger-label").textContent = "All categories";
+  syncFilterCategoryLabel();
+  recordsDateSelectionHydrated = true;
   recordsDateSelected.clear();
   recordsDateFilter?.refresh();
   duplicatesView = false;
@@ -1236,6 +1339,7 @@ async function commitInlineCell(td, txId, field, control) {
   inlineCommitting = true;
   try {
     await API.updateTransaction(txId, payload);
+    TransactionBus.emit();
     abortInlineCellEdit(false);
     await loadRecords();
   } catch (e) {
@@ -1346,6 +1450,10 @@ document.getElementById("records-table").addEventListener("click", (e) => {
 
 CategoryBus.onChanged(async () => {
   categories = await API.getCategories();
+  loadRecords();
+});
+
+TransactionBus.onChanged(() => {
   loadRecords();
 });
 

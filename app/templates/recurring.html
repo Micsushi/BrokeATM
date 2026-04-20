@@ -475,11 +475,11 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=11"></script>
+<script src="/static/js/utils.js?v=12"></script>
 <script src="/static/js/api.js?v=9"></script>
 <script src="/static/js/category-picker-modal.js?v=1"></script>
 <script src="/static/js/category-create-modal.js?v=2"></script>
-<script src="/static/js/add-tx-modal.js?v=6"></script>
+<script src="/static/js/add-tx-modal.js?v=7"></script>
 <script>
 (function () {
   let rules = [];
@@ -941,6 +941,7 @@
 
     try {
       await API.updateRecurringRule(editingRuleId, { ...payload, ...extraFlags });
+      TransactionBus.emit();
       closeEditModal();
       await loadAll({ preservePage: false });
       showAlert(alertsEl, "Recurring rule updated.", "success");
@@ -1149,6 +1150,7 @@
     try {
       if (mode === "all") {
         await API.deleteRecurringRule(deletingRuleId);
+        TransactionBus.emit();
         closeDeleteModal();
         await loadAll({ preservePage: false });
         showAlert(alertsEl, "Recurring rule and linked entries deleted.", "success");
@@ -1159,6 +1161,7 @@
           return;
         }
         const result = await API.deleteRecurringRuleFrom(deletingRuleId, fromDate);
+        TransactionBus.emit();
         closeDeleteModal();
         await loadAll({ preservePage: false });
         showAlert(

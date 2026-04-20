@@ -160,6 +160,16 @@ const CategoryBus = (() => {
   };
 })();
 
+const TransactionBus = (() => {
+  const ch = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("brokeatm_transactions") : null;
+  const listeners = [];
+  if (ch) ch.onmessage = () => listeners.forEach(fn => fn());
+  return {
+    emit() { ch?.postMessage("changed"); },
+    onChanged(fn) { listeners.push(fn); },
+  };
+})();
+
 function debounce(fn, ms = 300) {
   let t;
   return (...args) => {
@@ -174,6 +184,7 @@ async function processRecurringOnLoad() {
     if (result.created > 0) {
       const container = document.getElementById("alerts") || document.body;
       showAlert(container, `${result.created} recurring entr${result.created === 1 ? "y" : "ies"} added automatically.`, "success");
+      TransactionBus.emit();
     }
   } catch (_) {
     // Ignore recurring catch-up errors.

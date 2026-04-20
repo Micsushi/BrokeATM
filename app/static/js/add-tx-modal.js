@@ -260,10 +260,12 @@
           start_date: dateVal,
           end_date: endVal || null,
         });
+        TransactionBus.emit();
         closeModal();
         if (_onSuccess) _onSuccess(createdRule.transaction_count || 0, true, createdRule);
       } else {
         await API.createTransaction({ ...base, transaction_date: dateVal });
+        TransactionBus.emit();
         closeModal();
         if (_onSuccess) _onSuccess(1, false);
       }

@@ -16,32 +16,28 @@ RULE_TX_FIELDS = (
 )
 
 
-def _next_date(current: date, frequency: str) -> date:
+def _scheduled_date(start_date: date, frequency: str, step: int) -> date:
     if frequency == "monthly":
-        return add_months(current, 1)
+        return add_months(start_date, step, anchor_day=start_date.day)
     if frequency == "weekly":
-        return current + timedelta(weeks=1)
+        return start_date + timedelta(weeks=step)
     if frequency == "biweekly":
-        return current + timedelta(weeks=2)
+        return start_date + timedelta(weeks=2 * step)
     if frequency == "yearly":
-        return add_months(current, 12)
+        return add_months(start_date, 12 * step, anchor_day=start_date.day)
     raise ValueError(f"Unknown frequency: {frequency}")
 
 
 def _due_dates(rule: RecurringRule, today: date) -> list[date]:
-    ceiling = min(today, rule.end_date) if rule.end_date else today
-
-    cursor = (
-        _next_date(rule.last_created_date, rule.frequency)
-        if rule.last_created_date
-        else rule.start_date
+    dates = schedule_dates(
+        rule.start_date,
+        rule.frequency,
+        rule.end_date,
+        today=today,
     )
-
-    dates = []
-    while cursor <= ceiling:
-        dates.append(cursor)
-        cursor = _next_date(cursor, rule.frequency)
-    return dates
+    if not rule.last_created_date:
+        return dates
+    return [tx_date for tx_date in dates if tx_date > rule.last_created_date]
 
 
 def schedule_dates(
@@ -56,10 +52,13 @@ def schedule_dates(
         return []
 
     dates = []
-    cursor = start_date
-    while cursor <= ceiling:
+    step = 0
+    while True:
+        cursor = _scheduled_date(start_date, frequency, step)
+        if cursor > ceiling:
+            break
         dates.append(cursor)
-        cursor = _next_date(cursor, frequency)
+        step += 1
     return dates
 
 

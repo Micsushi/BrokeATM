@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from app.api import recurring_router
 from app.core.database import Base, get_db
 from app.models.models import RecurringRule, Transaction
-from app.services.recurring_service import apply_rule_update, preview_rule_update
+from app.services.recurring_service import apply_rule_update, preview_rule_update, schedule_dates
 
 
 @pytest.fixture()
@@ -98,6 +98,38 @@ def linked_dates(db_session: Session, rule_id: int) -> list[date]:
         .all()
     )
     return [row.transaction_date for row in rows]
+
+
+def test_schedule_dates_monthly_preserves_anchor_day_after_short_month() -> None:
+    assert schedule_dates(
+        date(2025, 8, 31),
+        "monthly",
+        date(2026, 3, 31),
+        today=date(2026, 4, 1),
+    ) == [
+        date(2025, 8, 31),
+        date(2025, 9, 30),
+        date(2025, 10, 31),
+        date(2025, 11, 30),
+        date(2025, 12, 31),
+        date(2026, 1, 31),
+        date(2026, 2, 28),
+        date(2026, 3, 31),
+    ]
+
+
+def test_schedule_dates_monthly_returns_to_original_day_after_february() -> None:
+    assert schedule_dates(
+        date(2025, 1, 29),
+        "monthly",
+        date(2025, 4, 30),
+        today=date(2025, 5, 1),
+    ) == [
+        date(2025, 1, 29),
+        date(2025, 2, 28),
+        date(2025, 3, 29),
+        date(2025, 4, 29),
+    ]
 
 
 def test_preview_rule_update_reports_overlap_and_missing_entries(db_session: Session) -> None:

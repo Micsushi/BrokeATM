@@ -8,7 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/main.css?v=16" />
   <script src="/static/js/month-picker.js?v=2"></script>
-  <script src="/static/js/month-filter.js?v=6"></script>
+  <script src="/static/js/month-filter.js?v=7"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <style>
     .dashboard-page .page-header .btn {
@@ -97,6 +97,34 @@
       gap: 0.4rem;
       flex-wrap: wrap;
     }
+    .performance-card-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.85rem;
+    }
+    .performance-range-controls {
+      margin-left: 0;
+      align-self: flex-start;
+      justify-content: flex-start;
+      flex-wrap: nowrap;
+    }
+    .performance-range-controls .month-input {
+      width: 136px;
+      flex: 0 0 136px;
+    }
+    @media (max-width: 560px) {
+      .performance-card-header {
+        align-items: stretch;
+      }
+      .performance-range-controls {
+        width: 100%;
+        align-self: stretch;
+      }
+      .performance-range-controls .month-input {
+        flex: 1 1 0;
+        min-width: 0;
+      }
+    }
   </style>
 </head>
 <body>
@@ -171,17 +199,8 @@
         <span class="section-title">Large Expenses</span>
         <div class="dashboard-subtitle" id="large-expenses-subtitle"></div>
       </div>
-      <div class="picker-card-controls">
-        <button class="ctrl-chip" id="le-clear-dates">All time</button>
-        <span class="inline-sep">·</span>
-        <a href="/settings" class="meta-link">⚙ Thresholds</a>
-      </div>
     </div>
-    <div class="picker-range-row" style="margin-bottom:0.875rem">
-      <input type="month" id="le-date-from" title="From month" />
-      <span class="picker-range-sep">→</span>
-      <input type="month" id="le-date-to" title="To month" />
-    </div>
+    <div id="large-expenses-filter" style="margin-bottom:0.875rem"></div>
     <div class="table-wrap">
       <table id="large-expenses-table" style="width:100%">
         <thead>
@@ -210,9 +229,9 @@
 
   <div class="bottom-grid mt-2">
     <div class="card">
-      <div class="picker-card-header" style="margin-bottom:0.75rem">
+      <div class="picker-card-header performance-card-header" style="margin-bottom:0.75rem">
         <span class="section-title">Monthly performance</span>
-        <div class="dashboard-inline-controls">
+        <div class="dashboard-inline-controls performance-range-controls">
           <input type="month" id="perf-from" class="month-input" title="From" />
           <span class="inline-sep">→</span>
           <input type="month" id="perf-to" class="month-input" title="To" />
@@ -231,8 +250,6 @@
         <span class="section-title">Category breakdown</span>
         <div class="picker-card-controls">
           <input type="month" id="cat-month" class="month-input" title="Month" />
-          <span class="inline-sep">·</span>
-          <a href="/budget" class="meta-link">Manage →</a>
         </div>
       </div>
       <div class="cat-progress-list" id="cat-progress-list">
@@ -242,11 +259,18 @@
   </div>
 </div>
 
-<script src="/static/js/utils.js?v=11"></script>
+<script src="/static/js/utils.js?v=12"></script>
 <script src="/static/js/api.js?v=8"></script>
 <script>
 renderMonthFilterSection("pie-filter-section", { prefix: "pie", title: "Totals & Pie Charts" });
 renderMonthFilterSection("bar-filter-section", { prefix: "bar", title: "Bar Chart" });
+renderDateRangeFilterBlock("large-expenses-filter", {
+  fromId: "le-date-from",
+  toId: "le-date-to",
+  allId: "le-all",
+  allLabel: "All",
+  allTitle: "Show all months",
+});
 
 let expensePieChart = null;
 let incomePieChart = null;
@@ -430,11 +454,21 @@ function getThresholdSettings() {
   }
 }
 
+function syncLargeExpensesFilterControls() {
+  const allBtn = document.getElementById("le-all");
+  if (!allBtn) return;
+
+  const from = document.getElementById("le-date-from")?.value || "";
+  const to = document.getElementById("le-date-to")?.value || "";
+  allBtn.classList.toggle("active", !from && !to);
+}
+
 async function loadLargeExpenses(resetPage = false) {
   const s = getThresholdSettings();
   const section = document.getElementById("large-expenses-section");
   if (!s.enableAmount && !s.enablePct) { section.style.display = "none"; return; }
   section.style.display = "";
+  syncLargeExpensesFilterControls();
 
   if (resetPage) leCurrentPage = 1;
 
@@ -506,7 +540,7 @@ document.getElementById("le-next").addEventListener("click", () => {
 // Large expenses date filter
 document.getElementById("le-date-from").addEventListener("change", () => { saveFilters(); loadLargeExpenses(true); });
 document.getElementById("le-date-to").addEventListener("change", () => { saveFilters(); loadLargeExpenses(true); });
-document.getElementById("le-clear-dates").addEventListener("click", () => {
+document.getElementById("le-all").addEventListener("click", () => {
   document.getElementById("le-date-from").value = "";
   document.getElementById("le-date-to").value = "";
   saveFilters();

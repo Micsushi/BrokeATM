@@ -1,32 +1,59 @@
 function renderDateRangeFilterBlock(targetId, {
   fromId,
   toId,
-  actionId,
+  allId = "",
+  clearId = "",
+  actionId = "",
   fromLabel = "From",
   toLabel = "To",
+  allLabel = "All",
+  clearLabel = "Clear",
   actionLabel = "All dates",
   fromTitle = "From",
   toTitle = "To",
+  allTitle = "Show all dates",
+  clearTitle = "Clear dates",
   actionTitle = "Show all dates",
   wrapperClass = "",
-  actionButtonClass = "btn btn-secondary",
+  allButtonClass = "btn btn-secondary btn-sm picker-action-btn",
+  clearButtonClass = "btn btn-ghost btn-sm picker-action-btn",
+  actionButtonClass = "btn btn-secondary btn-sm picker-action-btn",
 } = {}) {
   const target = document.getElementById(targetId);
   if (!target) return;
+  const rowClassName = ["picker-range-row", wrapperClass].filter(Boolean).join(" ");
+
+  const primaryActionId = allId || actionId;
+  const primaryActionLabel = allId ? allLabel : actionLabel;
+  const primaryActionTitle = allId ? allTitle : actionTitle;
+  const primaryActionClass = allId ? allButtonClass : actionButtonClass;
+  const actionButtons = [];
+
+  if (primaryActionId) {
+    actionButtons.push(
+      `<button class="${primaryActionClass}" id="${primaryActionId}" type="button" title="${primaryActionTitle}">${primaryActionLabel}</button>`
+    );
+  }
+  if (clearId) {
+    actionButtons.push(
+      `<button class="${clearButtonClass}" id="${clearId}" type="button" title="${clearTitle}">${clearLabel}</button>`
+    );
+  }
+
+  const actionMarkup = actionButtons.length
+    ? `
+        <div class="picker-range-actions">
+          ${actionButtons.join("")}
+        </div>
+      `
+    : "";
 
   target.innerHTML = `
-    <div class="${wrapperClass}">
-      <div class="filter-group">
-        <label>${fromLabel}</label>
-        <input type="month" id="${fromId}" title="${fromTitle}" />
-      </div>
-      <div class="filter-group">
-        <label>${toLabel}</label>
-        <input type="month" id="${toId}" title="${toTitle}" />
-      </div>
-      <div class="filter-group records-date-filter-action">
-        <button class="${actionButtonClass}" id="${actionId}" type="button" title="${actionTitle}">${actionLabel}</button>
-      </div>
+    <div class="${rowClassName}">
+      <input type="month" id="${fromId}" title="${fromTitle}" aria-label="${fromLabel}" />
+      <span class="picker-range-sep">→</span>
+      <input type="month" id="${toId}" title="${toTitle}" aria-label="${toLabel}" />
+      ${actionMarkup}
     </div>
   `;
 }
