@@ -40,3 +40,7 @@ NUL
 # Local agent context (private, not for repo)
 CLAUDE.md
 AGENTS.md
+
+# Local agent instructions and tooling
+.opencode/
+docs/agents/
