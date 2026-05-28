@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in | BrokeATM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/main.css?v=19" />
+</head>
+<body>
+<div class="page" style="max-width:760px">
+  <div class="page-header">
+    <h1>BrokeATM</h1>
+    <p>Sign in to your online budget workspace.</p>
+  </div>
+
+  <div id="alerts"></div>
+
+  <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+    <form id="signin-form" style="display:flex;flex-direction:column;gap:0.75rem">
+      <h2 style="font-size:1.1rem">Sign in</h2>
+      <input class="input" name="email" type="email" placeholder="Email" autocomplete="email" required />
+      <input class="input" name="password" type="password" placeholder="Password" autocomplete="current-password" required />
+      <button class="btn btn-primary" type="submit">Sign in</button>
+      <button class="btn btn-ghost" id="reset-password" type="button">Send reset email</button>
+    </form>
+
+    <form id="signup-form" style="display:flex;flex-direction:column;gap:0.75rem">
+      <h2 style="font-size:1.1rem">Create account</h2>
+      <input class="input" name="email" type="email" placeholder="Email" autocomplete="email" required />
+      <input class="input" name="password" type="password" placeholder="Password" autocomplete="new-password" required minlength="8" />
+      <button class="btn btn-secondary" type="submit">Create account</button>
+    </form>
+  </div>
+</div>
+
+<script src="/static/js/utils.js?v=12"></script>
+<script src="/static/js/auth-client.js?v=1"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const nextUrl = safeNextUrl(params.get("next"));
+const alerts = document.getElementById("alerts");
+
+function safeNextUrl(rawValue) {
+  if (!rawValue || rawValue.startsWith("//")) return "/";
+  try {
+    const parsed = new URL(rawValue, location.origin);
+    if (parsed.origin !== location.origin) return "/";
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch (_) {
+    return "/";
+  }
+}
+
+function showMessage(message, kind = "error") {
+  if (window.showAlert) showAlert(alerts, message, kind);
+  else alerts.textContent = message;
+}
+
+async function authClient() {
+  await window.BrokeATMAuth.init();
+  if (!window.BrokeATMAuth.client) {
+    showMessage("Online auth is not enabled for this BrokeATM instance.", "info");
+    return null;
+  }
+  return window.BrokeATMAuth.client;
+}
+
+document.getElementById("signin-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const client = await authClient();
+  if (!client) return;
+  const form = new FormData(event.currentTarget);
+  const { error } = await client.auth.signInWithPassword({
+    email: form.get("email"),
+    password: form.get("password"),
+  });
+  if (error) {
+    showMessage(error.message);
+    return;
+  }
+  location.href = nextUrl;
+});
+
+document.getElementById("signup-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const client = await authClient();
+  if (!client) return;
+  const form = new FormData(event.currentTarget);
+  const { error } = await client.auth.signUp({
+    email: form.get("email"),
+    password: form.get("password"),
+    options: { emailRedirectTo: `${location.origin}/login` },
+  });
+  if (error) {
+    showMessage(error.message);
+    return;
+  }
+  showMessage("Check your email to confirm your account, then sign in.", "success");
+});
+
+document.getElementById("reset-password").addEventListener("click", async () => {
+  const client = await authClient();
+  if (!client) return;
+  const email = document.querySelector("#signin-form input[name='email']").value;
+  if (!email) {
+    showMessage("Enter your email first.");
+    return;
+  }
+  const { error } = await client.auth.resetPasswordForEmail(email, {
+    redirectTo: `${location.origin}/login`,
+  });
+  if (error) showMessage(error.message);
+  else showMessage("Password reset email sent.", "success");
+});
+
+authClient().then(async (client) => {
+  if (!client) return;
+  const { data } = await client.auth.getSession();
+  if (data.session) location.href = nextUrl;
+});
+</script>
+</body>
+</html>

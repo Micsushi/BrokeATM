@@ -6,10 +6,9 @@ from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import String, asc, cast, desc, extract, func, or_
+from sqlalchemy import String, and_, asc, cast, desc, extract, func, or_
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.core.schemas import (
     BulkDeleteRequest,
     BulkUpdateRequest,
@@ -22,17 +21,43 @@ from app.core.schemas import (
     TransactionOut,
     TransactionUpdate,
 )
-from app.models.models import Category, Transaction
+from app.core.user_context import (
+    UserContext,
+    assign_user,
+    get_current_user,
+    get_db_for_user,
+    require_owned_record,
+    user_filter,
+)
+from app.models.models import Account, Category, Transaction
 from app.services.transaction_duplicates import find_exact_duplicate_groups, prune_exact_duplicates
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 NO_MONTHS_SENTINEL = "__none__"
 
 
-def _enrich(tx: Transaction, *, exact_duplicate: bool = False) -> TransactionOut:
+def _enrich(
+    tx: Transaction,
+    db: Session,
+    user: UserContext,
+    *,
+    exact_duplicate: bool = False,
+) -> TransactionOut:
     out = TransactionOut.model_validate(tx)
-    out.category_name = tx.category.name if tx.category else None
-    out.account_name = tx.account.name if tx.account else None
+    if tx.category_id:
+        cat = (
+            db.query(Category)
+            .filter(Category.id == tx.category_id, user_filter(Category, user))
+            .first()
+        )
+        out.category_name = cat.name if cat else None
+    if tx.account_id:
+        acc = (
+            db.query(Account)
+            .filter(Account.id == tx.account_id, user_filter(Account, user))
+            .first()
+        )
+        out.account_name = acc.name if acc else None
     return out.model_copy(update={"exact_duplicate": exact_duplicate})
 
 
@@ -167,17 +192,24 @@ def list_transactions(
     min_amount: float | None = Query(None, ge=0),
     max_amount: float | None = Query(None, ge=0),
     include_excluded: bool = Query(False),
-    sort_by: str = Query("date", description="Column to sort by: date, date_added, merchant, amount, type"),
+    sort_by: str = Query(
+        "date",
+        description="Column to sort by: date, date_added, merchant, amount, type",
+    ),
     sort_dir: str = Query("asc", description="asc or desc"),
-    duplicate_only: bool = Query(False, description="Only rows in an exact duplicate group; date filters ignored"),
-    db: Session = Depends(get_db),
+    duplicate_only: bool = Query(
+        False,
+        description="Only rows in an exact duplicate group; date filters ignored",
+    ),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
 ) -> Any:
-    dup_groups = find_exact_duplicate_groups(db)
+    dup_groups = find_exact_duplicate_groups(db, user_id=user.user_id)
     dup_set: set[int] = set()
     for g in dup_groups:
         dup_set.update(g["transaction_ids"])
 
-    q = db.query(Transaction)
+    q = db.query(Transaction).filter(user_filter(Transaction, user))
     if not include_excluded:
         q = q.filter(Transaction.is_excluded.is_(False))
 
@@ -203,7 +235,10 @@ def list_transactions(
     )
 
     if sort_by == "category":
-        q = q.outerjoin(Category, Transaction.category_id == Category.id)
+        q = q.outerjoin(
+            Category,
+            and_(Transaction.category_id == Category.id, user_filter(Category, user)),
+        )
     sort_col = _SORTABLE.get(sort_by, Transaction.transaction_date)
     order_fn = asc if sort_dir == "asc" else desc
     # Always secondary-sort by date asc so pages are stable
@@ -217,7 +252,7 @@ def list_transactions(
         .all()
     )
     return TransactionListResponse(
-        items=[_enrich(tx, exact_duplicate=tx.id in dup_set) for tx in items],
+        items=[_enrich(tx, db, user, exact_duplicate=tx.id in dup_set) for tx in items],
         total=total,
         page=page,
         page_size=page_size,
@@ -225,13 +260,16 @@ def list_transactions(
 
 
 @router.get("/latest-month")
-def latest_month(db: Session = Depends(get_db)) -> Any:
+def latest_month(
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
     row = (
         db.query(
             extract("year", Transaction.transaction_date).label("year"),
             extract("month", Transaction.transaction_date).label("month"),
         )
-        .filter(Transaction.is_excluded.is_(False))
+        .filter(Transaction.is_excluded.is_(False), user_filter(Transaction, user))
         .group_by("year", "month")
         .order_by(
             extract("year", Transaction.transaction_date).desc(),
@@ -258,13 +296,14 @@ def summary(
     search: str | None = Query(None),
     min_amount: float | None = Query(None, ge=0),
     max_amount: float | None = Query(None, ge=0),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
 ) -> Any:
     q = db.query(
         Transaction.transaction_type,
         func.sum(Transaction.amount).label("total"),
         func.count(Transaction.id).label("count"),
-    ).filter(Transaction.is_excluded.is_(False))
+    ).filter(Transaction.is_excluded.is_(False), user_filter(Transaction, user))
 
     if date_from or date_to:
         q = _apply_date_range_filter(q, date_from, date_to)
@@ -300,8 +339,11 @@ def summary(
 
 
 @router.get("/duplicate-report", response_model=DuplicateReportResponse)
-def duplicate_report(db: Session = Depends(get_db)) -> Any:
-    raw = find_exact_duplicate_groups(db)
+def duplicate_report(
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
+    raw = find_exact_duplicate_groups(db, user_id=user.user_id)
     groups = [DuplicateGroupOut(**g) for g in raw]
     extra = sum(g.row_count - 1 for g in groups)
     return DuplicateReportResponse(
@@ -314,20 +356,30 @@ def duplicate_report(db: Session = Depends(get_db)) -> Any:
 @router.post("/prune-exact-duplicates", response_model=PruneExactDuplicatesResponse)
 def prune_exact_duplicates_route(
     payload: PruneExactDuplicatesRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
 ) -> Any:
     if not payload.confirm:
         raise HTTPException(
             status_code=400,
-            detail='Send {"confirm": true} to delete duplicate copies. Lowest id is kept per group.',
+            detail=(
+                'Send {"confirm": true} to delete duplicate copies. '
+                "Lowest id is kept per group."
+            ),
         )
-    deleted = prune_exact_duplicates(db)
+    deleted = prune_exact_duplicates(db, user_id=user.user_id)
     db.commit()
     return PruneExactDuplicatesResponse(deleted=deleted)
 
 
 @router.post("", response_model=TransactionOut, status_code=201)
-def create_transaction(payload: TransactionCreate, db: Session = Depends(get_db)) -> Any:
+def create_transaction(
+    payload: TransactionCreate,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
+    require_owned_record(db, Category, payload.category_id, user, "Category")
+    require_owned_record(db, Account, payload.account_id, user, "Account")
     tx = Transaction(
         transaction_date=payload.transaction_date,
         posted_date=payload.posted_date,
@@ -342,15 +394,24 @@ def create_transaction(payload: TransactionCreate, db: Session = Depends(get_db)
         notes=payload.notes,
         is_excluded=False,
     )
+    assign_user(tx, user)
     db.add(tx)
     db.commit()
     db.refresh(tx)
-    return _enrich(tx)
+    return _enrich(tx, db, user)
 
 
 @router.post("/bulk-delete", status_code=200)
-def bulk_delete(payload: BulkDeleteRequest, db: Session = Depends(get_db)) -> Any:
-    txs = db.query(Transaction).filter(Transaction.id.in_(payload.ids)).all()
+def bulk_delete(
+    payload: BulkDeleteRequest,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
+    txs = (
+        db.query(Transaction)
+        .filter(Transaction.id.in_(payload.ids), user_filter(Transaction, user))
+        .all()
+    )
     for tx in txs:
         db.delete(tx)
     db.commit()
@@ -358,8 +419,18 @@ def bulk_delete(payload: BulkDeleteRequest, db: Session = Depends(get_db)) -> An
 
 
 @router.post("/bulk-update", status_code=200)
-def bulk_update(payload: BulkUpdateRequest, db: Session = Depends(get_db)) -> Any:
-    txs = db.query(Transaction).filter(Transaction.id.in_(payload.ids)).all()
+def bulk_update(
+    payload: BulkUpdateRequest,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
+    if payload.category_id is not None:
+        require_owned_record(db, Category, payload.category_id, user, "Category")
+    txs = (
+        db.query(Transaction)
+        .filter(Transaction.id.in_(payload.ids), user_filter(Transaction, user))
+        .all()
+    )
     for tx in txs:
         if payload.category_id is not None:
             tx.category_id = payload.category_id
@@ -370,32 +441,58 @@ def bulk_update(payload: BulkUpdateRequest, db: Session = Depends(get_db)) -> An
 
 
 @router.get("/{tx_id}", response_model=TransactionOut)
-def get_transaction(tx_id: int, db: Session = Depends(get_db)) -> Any:
-    tx = db.get(Transaction, tx_id)
+def get_transaction(
+    tx_id: int,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
+    tx = (
+        db.query(Transaction)
+        .filter(Transaction.id == tx_id, user_filter(Transaction, user))
+        .first()
+    )
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    return _enrich(tx)
+    return _enrich(tx, db, user)
 
 
 @router.patch("/{tx_id}", response_model=TransactionOut)
 def update_transaction(
     tx_id: int,
     payload: TransactionUpdate,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
 ) -> Any:
-    tx = db.get(Transaction, tx_id)
+    tx = (
+        db.query(Transaction)
+        .filter(Transaction.id == tx_id, user_filter(Transaction, user))
+        .first()
+    )
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
-    for field, value in payload.model_dump(exclude_unset=True).items():
+    updates = payload.model_dump(exclude_unset=True)
+    if updates.get("category_id") is not None:
+        require_owned_record(db, Category, updates["category_id"], user, "Category")
+    if updates.get("account_id") is not None:
+        require_owned_record(db, Account, updates["account_id"], user, "Account")
+    for field, value in updates.items():
         setattr(tx, field, value)
     db.commit()
     db.refresh(tx)
-    return _enrich(tx)
+    return _enrich(tx, db, user)
 
 
 @router.delete("/{tx_id}", status_code=204)
-def delete_transaction(tx_id: int, db: Session = Depends(get_db)) -> None:
-    tx = db.get(Transaction, tx_id)
+def delete_transaction(
+    tx_id: int,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> None:
+    tx = (
+        db.query(Transaction)
+        .filter(Transaction.id == tx_id, user_filter(Transaction, user))
+        .first()
+    )
     if not tx:
         raise HTTPException(status_code=404, detail="Transaction not found")
     db.delete(tx)
@@ -403,7 +500,14 @@ def delete_transaction(tx_id: int, db: Session = Depends(get_db)) -> None:
 
 
 @router.post("/delete-all", status_code=200)
-def delete_all_transactions(db: Session = Depends(get_db)) -> Any:
-    deleted = db.query(Transaction).delete()
+def delete_all_transactions(
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
+    deleted = (
+        db.query(Transaction)
+        .filter(user_filter(Transaction, user))
+        .delete(synchronize_session=False)
+    )
     db.commit()
     return {"deleted": deleted}

@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from typing import Any
 
 from sqlalchemy.orm import Session
 
@@ -72,6 +73,12 @@ def schedule_horizon(
     return dates[-1] if dates else None
 
 
+def _scope(q: Any, model: Any, user_id: str | None) -> Any:
+    if user_id is not None:
+        return q.filter(model.user_id == user_id)
+    return q.filter(model.user_id.is_(None))
+
+
 def _build_transaction(rule: RecurringRule, tx_date: date) -> Transaction:
     return Transaction(
         transaction_date=tx_date,
@@ -83,6 +90,7 @@ def _build_transaction(rule: RecurringRule, tx_date: date) -> Transaction:
         account_id=rule.account_id,
         notes=rule.notes,
         recurring_rule_id=rule.id,
+        user_id=rule.user_id,
     )
 
 
@@ -109,7 +117,12 @@ def preview_rule_update(
     )
     existing_txs = (
         db.query(Transaction)
-        .filter(Transaction.recurring_rule_id == rule.id)
+        .filter(
+            Transaction.recurring_rule_id == rule.id,
+            Transaction.user_id == rule.user_id
+            if rule.user_id is not None
+            else Transaction.user_id.is_(None),
+        )
         .order_by(Transaction.transaction_date.asc(), Transaction.id.asc())
         .all()
     )
@@ -127,9 +140,9 @@ def preview_rule_update(
     }
 
 
-def process_due_rules(db: Session) -> dict:
+def process_due_rules(db: Session, user_id: str | None = None) -> dict:
     today = date.today()
-    rules = db.query(RecurringRule).all()
+    rules = _scope(db.query(RecurringRule), RecurringRule, user_id).all()
 
     total_created = 0
     rules_triggered = 0
@@ -165,14 +178,22 @@ def apply_rule_update(
     for key, val in fields.items():
         setattr(rule, key, val)
 
+    owner_filter = (
+        Transaction.user_id == rule.user_id
+        if rule.user_id is not None
+        else Transaction.user_id.is_(None)
+    )
+
     if remove_overlap and impact["overlap_ids"]:
         db.query(Transaction).filter(
-            Transaction.id.in_(impact["overlap_ids"])
+            Transaction.id.in_(impact["overlap_ids"]),
+            owner_filter,
         ).delete(synchronize_session=False)
 
     if tx_fields:
         db.query(Transaction).filter(
-            Transaction.recurring_rule_id == rule.id
+            Transaction.recurring_rule_id == rule.id,
+            owner_filter,
         ).update(tx_fields, synchronize_session=False)
 
     if backfill_missing:
@@ -188,9 +209,15 @@ def apply_rule_update(
 
 
 def delete_rule_transactions_from(db: Session, rule: RecurringRule, from_date: date) -> int:
+    owner_filter = (
+        Transaction.user_id == rule.user_id
+        if rule.user_id is not None
+        else Transaction.user_id.is_(None)
+    )
     deleted = db.query(Transaction).filter(
         Transaction.recurring_rule_id == rule.id,
         Transaction.transaction_date >= from_date,
+        owner_filter,
     ).delete(synchronize_session=False)
 
     prev_last = None
@@ -199,6 +226,7 @@ def delete_rule_transactions_from(db: Session, rule: RecurringRule, from_date: d
         remaining = db.query(Transaction).filter(
             Transaction.recurring_rule_id == rule.id,
             Transaction.transaction_date <= prev_date,
+            owner_filter,
         ).order_by(Transaction.transaction_date.desc()).first()
         prev_last = remaining.transaction_date if remaining else None
         rule.last_created_date = prev_last
@@ -214,8 +242,14 @@ def delete_rule_transactions_from(db: Session, rule: RecurringRule, from_date: d
 
 
 def delete_rule_and_all_transactions(db: Session, rule: RecurringRule) -> int:
+    owner_filter = (
+        Transaction.user_id == rule.user_id
+        if rule.user_id is not None
+        else Transaction.user_id.is_(None)
+    )
     deleted = db.query(Transaction).filter(
-        Transaction.recurring_rule_id == rule.id
+        Transaction.recurring_rule_id == rule.id,
+        owner_filter,
     ).delete(synchronize_session=False)
     db.delete(rule)
     db.commit()

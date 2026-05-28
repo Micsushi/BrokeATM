@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 from app.models.models import Category
 from app.services.keyword_matching import keywords_to_csv
 
-STARTER_CATEGORIES_PATH = Path(__file__).resolve().parent.parent / "data" / "starter_categories.json"
+STARTER_CATEGORIES_PATH = (
+    Path(__file__).resolve().parent.parent / "data" / "starter_categories.json"
+)
 _HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
@@ -90,11 +92,16 @@ def starter_category_seed_tuples() -> list[tuple[str, str, str]]:
     ]
 
 
-def seed_starter_categories(db: Session) -> None:
+def seed_starter_categories(db: Session, user_id: str | None = None) -> None:
     """Populate live categories from the starter templates if the table is empty."""
-    if db.query(Category.id).limit(1).first() is not None:
+    q = db.query(Category.id)
+    if user_id is None:
+        q = q.filter(Category.user_id.is_(None))
+    else:
+        q = q.filter(Category.user_id == user_id)
+    if q.limit(1).first() is not None:
         return
 
     for payload in build_starter_category_payloads():
-        db.add(Category(**payload))
+        db.add(Category(**payload, user_id=user_id))
     db.commit()

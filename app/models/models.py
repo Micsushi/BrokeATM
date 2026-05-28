@@ -10,11 +10,16 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+
+class UserOwnedMixin:
+    user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
 
 
 class TransactionType(StrEnum):
@@ -24,7 +29,7 @@ class TransactionType(StrEnum):
     transfer = "transfer"
 
 
-class Account(Base):
+class Account(UserOwnedMixin, Base):
     __tablename__ = "accounts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -38,11 +43,12 @@ class Account(Base):
     )
 
 
-class Category(Base):
+class Category(UserOwnedMixin, Base):
     __tablename__ = "categories"
+    __table_args__ = (UniqueConstraint("user_id", "name", name="uq_categories_user_name"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
     color: Mapped[str | None] = mapped_column(String(7), nullable=True)
     keywords: Mapped[str | None] = mapped_column("mcc_descriptions", Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -52,7 +58,7 @@ class Category(Base):
     )
 
 
-class Transaction(Base):
+class Transaction(UserOwnedMixin, Base):
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -97,7 +103,7 @@ class Transaction(Base):
     category: Mapped["Category | None"] = relationship("Category", back_populates="transactions")
 
 
-class BudgetRule(Base):
+class BudgetRule(UserOwnedMixin, Base):
     __tablename__ = "budget_rules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -113,10 +119,14 @@ class BudgetRule(Base):
     )
 
 
-class BudgetHiddenCategory(Base):
+class BudgetHiddenCategory(UserOwnedMixin, Base):
     __tablename__ = "budget_hidden_categories"
+    __table_args__ = (
+        UniqueConstraint("user_id", "category_key", name="uq_budget_hidden_categories_user_key"),
+    )
 
-    category_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    category_key: Mapped[str] = mapped_column(String(64), nullable=False)
     category_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("categories.id", ondelete="CASCADE"),
@@ -126,7 +136,7 @@ class BudgetHiddenCategory(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
-class RecurringRule(Base):
+class RecurringRule(UserOwnedMixin, Base):
     __tablename__ = "recurring_rules"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -150,7 +160,7 @@ class RecurringRule(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
-class ImportBatch(Base):
+class ImportBatch(UserOwnedMixin, Base):
     __tablename__ = "import_batches"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
@@ -163,8 +173,8 @@ class ImportBatch(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
-class AppSetting(Base):
+class AppSetting(UserOwnedMixin, Base):
     __tablename__ = "app_settings"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     default_currency: Mapped[str] = mapped_column(String(3), default="CAD", nullable=False)

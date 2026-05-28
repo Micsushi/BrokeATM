@@ -5,11 +5,17 @@ from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import extract, func, or_
+from sqlalchemy import and_, extract, func, or_
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
-from app.core.schemas import BarMonth, DashboardResponse, LargeExpenseRow, LargeExpensesResponse, PieSlice
+from app.core.schemas import (
+    BarMonth,
+    DashboardResponse,
+    LargeExpenseRow,
+    LargeExpensesResponse,
+    PieSlice,
+)
+from app.core.user_context import UserContext, get_current_user, get_db_for_user, user_filter
 from app.models.models import Category, Transaction, TransactionType
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -35,14 +41,17 @@ def _parse_month_list(raw: str | None) -> list[tuple[int, int]]:
 
 
 @router.get("/available-months")
-def available_months(db: Session = Depends(get_db)) -> Any:
+def available_months(
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
     rows = (
         db.query(
             extract("year", Transaction.transaction_date).label("year"),
             extract("month", Transaction.transaction_date).label("month"),
             func.count(Transaction.id).label("cnt"),
         )
-        .filter(Transaction.is_excluded.is_(False))
+        .filter(Transaction.is_excluded.is_(False), user_filter(Transaction, user))
         .group_by("year", "month")
         .order_by(
             extract("year", Transaction.transaction_date).desc(),
@@ -65,7 +74,8 @@ def available_months(db: Session = Depends(get_db)) -> Any:
 def get_dashboard(
     months: str | None = Query(None, description="Comma-separated YYYY-MM for pie charts + totals"),
     bar_months: str | None = Query(None, description="Comma-separated YYYY-MM for bar chart"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
 ) -> Any:
     pie_pairs = _parse_month_list(months)
     bar_pairs = _parse_month_list(bar_months)
@@ -77,10 +87,15 @@ def get_dashboard(
                 Category.color.label("color"),
                 func.sum(Transaction.amount).label("total"),
             )
-            .join(Category, Transaction.category_id == Category.id, isouter=True)
+            .join(
+                Category,
+                and_(Transaction.category_id == Category.id, user_filter(Category, user)),
+                isouter=True,
+            )
             .filter(
                 Transaction.transaction_type == tx_type,
                 Transaction.is_excluded.is_(False),
+                user_filter(Transaction, user),
             )
         )
         if pie_pairs:
@@ -93,7 +108,9 @@ def get_dashboard(
                     ]
                 )
             )
-        return q.group_by(Category.name, Category.color).order_by(func.sum(Transaction.amount).desc())
+        return q.group_by(Category.name, Category.color).order_by(
+            func.sum(Transaction.amount).desc()
+        )
 
     def make_pie(rows: list[Any]) -> list[PieSlice]:
         return [
@@ -117,7 +134,7 @@ def get_dashboard(
             Transaction.transaction_type,
             func.sum(Transaction.amount).label("total"),
         )
-        .filter(Transaction.is_excluded.is_(False))
+        .filter(Transaction.is_excluded.is_(False), user_filter(Transaction, user))
     )
     if bar_pairs:
         bar_q = bar_q.filter(
@@ -175,14 +192,19 @@ def large_expenses(
     date_from: str | None = Query(None, description="YYYY-MM start (inclusive), omit for all time"),
     date_to: str | None = Query(None, description="YYYY-MM end (inclusive), omit for all time"),
     min_amount: float | None = Query(None, description="Fixed amount threshold (CAD)"),
-    min_pct: float | None = Query(None, description="% of the transaction's own month total (0-100)"),
+    min_pct: float | None = Query(
+        None,
+        description="% of the transaction's own month total (0-100)",
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=500),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
 ) -> Any:
     base_q = db.query(Transaction).filter(
         Transaction.transaction_type == TransactionType.expense,
         Transaction.is_excluded.is_(False),
+        user_filter(Transaction, user),
     )
 
     if date_from:
@@ -194,7 +216,9 @@ def large_expenses(
     if date_to:
         try:
             y, m = int(date_to[:4]), int(date_to[5:7])
-            base_q = base_q.filter(Transaction.transaction_date <= date(y, m, calendar.monthrange(y, m)[1]))
+            base_q = base_q.filter(
+                Transaction.transaction_date <= date(y, m, calendar.monthrange(y, m)[1])
+            )
         except (ValueError, IndexError):
             pass
 
@@ -220,6 +244,17 @@ def large_expenses(
 
     total_count = len(matched)
     page_items = matched[(page - 1) * page_size: page * page_size]
+    category_ids = {r.category_id for r, _ in page_items if r.category_id is not None}
+    categories = {
+        category.id: category
+        for category in (
+            db.query(Category)
+            .filter(Category.id.in_(category_ids), user_filter(Category, user))
+            .all()
+            if category_ids
+            else []
+        )
+    }
 
     return LargeExpensesResponse(
         items=[
@@ -227,7 +262,9 @@ def large_expenses(
                 id=r.id,
                 transaction_date=r.transaction_date,
                 merchant_name=r.merchant_name,
-                category=r.category.name if r.category else None,
+                category=(
+                    categories.get(r.category_id).name if r.category_id in categories else None
+                ),
                 amount=round(r.amount, 2),
                 pct_of_month=pct,
                 currency=r.currency,

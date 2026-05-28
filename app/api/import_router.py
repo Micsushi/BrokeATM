@@ -10,14 +10,14 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Up
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
+from app.core.config import settings
 from app.core.schemas import CommitRequest, CommitResponse, ParseResponse, ParserResult
+from app.core.user_context import UserContext, get_current_user, get_db_for_user, user_filter
 from app.models.models import Category
 from app.services.app_settings import get_default_currency
 from app.services.csv_parser import parse_csv
 from app.services.import_service import check_duplicates, commit_import
 from app.services.keyword_matching import KeywordMatcher
-from app.services.parsers.registry import run_all
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -34,12 +34,23 @@ def _prune_old_jobs() -> None:
         _jobs.pop(k, None)
 
 
-async def _run_csv_job(job_id: str, content: bytes, filename: str, default_currency: str, keyword_matcher: Any) -> None:
+async def _run_csv_job(
+    job_id: str,
+    content: bytes,
+    filename: str,
+    default_currency: str,
+    keyword_matcher: Any,
+) -> None:
     try:
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(
             None,
-            functools.partial(parse_csv, content, default_currency=default_currency, keyword_matcher=keyword_matcher),
+            functools.partial(
+                parse_csv,
+                content,
+                default_currency=default_currency,
+                keyword_matcher=keyword_matcher,
+            ),
         )
         _jobs[job_id]["status"] = "done"
         _jobs[job_id]["result"] = result  # already a dict
@@ -48,12 +59,28 @@ async def _run_csv_job(job_id: str, content: bytes, filename: str, default_curre
         _jobs[job_id]["error"] = str(exc)
 
 
-async def _run_pdf_job(job_id: str, content: bytes, filename: str, currency: str, keyword_matcher: Any, known_categories: list[str]) -> None:
+async def _run_pdf_job(
+    job_id: str,
+    content: bytes,
+    filename: str,
+    currency: str,
+    keyword_matcher: Any,
+    known_categories: list[str],
+) -> None:
     try:
+        from app.services.parsers.registry import run_all
+
         loop = asyncio.get_running_loop()
         results = await loop.run_in_executor(
             None,
-            functools.partial(run_all, content, filename, currency, keyword_matcher, known_categories),
+            functools.partial(
+                run_all,
+                content,
+                filename,
+                currency,
+                keyword_matcher,
+                known_categories,
+            ),
         )
         _jobs[job_id]["status"] = "done"
         _jobs[job_id]["result"] = results  # already dicts from _result_to_dict
@@ -63,20 +90,33 @@ async def _run_pdf_job(job_id: str, content: bytes, filename: str, currency: str
 
 
 @router.post("/parse", response_model=ParseResponse)
-async def parse_upload(file: UploadFile = File(...), db: Session = Depends(get_db)) -> Any:
+async def parse_upload(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported.")
     content = await file.read()
-    keyword_matcher = KeywordMatcher.from_categories(db.query(Category).all())
+    keyword_matcher = KeywordMatcher.from_categories(
+        db.query(Category).filter(user_filter(Category, user)).all()
+    )
     return parse_csv(
         content,
-        default_currency=get_default_currency(db),
+        default_currency=get_default_currency(db, user_id=user.user_id),
         keyword_matcher=keyword_matcher,
     )
 
 
 @router.post("/parse-all", response_model=list[ParserResult])
-async def parse_all_upload(file: UploadFile = File(...), db: Session = Depends(get_db)) -> Any:
+async def parse_all_upload(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
+    if settings.csv_only_imports:
+        raise HTTPException(status_code=400, detail="Online mode supports CSV import only.")
+    from app.services.parsers.registry import run_all
     fname = (file.filename or "").lower()
     ext = "." + fname.rsplit(".", 1)[-1] if "." in fname else ""
     if ext not in _PDF_OFX_EXTS:
@@ -85,47 +125,98 @@ async def parse_all_upload(file: UploadFile = File(...), db: Session = Depends(g
             detail=f"Unsupported file type '{ext}'. Accepted: .pdf, .ofx, .qfx",
         )
     content = await file.read()
-    cats = db.query(Category).all()
+    cats = db.query(Category).filter(user_filter(Category, user)).all()
     keyword_matcher = KeywordMatcher.from_categories(cats)
     known_categories = [c.name for c in cats]
-    currency = get_default_currency(db)
+    currency = get_default_currency(db, user_id=user.user_id)
     loop = asyncio.get_event_loop()
     results = await loop.run_in_executor(
         None,
-        functools.partial(run_all, content, file.filename or "", currency, keyword_matcher, known_categories),
+        functools.partial(
+            run_all,
+            content,
+            file.filename or "",
+            currency,
+            keyword_matcher,
+            known_categories,
+        ),
     )
     return results
 
 
 @router.post("/parse-async")
-async def parse_async_csv(background_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)) -> Any:
+async def parse_async_csv(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported.")
     content = await file.read()
-    keyword_matcher = KeywordMatcher.from_categories(db.query(Category).all())
-    default_currency = get_default_currency(db)
+    keyword_matcher = KeywordMatcher.from_categories(
+        db.query(Category).filter(user_filter(Category, user)).all()
+    )
+    default_currency = get_default_currency(db, user_id=user.user_id)
     job_id = str(uuid.uuid4())
-    _jobs[job_id] = {"status": "pending", "result": None, "error": None, "filename": file.filename, "created_at": time.time()}
+    _jobs[job_id] = {
+        "status": "pending",
+        "result": None,
+        "error": None,
+        "filename": file.filename,
+        "created_at": time.time(),
+    }
     _prune_old_jobs()
-    background_tasks.add_task(_run_csv_job, job_id, content, file.filename, default_currency, keyword_matcher)
+    background_tasks.add_task(
+        _run_csv_job,
+        job_id,
+        content,
+        file.filename,
+        default_currency,
+        keyword_matcher,
+    )
     return {"job_id": job_id, "filename": file.filename}
 
 
 @router.post("/parse-all-async")
-async def parse_all_async(background_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(get_db)) -> Any:
+async def parse_all_async(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
+    if settings.csv_only_imports:
+        raise HTTPException(status_code=400, detail="Online mode supports CSV import only.")
     fname = (file.filename or "").lower()
     ext = "." + fname.rsplit(".", 1)[-1] if "." in fname else ""
     if ext not in _PDF_OFX_EXTS:
-        raise HTTPException(status_code=400, detail=f"Unsupported file type '{ext}'. Accepted: .pdf, .ofx, .qfx")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Accepted: .pdf, .ofx, .qfx",
+        )
     content = await file.read()
-    cats = db.query(Category).all()
+    cats = db.query(Category).filter(user_filter(Category, user)).all()
     keyword_matcher = KeywordMatcher.from_categories(cats)
     known_categories = [c.name for c in cats]
-    currency = get_default_currency(db)
+    currency = get_default_currency(db, user_id=user.user_id)
     job_id = str(uuid.uuid4())
-    _jobs[job_id] = {"status": "pending", "result": None, "error": None, "filename": file.filename, "created_at": time.time()}
+    _jobs[job_id] = {
+        "status": "pending",
+        "result": None,
+        "error": None,
+        "filename": file.filename,
+        "created_at": time.time(),
+    }
     _prune_old_jobs()
-    background_tasks.add_task(_run_pdf_job, job_id, content, file.filename or "", currency, keyword_matcher, known_categories)
+    background_tasks.add_task(
+        _run_pdf_job,
+        job_id,
+        content,
+        file.filename or "",
+        currency,
+        keyword_matcher,
+        known_categories,
+    )
     return {"job_id": job_id, "filename": file.filename}
 
 
@@ -144,13 +235,21 @@ async def get_import_job(job_id: str) -> Any:
 
 
 @router.post("/check-duplicates")
-async def check_dups(payload: dict[str, Any], db: Session = Depends(get_db)) -> Any:
+async def check_dups(
+    payload: dict[str, Any],
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
     rows = payload.get("rows", [])
-    return {"rows": check_duplicates(db, rows)}
+    return {"rows": check_duplicates(db, rows, user_id=user.user_id)}
 
 
 @router.post("/commit", response_model=CommitResponse)
-async def commit(request: CommitRequest, db: Session = Depends(get_db)) -> Any:
+async def commit(
+    request: CommitRequest,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+) -> Any:
     rows_dicts = [r.model_dump() for r in request.rows]
     try:
         batches, total_imported, total_skipped = commit_import(
@@ -159,6 +258,7 @@ async def commit(request: CommitRequest, db: Session = Depends(get_db)) -> Any:
             filename=request.filename,
             month=request.month,
             year=request.year,
+            user_id=user.user_id,
         )
     except IntegrityError:
         db.rollback()

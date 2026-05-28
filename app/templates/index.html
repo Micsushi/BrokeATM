@@ -550,7 +550,7 @@
 <div class="page import-page">
   <div class="page-header">
     <h1>Import Transactions</h1>
-    <p>Upload CSV, PDF, or OFX/QFX bank statements. Duplicates are checked across this upload and your database.</p>
+    <p id="import-subtitle">Upload CSV, PDF, or OFX/QFX bank statements. Duplicates are checked across this upload and your database.</p>
   </div>
 
   <div class="steps" id="steps">
@@ -596,7 +596,7 @@
       <div class="drop-zone" id="drop-zone">
         <div class="drop-icon">📂</div>
         <p><strong>Drop files here</strong> or click to browse</p>
-        <p class="mt-1 upload-help">CSV · PDF · OFX · QFX &nbsp;·&nbsp; Drop one file or a whole batch. Files are processed one by one.</p>
+        <p class="mt-1 upload-help" id="upload-help">CSV · PDF · OFX · QFX &nbsp;·&nbsp; Drop one file or a whole batch. Files are processed one by one.</p>
         <input type="file" id="file-input" accept=".csv,.pdf,.ofx,.qfx" multiple class="hidden" />
       </div>
     </div>
@@ -708,7 +708,19 @@
 </div>
 
 <script src="/static/js/utils.js?v=12"></script>
+<script src="/static/js/auth-client.js?v=1"></script>
+<script>window.BrokeATMAuth.requireSession();</script>
 <script src="/static/js/api.js?v=8"></script>
+<script>
+window.BrokeATMAuth.init().then(({ config }) => {
+  if (!config || !config.csv_only_imports) return;
+  document.getElementById("import-subtitle").textContent =
+    "Upload CSV bank statements. Duplicates are checked across this upload and your database.";
+  document.getElementById("upload-help").textContent =
+    "CSV only for the online version. PDF and OFX/QFX stay available in the local app.";
+  document.getElementById("file-input").setAttribute("accept", ".csv");
+});
+</script>
 <script src="/static/js/category-picker-modal.js?v=1"></script>
 <script src="/static/js/category-keyword-tools.js?v=2"></script>
 <script src="/static/js/keyword-conflict-modal.js?v=22"></script>

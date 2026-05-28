@@ -1,13 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.database import get_db
 from app.core.schemas import (
     ProcessRecurringResponse,
     RecurringDeleteFromRequest,
     RecurringRuleCreate,
     RecurringRuleOut,
     RecurringRuleUpdate,
+)
+from app.core.user_context import (
+    UserContext,
+    assign_user,
+    get_current_user,
+    get_db_for_user,
+    require_owned_record,
+    user_filter,
 )
 from app.models.models import Account, Category, RecurringRule, Transaction
 from app.services.recurring_service import (
@@ -21,16 +28,25 @@ from app.services.recurring_service import (
 router = APIRouter(prefix="/api/recurring", tags=["recurring"])
 
 
-def _enrich(rule: RecurringRule, db: Session) -> RecurringRuleOut:
+def _enrich(rule: RecurringRule, db: Session, user: UserContext) -> RecurringRuleOut:
     out = RecurringRuleOut.model_validate(rule)
     if rule.category_id:
-        cat = db.get(Category, rule.category_id)
+        cat = (
+            db.query(Category)
+            .filter(Category.id == rule.category_id, user_filter(Category, user))
+            .first()
+        )
         out.category_name = cat.name if cat else None
     if rule.account_id:
-        acc = db.get(Account, rule.account_id)
+        acc = (
+            db.query(Account)
+            .filter(Account.id == rule.account_id, user_filter(Account, user))
+            .first()
+        )
         out.account_name = acc.name if acc else None
     out.transaction_count = db.query(Transaction).filter(
-        Transaction.recurring_rule_id == rule.id
+        Transaction.recurring_rule_id == rule.id,
+        user_filter(Transaction, user),
     ).count()
     return out
 
@@ -44,27 +60,51 @@ def _validate_rule_window(start_date, end_date) -> None:
 
 
 @router.get("", response_model=list[RecurringRuleOut])
-def list_rules(db: Session = Depends(get_db)):
-    rules = db.query(RecurringRule).order_by(RecurringRule.start_date.desc()).all()
-    return [_enrich(r, db) for r in rules]
+def list_rules(
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+):
+    rules = (
+        db.query(RecurringRule)
+        .filter(user_filter(RecurringRule, user))
+        .order_by(RecurringRule.start_date.desc())
+        .all()
+    )
+    return [_enrich(r, db, user) for r in rules]
 
 
 @router.post("", response_model=RecurringRuleOut, status_code=201)
-def create_rule(payload: RecurringRuleCreate, db: Session = Depends(get_db)):
+def create_rule(
+    payload: RecurringRuleCreate,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+):
     _validate_rule_window(payload.start_date, payload.end_date)
+    require_owned_record(db, Category, payload.category_id, user, "Category")
+    require_owned_record(db, Account, payload.account_id, user, "Account")
     rule = RecurringRule(**payload.model_dump())
+    assign_user(rule, user)
     db.add(rule)
     db.commit()
     db.refresh(rule)
     # generate all entries up to today immediately
-    process_due_rules(db)
+    process_due_rules(db, user_id=user.user_id)
     db.refresh(rule)
-    return _enrich(rule, db)
+    return _enrich(rule, db, user)
 
 
 @router.patch("/{rule_id}", response_model=RecurringRuleOut)
-def update_rule(rule_id: int, payload: RecurringRuleUpdate, db: Session = Depends(get_db)):
-    rule = db.get(RecurringRule, rule_id)
+def update_rule(
+    rule_id: int,
+    payload: RecurringRuleUpdate,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+):
+    rule = (
+        db.query(RecurringRule)
+        .filter(RecurringRule.id == rule_id, user_filter(RecurringRule, user))
+        .first()
+    )
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
 
@@ -81,6 +121,10 @@ def update_rule(rule_id: int, payload: RecurringRuleUpdate, db: Session = Depend
     next_start = fields.get("start_date", rule.start_date)
     next_end = fields.get("end_date", rule.end_date)
     _validate_rule_window(next_start, next_end)
+    if fields.get("category_id") is not None:
+        require_owned_record(db, Category, fields["category_id"], user, "Category")
+    if fields.get("account_id") is not None:
+        require_owned_record(db, Account, fields["account_id"], user, "Account")
 
     impact = preview_rule_update(db, rule, fields)
     needs_overlap_choice = impact["overlap_count"] > 0 and not (
@@ -117,12 +161,20 @@ def update_rule(rule_id: int, payload: RecurringRuleUpdate, db: Session = Depend
         remove_overlap=payload.force_remove_overlap,
         backfill_missing=payload.backfill_missing,
     )
-    return _enrich(rule, db)
+    return _enrich(rule, db, user)
 
 
 @router.delete("/{rule_id}", status_code=204)
-def delete_rule(rule_id: int, db: Session = Depends(get_db)):
-    rule = db.get(RecurringRule, rule_id)
+def delete_rule(
+    rule_id: int,
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+):
+    rule = (
+        db.query(RecurringRule)
+        .filter(RecurringRule.id == rule_id, user_filter(RecurringRule, user))
+        .first()
+    )
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
     delete_rule_and_all_transactions(db, rule)
@@ -132,9 +184,14 @@ def delete_rule(rule_id: int, db: Session = Depends(get_db)):
 def delete_from_date(
     rule_id: int,
     payload: RecurringDeleteFromRequest,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
 ):
-    rule = db.get(RecurringRule, rule_id)
+    rule = (
+        db.query(RecurringRule)
+        .filter(RecurringRule.id == rule_id, user_filter(RecurringRule, user))
+        .first()
+    )
     if not rule:
         raise HTTPException(status_code=404, detail="Rule not found")
     deleted = delete_rule_transactions_from(db, rule, payload.from_date)
@@ -142,5 +199,8 @@ def delete_from_date(
 
 
 @router.post("/process", response_model=ProcessRecurringResponse)
-def process_recurring(db: Session = Depends(get_db)):
-    return process_due_rules(db)
+def process_recurring(
+    db: Session = Depends(get_db_for_user),
+    user: UserContext = Depends(get_current_user),
+):
+    return process_due_rules(db, user_id=user.user_id)

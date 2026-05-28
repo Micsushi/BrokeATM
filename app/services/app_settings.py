@@ -15,33 +15,50 @@ def normalize_currency_code(code: str | None) -> str:
     return value
 
 
-def get_or_create_app_settings(db: Session) -> AppSetting:
-    settings = db.get(AppSetting, SETTINGS_ROW_ID)
+def get_or_create_app_settings(db: Session, user_id: str | None = None) -> AppSetting:
+    if user_id is None:
+        settings = db.query(AppSetting).filter(AppSetting.user_id.is_(None)).first()
+    else:
+        settings = db.query(AppSetting).filter(AppSetting.user_id == user_id).first()
     if settings is None:
-        settings = AppSetting(id=SETTINGS_ROW_ID, default_currency=DEFAULT_CURRENCY)
+        settings = AppSetting(default_currency=DEFAULT_CURRENCY, user_id=user_id)
+        if user_id is None:
+            settings.id = SETTINGS_ROW_ID
         db.add(settings)
         db.flush()
     return settings
 
 
-def ensure_app_settings(db: Session) -> AppSetting:
-    settings = get_or_create_app_settings(db)
+def ensure_app_settings(db: Session, user_id: str | None = None) -> AppSetting:
+    settings = get_or_create_app_settings(db, user_id=user_id)
     db.commit()
     db.refresh(settings)
     return settings
 
 
-def get_default_currency(db: Session) -> str:
-    return get_or_create_app_settings(db).default_currency
+def get_default_currency(db: Session, user_id: str | None = None) -> str:
+    return get_or_create_app_settings(db, user_id=user_id).default_currency
 
 
-def update_default_currency(db: Session, currency_code: str) -> AppSetting:
+def update_default_currency(
+    db: Session,
+    currency_code: str,
+    user_id: str | None = None,
+) -> AppSetting:
     currency = normalize_currency_code(currency_code)
-    settings = get_or_create_app_settings(db)
+    settings = get_or_create_app_settings(db, user_id=user_id)
     if settings.default_currency != currency:
         settings.default_currency = currency
-        db.query(Transaction).update({Transaction.currency: currency}, synchronize_session=False)
-        db.query(RecurringRule).update(
+        tx_q = db.query(Transaction)
+        rule_q = db.query(RecurringRule)
+        if user_id is None:
+            tx_q = tx_q.filter(Transaction.user_id.is_(None))
+            rule_q = rule_q.filter(RecurringRule.user_id.is_(None))
+        else:
+            tx_q = tx_q.filter(Transaction.user_id == user_id)
+            rule_q = rule_q.filter(RecurringRule.user_id == user_id)
+        tx_q.update({Transaction.currency: currency}, synchronize_session=False)
+        rule_q.update(
             {RecurringRule.currency: currency},
             synchronize_session=False,
         )

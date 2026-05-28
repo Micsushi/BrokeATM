@@ -3,14 +3,7 @@ import threading
 from pathlib import Path
 
 from fastapi import FastAPI
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
-    datefmt="%H:%M:%S",
-)
-
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.api import (
@@ -20,16 +13,27 @@ from app.api import (
     dashboard_router,
     import_router,
     recurring_router,
+    runtime_router,
     settings_router,
     transactions_router,
 )
 from app.core.config import settings
-from app.core.database import Base, SessionLocal, engine
+from app.core.database import (
+    Base,
+    SessionLocal,
+    engine,
+    ensure_budget_hidden_categories_schema,
+    ensure_local_user_scope_columns,
+)
 from app.services.app_settings import ensure_app_settings
+from app.services.recurring_service import process_due_rules
 from app.services.starter_categories import seed_starter_categories
 
-Base.metadata.create_all(bind=engine)
-
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(name)s  %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 def _prewarm_ocr() -> None:
     try:
@@ -39,14 +43,19 @@ def _prewarm_ocr() -> None:
         pass
 
 
-threading.Thread(target=_prewarm_ocr, daemon=True).start()
+def _initialize_local_runtime() -> None:
+    Base.metadata.create_all(bind=engine)
+    ensure_local_user_scope_columns()
+    ensure_budget_hidden_categories_schema()
+    threading.Thread(target=_prewarm_ocr, daemon=True).start()
+    with SessionLocal() as _db:
+        seed_starter_categories(_db)
+        ensure_app_settings(_db)
+        process_due_rules(_db)
 
-from app.services.recurring_service import process_due_rules
 
-with SessionLocal() as _db:
-    seed_starter_categories(_db)
-    ensure_app_settings(_db)
-    process_due_rules(_db)
+if not settings.is_cloud_mode:
+    _initialize_local_runtime()
 
 app = FastAPI(
     title=settings.app_name,
@@ -63,6 +72,7 @@ app.include_router(dashboard_router.router)
 app.include_router(recurring_router.router)
 app.include_router(budget_router.router)
 app.include_router(settings_router.router)
+app.include_router(runtime_router.router)
 
 STATIC_DIR = Path(__file__).parent / "static"
 TEMPLATES_DIR = Path(__file__).parent / "templates"
@@ -70,7 +80,11 @@ TEMPLATES_DIR = Path(__file__).parent / "templates"
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
-_NO_CACHE = {"Cache-Control": "no-cache, no-store, must-revalidate", "Pragma": "no-cache", "Expires": "0"}
+_NO_CACHE = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
 
 
 def _html(name: str) -> FileResponse:
@@ -80,6 +94,13 @@ def _html(name: str) -> FileResponse:
 @app.get("/")
 def index() -> FileResponse:
     return _html("dashboard.html")
+
+
+@app.get("/login")
+def login() -> Response:
+    if settings.auth_mode == "none":
+        return RedirectResponse(url="/")
+    return _html("login.html")
 
 
 @app.get("/import")

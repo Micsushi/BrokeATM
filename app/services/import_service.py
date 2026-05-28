@@ -34,19 +34,33 @@ def _digits_only(s: str) -> str:
     return "".join(ch for ch in (s or "") if ch.isdigit())
 
 
-def _find_account_by_card_mask(db: Session, card: str) -> Account | None:
+def _find_account_by_card_mask(
+    db: Session,
+    card: str,
+    user_id: str | None = None,
+) -> Account | None:
     """Exact match on card mask, falling back to last-4 digits ('3600' vs '************3600')."""
     card = _normalize_card_masked(card)
     if not card:
         return None
-    hit = db.query(Account).filter_by(card_number_masked=card).first()
+    q = db.query(Account).filter_by(card_number_masked=card)
+    if user_id is not None:
+        q = q.filter(Account.user_id == user_id)
+    else:
+        q = q.filter(Account.user_id.is_(None))
+    hit = q.first()
     if hit is not None:
         return hit
     d = _digits_only(card)
     if len(d) < 4:
         return None
     suf4 = d[-4:]
-    for a in db.query(Account).all():
+    all_q = db.query(Account)
+    if user_id is not None:
+        all_q = all_q.filter(Account.user_id == user_id)
+    else:
+        all_q = all_q.filter(Account.user_id.is_(None))
+    for a in all_q.all():
         ad = _digits_only(a.card_number_masked or "")
         if len(ad) >= 4 and ad.endswith(suf4):
             return a
@@ -158,7 +172,10 @@ def _transaction_exact_duplicate_fingerprint(tx: Transaction) -> tuple[Any, ...]
     )
 
 
-def _upload_exact_duplicate_key(row: dict[str, Any], account_token: str | int | None) -> tuple[Any, ...] | None:
+def _upload_exact_duplicate_key(
+    row: dict[str, Any],
+    account_token: str | int | None,
+) -> tuple[Any, ...] | None:
     exact_fp = _row_exact_duplicate_fingerprint(row)
     if exact_fp is None:
         return None
@@ -172,16 +189,20 @@ def _find_interest_account_date_amount_duplicate(
     amount: float,
 ) -> Transaction | None:
     amt = float(amount)
-    candidates = (
+    candidates_q = (
         db.query(Transaction)
         .filter(
             Transaction.account_id == account.id,
             func.abs(Transaction.amount - amt) < 0.0001,
             or_(Transaction.transaction_date == tx_d, Transaction.posted_date == tx_d),
         )
-        .limit(25)
-        .all()
     )
+    candidates_q = (
+        candidates_q.filter(Transaction.user_id == account.user_id)
+        if account.user_id is not None
+        else candidates_q.filter(Transaction.user_id.is_(None))
+    )
+    candidates = candidates_q.limit(25).all()
     for tx in candidates:
         if _interest_like_row({"merchant_name": tx.merchant_name or ""}):
             return tx
@@ -200,12 +221,17 @@ def _find_existing_transaction_duplicate(
     merchant_fp: str,
     interest_like: bool,
     exact_fp: tuple[Any, ...] | None = None,
+    user_id: str | None = None,
 ) -> Transaction | None:
     if ref and account is not None:
         q = (
             db.query(Transaction)
             .filter_by(reference_number=ref, account_id=account.id)
         )
+        if account.user_id is not None:
+            q = q.filter(Transaction.user_id == account.user_id)
+        else:
+            q = q.filter(Transaction.user_id.is_(None))
         if tx_d is not None:
             hit = q.filter_by(transaction_date=tx_d).first()
             if hit is None:
@@ -221,7 +247,7 @@ def _find_existing_transaction_duplicate(
         return None
     if interest_like and account is not None and tx_d is not None and merchant_fp:
         amt = float(amount)
-        candidates = (
+        candidates_q = (
             db.query(Transaction)
             .filter(
                 Transaction.account_id == account.id,
@@ -229,9 +255,13 @@ def _find_existing_transaction_duplicate(
                 Transaction.reference_number.is_(None),
                 func.abs(Transaction.amount - amt) < 0.0001,
             )
-            .limit(50)
-            .all()
         )
+        candidates_q = (
+            candidates_q.filter(Transaction.user_id == account.user_id)
+            if account.user_id is not None
+            else candidates_q.filter(Transaction.user_id.is_(None))
+        )
+        candidates = candidates_q.limit(50).all()
         for tx in candidates:
             if _normalize_merchant_for_fingerprint(tx.merchant_name or "") == merchant_fp:
                 return tx
@@ -248,6 +278,12 @@ def _find_existing_transaction_duplicate(
         )
         if account is not None:
             candidates_q = candidates_q.filter(Transaction.account_id == account.id)
+        # Prefer account's user_id; fall back to the call-site user_id (covers no-account rows).
+        effective_uid = account.user_id if account is not None else user_id
+        if effective_uid is not None:
+            candidates_q = candidates_q.filter(Transaction.user_id == effective_uid)
+        else:
+            candidates_q = candidates_q.filter(Transaction.user_id.is_(None))
         for tx in candidates_q.limit(50).all():
             if _transaction_exact_duplicate_fingerprint(tx) == exact_fp:
                 return tx
@@ -259,32 +295,51 @@ def seed_defaults(db: Session) -> None:
     seed_starter_categories(db)
 
 
-def _keyword_matcher(db: Session) -> KeywordMatcher:
-    return KeywordMatcher.from_categories(db.query(Category).all())
+def _keyword_matcher(db: Session, user_id: str | None = None) -> KeywordMatcher:
+    q = db.query(Category)
+    if user_id is not None:
+        q = q.filter(Category.user_id == user_id)
+    else:
+        q = q.filter(Category.user_id.is_(None))
+    return KeywordMatcher.from_categories(q.all())
 
 
-def get_or_create_account(db: Session, card_number_masked: str, cardholder: str) -> Account:
+def get_or_create_account(
+    db: Session,
+    card_number_masked: str,
+    cardholder: str,
+    user_id: str | None = None,
+) -> Account:
     card_number_masked = _normalize_card_masked(card_number_masked)
-    account = _find_account_by_card_mask(db, card_number_masked)
+    account = _find_account_by_card_mask(db, card_number_masked, user_id=user_id)
     if not account:
         name = f"{cardholder} ({card_number_masked})" if cardholder else card_number_masked
-        account = Account(name=name, card_number_masked=card_number_masked)
+        account = Account(name=name, card_number_masked=card_number_masked, user_id=user_id)
         db.add(account)
         db.flush()
     return account
 
 
-def get_or_create_category(db: Session, name: str) -> Category:
+def get_or_create_category(db: Session, name: str, user_id: str | None = None) -> Category:
     normalized = name.strip().lower()
-    cat = db.query(Category).filter(Category.name == normalized).first()
+    q = db.query(Category).filter(Category.name == normalized)
+    if user_id is not None:
+        q = q.filter(Category.user_id == user_id)
+    else:
+        q = q.filter(Category.user_id.is_(None))
+    cat = q.first()
     if not cat:
-        cat = Category(name=normalized)
+        cat = Category(name=normalized, user_id=user_id)
         db.add(cat)
         db.flush()
     return cat
 
 
-def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def check_duplicates(
+    db: Session,
+    rows: list[dict[str, Any]],
+    user_id: str | None = None,
+) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     seen_ref_line: set[tuple[str, str, str]] = set()
     seen_interest_fp: set[tuple[str, str, str, float, str]] = set()
@@ -302,7 +357,7 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
         interest_like = _interest_like_row(row)
         exact_fp = _row_exact_duplicate_fingerprint(row)
         upload_exact_key = _upload_exact_duplicate_key(row, card)
-        account = _find_account_by_card_mask(db, card) if card else None
+        account = _find_account_by_card_mask(db, card, user_id=user_id) if card else None
 
         is_dup = False
         dup_in_import = False
@@ -324,6 +379,7 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
                     merchant_fp=merch_fp,
                     interest_like=interest_like,
                     exact_fp=exact_fp,
+                    user_id=user_id,
                 )
                 if existing is not None:
                     is_dup = True
@@ -346,6 +402,7 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
                     merchant_fp=merch_fp,
                     interest_like=True,
                     exact_fp=exact_fp,
+                    user_id=user_id,
                 )
                 if existing is not None:
                     is_dup = True
@@ -367,6 +424,7 @@ def check_duplicates(db: Session, rows: list[dict[str, Any]]) -> list[dict[str, 
                     merchant_fp=merch_fp,
                     interest_like=False,
                     exact_fp=exact_fp,
+                    user_id=user_id,
                 )
                 if existing is not None:
                     is_dup = True
@@ -414,33 +472,44 @@ def commit_import(
     filename: str,
     month: int,
     year: int,
+    user_id: str | None = None,
 ) -> tuple[list[ImportBatch], int, int]:
     default_label = (filename or "import").strip()[:255] or "import"
 
     totals: defaultdict[tuple[str, int, int], int] = defaultdict(int)
     for row in rows:
-        gk = _row_import_batch_group(row, default_filename=default_label, default_month=month, default_year=year)
+        gk = _row_import_batch_group(
+            row,
+            default_filename=default_label,
+            default_month=month,
+            default_year=year,
+        )
         totals[gk] += 1
 
     batch_id_by_key = {gk: str(uuid.uuid4()) for gk in totals}
     imported_by: defaultdict[tuple[str, int, int], int] = defaultdict(int)
     skipped_by: defaultdict[tuple[str, int, int], int] = defaultdict(int)
 
-    keyword_matcher = _keyword_matcher(db)
+    keyword_matcher = _keyword_matcher(db, user_id=user_id)
     seen_ref_line: set[tuple[str, int, str]] = set()
     seen_interest_fp: set[tuple[int, str, float, str]] = set()
     seen_exact_line: set[tuple[Any, ...]] = set()
     default_card = _default_card_masked_for_rows(rows)
 
     for row in rows:
-        gk = _row_import_batch_group(row, default_filename=default_label, default_month=month, default_year=year)
+        gk = _row_import_batch_group(
+            row,
+            default_filename=default_label,
+            default_month=month,
+            default_year=year,
+        )
         if row.get("exclude", False):
             skipped_by[gk] += 1
             continue
 
         card = _effective_card_for_row(row, default_card)
         cardholder = row.get("cardholder", "")
-        account = get_or_create_account(db, card, cardholder)
+        account = get_or_create_account(db, card, cardholder, user_id=user_id)
         duplicate_account = account if card else None
         ref = _normalize_reference_number(row.get("reference_number"))
         tx_d = _row_statement_date(row)
@@ -469,6 +538,7 @@ def commit_import(
                 merchant_fp=merch_fp,
                 interest_like=interest_like,
                 exact_fp=exact_fp,
+                user_id=user_id,
             )
             if existing is not None:
                 skipped_by[gk] += 1
@@ -490,6 +560,7 @@ def commit_import(
                 merchant_fp=merch_fp,
                 interest_like=True,
                 exact_fp=exact_fp,
+                user_id=user_id,
             )
             if existing is not None:
                 skipped_by[gk] += 1
@@ -510,6 +581,7 @@ def commit_import(
                 merchant_fp=merch_fp,
                 interest_like=False,
                 exact_fp=exact_fp,
+                user_id=user_id,
             )
             if existing is not None:
                 skipped_by[gk] += 1
@@ -519,9 +591,13 @@ def commit_import(
         raw_cat = row.get("category_name") or row.get("suggested_category")
         if not raw_cat or raw_cat == "uncategorized":
             merchant = row.get("merchant_name", "")
-            raw_cat = keyword_matcher.analyze(merchant)["suggested_category"] or raw_cat or "uncategorized"
+            raw_cat = (
+                keyword_matcher.analyze(merchant)["suggested_category"]
+                or raw_cat
+                or "uncategorized"
+            )
 
-        category = get_or_create_category(db, raw_cat)
+        category = get_or_create_category(db, raw_cat, user_id=user_id)
         bid = batch_id_by_key[gk]
 
         tx_type = row.get("transaction_type", "expense")
@@ -545,6 +621,7 @@ def commit_import(
             notes=row.get("notes") or None,
             import_batch_id=bid,
             is_excluded=False,
+            user_id=user_id,
         )
         db.add(tx)
         imported_by[gk] += 1
@@ -561,6 +638,7 @@ def commit_import(
                 total_rows=totals[gk],
                 imported_rows=imported_by[gk],
                 skipped_rows=skipped_by[gk],
+                user_id=user_id,
             )
         )
         db.add(batches[-1])
