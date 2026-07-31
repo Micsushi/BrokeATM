@@ -30,7 +30,7 @@
       state.config.supabase_url &&
       state.config.supabase_anon_key
     ) {
-      // Vendored SDK — avoids CDN SRI issues with dynamically-generated builds.
+      // Vendored SDK avoids CDN SRI issues with dynamically generated builds.
       // Update the version in both this path and the filename when upgrading.
       if (!window.supabase) {
         await loadScript("/static/js/supabase-2.49.4.min.js");

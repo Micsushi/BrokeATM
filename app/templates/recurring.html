@@ -993,7 +993,7 @@
     deletingRuleId = ruleId;
     const rule = rules.find((item) => item.id === ruleId);
     document.getElementById("delete-desc").textContent =
-      `"${rule?.merchant_name}" — ${rule?.transaction_count || 0} linked entr${rule?.transaction_count === 1 ? "y" : "ies"}`;
+      `"${rule?.merchant_name}": ${rule?.transaction_count || 0} linked entr${rule?.transaction_count === 1 ? "y" : "ies"}`;
     document.getElementById("tx-count-badge").textContent = `(${rule?.transaction_count || 0})`;
     document.querySelector('input[name="del-mode"][value="all"]').checked = true;
     document.getElementById("from-date-section").style.display = "none";
@@ -1009,7 +1009,7 @@
         await loadAll({ preservePage: false });
         if (isRecurring) {
           const message = count > 0
-            ? `Recurring rule created — ${count} entr${count === 1 ? "y" : "ies"} generated.`
+            ? `Recurring rule created: ${count} entr${count === 1 ? "y" : "ies"} generated.`
             : "Recurring rule created.";
           showAlert(alertsEl, message, "success");
         }

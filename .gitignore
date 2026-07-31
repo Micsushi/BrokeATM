@@ -30,17 +30,13 @@ uploads/
 # Env
 .env
 
+# Local agent context and tooling
 .claude/
-.codex/
-skills-lock.json
-NUL
+.codex
 .agents/
-
-
-# Local agent context (private, not for repo)
 CLAUDE.md
 AGENTS.md
-
-# Local agent instructions and tooling
+skills-lock.json
 .opencode/
 docs/agents/
+NUL

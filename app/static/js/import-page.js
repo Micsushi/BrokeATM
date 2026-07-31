@@ -1311,7 +1311,7 @@ async function pollWaitingJobs() {
       return
     }
     for (const doc of waiting) {
-      // re-check inside the loop — a previous iteration may have already resolved this doc
+      // Recheck because a previous iteration may have resolved this document.
       if (doc.status !== "waiting" || !doc.jobId) continue
       let jobData
       try {

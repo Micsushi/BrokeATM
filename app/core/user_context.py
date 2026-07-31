@@ -17,7 +17,7 @@ from app.services.starter_categories import seed_starter_categories
 MOCK_USER_ID = "00000000-0000-4000-8000-000000000001"
 
 # Per-process cache: avoids re-running seed SELECTs on every request.
-# Serverless cold starts get an empty set — first request does 2 cheap SELECTs,
+# Serverless cold starts get an empty set. The first request does 2 cheap SELECTs;
 # subsequent warm invocations skip them. Correctness is guaranteed by the
 # idempotent seed functions regardless.
 _bootstrapped_users: set[str] = set()
