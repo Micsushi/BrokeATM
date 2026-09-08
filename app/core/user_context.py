@@ -46,16 +46,28 @@ def _validate_supabase_user(token: str) -> str:
     # Fast path: verify the JWT locally using the project secret (no network call).
     if settings.supabase_jwt_secret:
         try:
+            decode_options = {
+                "require": ["exp", "sub", "aud", "role"],
+            }
+            decode_kwargs: dict[str, Any] = {
+                "options": decode_options,
+                "audience": "authenticated",
+            }
+            if settings.supabase_url:
+                decode_options["require"].append("iss")
+                decode_kwargs["issuer"] = settings.supabase_url.rstrip("/") + "/auth/v1"
             payload = jwt.decode(
                 token,
                 settings.supabase_jwt_secret,
                 algorithms=["HS256"],
-                options={"verify_aud": False},
+                **decode_kwargs,
             )
         except jwt.ExpiredSignatureError as exc:
             raise HTTPException(status_code=401, detail="Invalid or expired auth session.") from exc
         except jwt.InvalidTokenError as exc:
             raise HTTPException(status_code=401, detail="Invalid or expired auth session.") from exc
+        if payload.get("role") != "authenticated":
+            raise HTTPException(status_code=401, detail="Invalid auth session.")
         user_id = payload.get("sub")
         if not isinstance(user_id, str) or not user_id:
             raise HTTPException(status_code=401, detail="Invalid auth session.")

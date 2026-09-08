@@ -22,9 +22,21 @@ from app.services.keyword_matching import KeywordMatcher
 router = APIRouter(prefix="/api/import", tags=["import"])
 
 _PDF_OFX_EXTS = {".pdf", ".ofx", ".qfx"}
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 
 _jobs: dict[str, dict] = {}
 _JOB_TTL = 3600
+
+
+async def _read_upload(file: UploadFile) -> bytes:
+    reported_size = file.size
+    if reported_size is not None and reported_size > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded file is too large.")
+
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded file is too large.")
+    return content
 
 
 def _prune_old_jobs() -> None:
@@ -97,7 +109,7 @@ async def parse_upload(
 ) -> Any:
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported.")
-    content = await file.read()
+    content = await _read_upload(file)
     keyword_matcher = KeywordMatcher.from_categories(
         db.query(Category).filter(user_filter(Category, user)).all()
     )
@@ -117,6 +129,7 @@ async def parse_all_upload(
     if settings.csv_only_imports:
         raise HTTPException(status_code=400, detail="Online mode supports CSV import only.")
     from app.services.parsers.registry import run_all
+
     fname = (file.filename or "").lower()
     ext = "." + fname.rsplit(".", 1)[-1] if "." in fname else ""
     if ext not in _PDF_OFX_EXTS:
@@ -124,7 +137,7 @@ async def parse_all_upload(
             status_code=400,
             detail=f"Unsupported file type '{ext}'. Accepted: .pdf, .ofx, .qfx",
         )
-    content = await file.read()
+    content = await _read_upload(file)
     cats = db.query(Category).filter(user_filter(Category, user)).all()
     keyword_matcher = KeywordMatcher.from_categories(cats)
     known_categories = [c.name for c in cats]
@@ -153,7 +166,7 @@ async def parse_async_csv(
 ) -> Any:
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are supported.")
-    content = await file.read()
+    content = await _read_upload(file)
     keyword_matcher = KeywordMatcher.from_categories(
         db.query(Category).filter(user_filter(Category, user)).all()
     )
@@ -165,6 +178,7 @@ async def parse_async_csv(
         "error": None,
         "filename": file.filename,
         "created_at": time.time(),
+        "user_id": user.user_id,
     }
     _prune_old_jobs()
     background_tasks.add_task(
@@ -194,7 +208,7 @@ async def parse_all_async(
             status_code=400,
             detail=f"Unsupported file type '{ext}'. Accepted: .pdf, .ofx, .qfx",
         )
-    content = await file.read()
+    content = await _read_upload(file)
     cats = db.query(Category).filter(user_filter(Category, user)).all()
     keyword_matcher = KeywordMatcher.from_categories(cats)
     known_categories = [c.name for c in cats]
@@ -206,6 +220,7 @@ async def parse_all_async(
         "error": None,
         "filename": file.filename,
         "created_at": time.time(),
+        "user_id": user.user_id,
     }
     _prune_old_jobs()
     background_tasks.add_task(
@@ -221,9 +236,12 @@ async def parse_all_async(
 
 
 @router.get("/job/{job_id}")
-async def get_import_job(job_id: str) -> Any:
+async def get_import_job(
+    job_id: str,
+    user: UserContext = Depends(get_current_user),
+) -> Any:
     job = _jobs.get(job_id)
-    if not job:
+    if not job or job.get("user_id") != user.user_id:
         raise HTTPException(status_code=404, detail="Job not found or expired.")
     return {
         "job_id": job_id,
