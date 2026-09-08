@@ -25,6 +25,7 @@ from app.core.database import (
     ensure_budget_hidden_categories_schema,
     ensure_local_user_scope_columns,
 )
+from app.core.request_limits import ImportRequestBodyLimitMiddleware
 from app.services.app_settings import ensure_app_settings
 from app.services.recurring_service import process_due_rules
 from app.services.starter_categories import seed_starter_categories
@@ -63,6 +64,7 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
+app.add_middleware(ImportRequestBodyLimitMiddleware)
 
 app.include_router(import_router.router)
 app.include_router(transactions_router.router)

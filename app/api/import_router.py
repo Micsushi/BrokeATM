@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import json
 import time
 import uuid
+from threading import RLock
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
@@ -23,8 +25,14 @@ router = APIRouter(prefix="/api/import", tags=["import"])
 
 _PDF_OFX_EXTS = {".pdf", ".ofx", ".qfx"}
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_ASYNC_JOBS = 32
+MAX_ASYNC_RESULT_BYTES = 4 * 1024 * 1024
+MAX_ASYNC_FILENAME_BYTES = 1024
+MAX_ASYNC_ERROR_BYTES = 8 * 1024
 
 _jobs: dict[str, dict] = {}
+_jobs_lock = RLock()
+_retained_result_bytes = 0
 _JOB_TTL = 3600
 
 
@@ -39,11 +47,101 @@ async def _read_upload(file: UploadFile) -> bytes:
     return content
 
 
+def _truncate_utf8(value: object, max_bytes: int) -> str:
+    text = str(value)
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def _serialize_result(result: object) -> bytes:
+    return json.dumps(
+        result,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+
+
 def _prune_old_jobs() -> None:
+    global _retained_result_bytes
+
     cutoff = time.time() - _JOB_TTL
-    expired = [k for k, v in list(_jobs.items()) if v["created_at"] < cutoff]
-    for k in expired:
-        _jobs.pop(k, None)
+    with _jobs_lock:
+        expired = [
+            k
+            for k, v in list(_jobs.items())
+            if v.get("status") in {"done", "error"} and v["created_at"] < cutoff
+        ]
+        for k in expired:
+            job = _jobs.pop(k, None)
+            if job:
+                _retained_result_bytes -= int(job.get("result_bytes", 0) or 0)
+
+
+def _register_async_job(filename: str, user_id: str | None) -> str:
+    _prune_old_jobs()
+    with _jobs_lock:
+        if len(_jobs) >= MAX_ASYNC_JOBS:
+            raise HTTPException(
+                status_code=429,
+                detail="Too many asynchronous imports are already queued.",
+            )
+        job_id = str(uuid.uuid4())
+        _jobs[job_id] = {
+            "status": "pending",
+            "result": None,
+            "result_bytes": 0,
+            "error": None,
+            "filename": _truncate_utf8(filename, MAX_ASYNC_FILENAME_BYTES),
+            "created_at": time.time(),
+            "user_id": user_id,
+        }
+        return job_id
+
+
+def _store_job_error(job_id: str, error: object) -> None:
+    global _retained_result_bytes
+
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return
+        _retained_result_bytes -= int(job.get("result_bytes", 0) or 0)
+        job["status"] = "error"
+        job["result"] = None
+        job["result_bytes"] = 0
+        job["error"] = _truncate_utf8(error, MAX_ASYNC_ERROR_BYTES)
+
+
+def _store_job_result(job_id: str, result: object) -> None:
+    global _retained_result_bytes
+
+    try:
+        encoded = _serialize_result(result)
+    except (TypeError, ValueError, OverflowError):
+        _store_job_error(job_id, "Import result could not be retained.")
+        return
+
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return
+        if (
+            len(encoded) > MAX_ASYNC_RESULT_BYTES
+            or _retained_result_bytes + len(encoded) > MAX_ASYNC_RESULT_BYTES
+        ):
+            job["status"] = "error"
+            job["result"] = None
+            job["result_bytes"] = 0
+            job["error"] = "Import result exceeded the retention budget."
+            return
+        job["status"] = "done"
+        job["result"] = result
+        job["result_bytes"] = len(encoded)
+        job["error"] = None
+        _retained_result_bytes += len(encoded)
 
 
 async def _run_csv_job(
@@ -64,11 +162,9 @@ async def _run_csv_job(
                 keyword_matcher=keyword_matcher,
             ),
         )
-        _jobs[job_id]["status"] = "done"
-        _jobs[job_id]["result"] = result  # already a dict
+        _store_job_result(job_id, result)
     except Exception as exc:
-        _jobs[job_id]["status"] = "error"
-        _jobs[job_id]["error"] = str(exc)
+        _store_job_error(job_id, exc)
 
 
 async def _run_pdf_job(
@@ -94,11 +190,9 @@ async def _run_pdf_job(
                 known_categories,
             ),
         )
-        _jobs[job_id]["status"] = "done"
-        _jobs[job_id]["result"] = results  # already dicts from _result_to_dict
+        _store_job_result(job_id, results)
     except Exception as exc:
-        _jobs[job_id]["status"] = "error"
-        _jobs[job_id]["error"] = str(exc)
+        _store_job_error(job_id, exc)
 
 
 @router.post("/parse", response_model=ParseResponse)
@@ -171,16 +265,7 @@ async def parse_async_csv(
         db.query(Category).filter(user_filter(Category, user)).all()
     )
     default_currency = get_default_currency(db, user_id=user.user_id)
-    job_id = str(uuid.uuid4())
-    _jobs[job_id] = {
-        "status": "pending",
-        "result": None,
-        "error": None,
-        "filename": file.filename,
-        "created_at": time.time(),
-        "user_id": user.user_id,
-    }
-    _prune_old_jobs()
+    job_id = _register_async_job(file.filename, user.user_id)
     background_tasks.add_task(
         _run_csv_job,
         job_id,
@@ -213,16 +298,7 @@ async def parse_all_async(
     keyword_matcher = KeywordMatcher.from_categories(cats)
     known_categories = [c.name for c in cats]
     currency = get_default_currency(db, user_id=user.user_id)
-    job_id = str(uuid.uuid4())
-    _jobs[job_id] = {
-        "status": "pending",
-        "result": None,
-        "error": None,
-        "filename": file.filename,
-        "created_at": time.time(),
-        "user_id": user.user_id,
-    }
-    _prune_old_jobs()
+    job_id = _register_async_job(file.filename, user.user_id)
     background_tasks.add_task(
         _run_pdf_job,
         job_id,
@@ -240,16 +316,19 @@ async def get_import_job(
     job_id: str,
     user: UserContext = Depends(get_current_user),
 ) -> Any:
-    job = _jobs.get(job_id)
-    if not job or job.get("user_id") != user.user_id:
-        raise HTTPException(status_code=404, detail="Job not found or expired.")
-    return {
-        "job_id": job_id,
-        "status": job["status"],
-        "result": job["result"] if job["status"] == "done" else None,
-        "error": job.get("error") if job["status"] == "error" else None,
-        "filename": job["filename"],
-    }
+    _prune_old_jobs()
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job or job.get("user_id") != user.user_id:
+            raise HTTPException(status_code=404, detail="Job not found or expired.")
+        status = job["status"]
+        return {
+            "job_id": job_id,
+            "status": status,
+            "result": job["result"] if status == "done" else None,
+            "error": job.get("error") if status == "error" else None,
+            "filename": job["filename"],
+        }
 
 
 @router.post("/check-duplicates")
